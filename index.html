@@ -2,13 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>SYGN1L</title>
 
 <style>
-/* =========================
-   BASE THEME
-   ========================= */
 :root{
   --bg0:#020402;
   --bg1:#010701;
@@ -18,160 +15,85 @@
   --danger:#FF3B6B;
   --border:rgba(57,255,106,.25);
   --radius:16px;
-  --shadow:0 10px 22px rgba(0,0,0,.55);
-  --glow:0 0 18px rgba(57,255,106,.25);
 }
 
-html{ background:var(--bg0); -webkit-text-size-adjust:100%; }
-
-body{
+html,body{
   margin:0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background:linear-gradient(180deg,var(--bg1),var(--bg0));
+  font-family:ui-monospace,Menlo,Consolas,monospace;
   color:var(--text);
-  background:
-    radial-gradient(900px 600px at 60% 15%, rgba(57,255,106,.10), transparent 60%),
-    linear-gradient(180deg, var(--bg1), var(--bg0));
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
   touch-action:manipulation;
-  padding:14px 12px calc(24px + env(safe-area-inset-bottom));
 }
 
-/* Mood layers */
-body.mood-calm{}
-body.mood-tense{ filter: saturate(1.05); }
-body.mood-unstable{ filter: saturate(1.12) contrast(1.05); }
-body.mood-hostile{ filter: saturate(1.2) contrast(1.1) hue-rotate(-4deg); }
+body{ padding:14px 12px 40px; }
 
-/* CRT effects */
-body::before{
-  content:"";
-  position:fixed; inset:0;
-  pointer-events:none;
-  background:radial-gradient(1200px 900px at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.65) 100%);
-  z-index:0;
-}
-
-.fx{
-  position:fixed; inset:0; pointer-events:none; z-index:0;
-}
-.fx.scanlines{
-  background:repeating-linear-gradient(
-    to bottom,
-    rgba(57,255,106,.05),
-    rgba(57,255,106,.05) 1px,
-    rgba(0,0,0,0) 4px,
-    rgba(0,0,0,0) 8px
-  );
-  opacity:.25;
-}
-
-.wrap{ position:relative; z-index:1; max-width:860px; margin:0 auto; display:grid; gap:18px; }
+.wrap{ max-width:880px; margin:auto; display:grid; gap:18px; }
 
 .card{
   border:1px solid var(--border);
   border-radius:var(--radius);
-  box-shadow:var(--shadow);
-  background:linear-gradient(180deg, rgba(6,28,12,.62), rgba(3,14,7,.40));
-  overflow:hidden;
+  background:rgba(0,0,0,.45);
+  box-shadow:0 12px 28px rgba(0,0,0,.6);
 }
 
 .pad{ padding:14px; }
 
-h1{ margin:0; letter-spacing:.25em; font-size:18px; }
-.subtitle{ margin-top:6px; font-size:12px; color:var(--muted); }
+h1{ margin:0; letter-spacing:.28em; font-size:18px; }
+.sub{ font-size:12px; color:var(--muted); margin-top:6px; }
 
-/* =========================
-   STATS
-   ========================= */
-.stats{ margin-top:12px; display:grid; grid-template-columns:1fr; gap:10px; }
-@media(min-width:420px){ .stats{ grid-template-columns:repeat(3,1fr); } }
+.stats{ display:grid; gap:10px; margin-top:12px; }
+@media(min-width:420px){ .stats{ grid-template-columns:repeat(4,1fr); } }
 
 .stat{
   border:1px solid rgba(57,255,106,.2);
   border-radius:12px;
   padding:10px;
-  background:rgba(0,0,0,.3);
+  background:rgba(0,0,0,.35);
 }
+.stat.primary{ box-shadow:0 0 20px rgba(57,255,106,.25); }
+.k{ font-size:11px; letter-spacing:.12em; color:var(--muted); }
+.v{ font-size:18px; margin-top:6px; }
 
-.stat.primary{
-  box-shadow:0 0 22px rgba(57,255,106,.25);
-  border-color:rgba(57,255,106,.45);
-}
-
-.stat .k{ font-size:11px; color:var(--muted); letter-spacing:.1em; }
-.stat .v{ margin-top:6px; font-size:18px; }
-
-/* =========================
-   BUTTONS
-   ========================= */
 button{
-  font:inherit;
   border-radius:14px;
-  border:1px solid rgba(57,255,106,.3);
-  background:rgba(57,255,106,.08);
+  border:1px solid rgba(57,255,106,.35);
+  background:rgba(57,255,106,.1);
   color:var(--text);
-  padding:14px;
+  padding:12px;
+  font:inherit;
   cursor:pointer;
-  user-select:none;
-  -webkit-tap-highlight-color:transparent;
-  transition:.15s;
 }
-button:hover{ box-shadow:var(--glow); }
 button:active{ transform:translateY(1px); }
-button:disabled{ opacity:.5; cursor:not-allowed; }
+button.on{ background:rgba(57,255,106,.25); }
+button:disabled{ opacity:.5; }
 
-.big{
-  width:100%;
-  font-weight:900;
-  letter-spacing:.14em;
-  font-size:18px;
-}
+.big{ width:100%; font-weight:900; letter-spacing:.14em; }
 
-/* =========================
-   POPUPS
-   ========================= */
 .popHost{
-  position:fixed;
-  top:12px; left:12px; right:12px;
-  z-index:999;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
+  position:fixed; top:12px; left:12px; right:12px;
+  display:flex; flex-direction:column; gap:10px; z-index:999;
 }
-
 .pop{
   pointer-events:auto;
   cursor:pointer;
-  max-width:860px;
-  margin:0 auto;
-  border:1px solid rgba(57,255,106,.25);
-  border-radius:14px;
+  border:1px solid rgba(57,255,106,.3);
   background:rgba(0,0,0,.75);
-  box-shadow:0 10px 26px rgba(0,0,0,.55);
+  border-radius:14px;
   padding:10px 12px;
-  animation:popin .14s ease-out;
+  animation:popin .15s ease-out;
 }
-
 @keyframes popin{ from{opacity:0;transform:translateY(-6px);} to{opacity:1;} }
 @keyframes popout{ to{opacity:0;transform:translateY(-4px);} }
-
 .pop.fade{ animation:popout .18s forwards; }
-.pop .who{ font-size:10px; letter-spacing:.14em; color:var(--muted); margin-bottom:6px; }
-.pop .msg{ font-size:12px; line-height:1.5; }
+.who{ font-size:10px; letter-spacing:.14em; color:var(--muted); }
+.msg{ font-size:12px; margin-top:6px; line-height:1.45; }
 
-/* =========================
-   FLICKER
-   ========================= */
-@keyframes microflicker{
-  0%{opacity:1;} 40%{opacity:.85;} 100%{opacity:1;}
-}
-.flicker{ animation:microflicker .12s linear; }
+@keyframes flicker{ 0%{opacity:1;}40%{opacity:.82;}100%{opacity:1;} }
+.flicker{ animation:flicker .12s linear; }
 </style>
 </head>
 
-<body class="mood-calm">
-<div class="fx scanlines"></div>
+<body>
 <div class="popHost" id="popHost"></div>
 
 <div class="wrap">
@@ -179,131 +101,114 @@ button:disabled{ opacity:.5; cursor:not-allowed; }
 <header class="card">
   <div class="pad">
     <h1>SYGN1L</h1>
-    <div class="subtitle">THE ARRAY LISTENS.</div>
+    <div class="sub">THE ARRAY LISTENS.</div>
 
     <div class="stats" id="statsRow">
       <div class="stat primary" id="statSignal"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
       <div class="stat" id="statSps"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
       <div class="stat" id="statBw"><div class="k">BANDWIDTH</div><div class="v" id="bw">1.00×</div></div>
+      <div class="stat" id="statStab"><div class="k">STABILITY</div><div class="v" id="stab">100%</div></div>
     </div>
   </div>
 </header>
 
-<section class="card">
-  <div class="pad">
-    <button class="big" id="ping">PING THE VOID</button>
+<section class="card"><div class="pad">
+  <button class="big" id="ping">PING THE VOID</button>
+</div></section>
+
+<section class="card"><div class="pad">
+  <div class="k">CONTAINMENT</div>
+  <div style="display:grid;gap:10px;margin-top:10px;">
+    <button id="filter">FILTER NOISE</button>
+    <button id="suppress">SUPPRESS FEEDBACK</button>
+    <button id="quarantine">QUARANTINE CHANNEL</button>
   </div>
-</section>
+</div></section>
 
 </div>
 
 <script>
-(() => {
-  const $ = id => document.getElementById(id);
+(()=>{
 
-  const state = {
-    signal:0,
-    total:0,
-    sps:0,
-    bandwidth:1,
-    corruption:0,
-    phase:1
+const $=id=>document.getElementById(id);
+const state={
+  signal:0,total:0,sps:0,bandwidth:1,
+  corruption:0,phase:1,
+  toggles:{filter:false,suppress:false,quarantine:false}
+};
+
+function fmt(n){ return n<1000?Math.floor(n):(n/1000).toFixed(1)+"K"; }
+
+function popup(who,msg){
+  const b=document.createElement("div");
+  b.className="pop";
+  b.innerHTML=`<div class="who">${who}</div><div class="msg">${msg}</div>`;
+  $("popHost").prepend(b);
+  let done=false;
+  const close=()=>{ if(done)return; done=true; b.classList.add("fade"); setTimeout(()=>b.remove(),200); };
+  b.onclick=close; setTimeout(close,9000);
+}
+
+function stability(){
+  let s=state.bandwidth*0.4;
+  if(state.toggles.filter) s+=0.25;
+  if(state.toggles.suppress) s+=0.25;
+  if(state.toggles.quarantine) s+=0.35;
+  return Math.min(1,s);
+}
+
+function corruptionBoost(){
+  return 1+(state.corruption*0.8);
+}
+
+function updateUI(){
+  $("signal").textContent=fmt(state.signal);
+  $("sps").textContent=fmt(state.sps);
+  $("bw").textContent=state.bandwidth.toFixed(2)+"×";
+  $("stab").textContent=Math.round(stability()*100)+"%";
+
+  $("filter").classList.toggle("on",state.toggles.filter);
+  $("suppress").classList.toggle("on",state.toggles.suppress);
+  $("quarantine").classList.toggle("on",state.toggles.quarantine);
+}
+
+function maybeFlicker(){
+  const leak=state.corruption*(1-stability());
+  if(Math.random()<leak*0.01){
+    document.body.classList.add("flicker");
+    setTimeout(()=>document.body.classList.remove("flicker"),140);
+  }
+}
+
+$("ping").onclick=()=>{
+  const gain=1*state.bandwidth*corruptionBoost();
+  state.signal+=gain;
+  state.total+=gain;
+  state.sps=Math.max(state.sps,state.signal/10);
+  state.corruption=Math.min(1,state.corruption+0.002);
+
+  if(state.total>50) state.phase=2;
+  if(state.total>200) state.phase=3;
+
+  updateUI();
+  maybeFlicker();
+
+  if(Math.random()<0.06){
+    popup("OPS","Containment holding. For now.");
+  }
+};
+
+["filter","suppress","quarantine"].forEach(id=>{
+  $(id).onclick=()=>{
+    if(state.signal<25) return;
+    state.signal-=25;
+    state.toggles[id]=!state.toggles[id];
+    popup("OPS","Containment layer adjusted.");
+    updateUI();
   };
+});
 
-  function fmt(n){ return n < 1000 ? n.toFixed(0) : (n/1000).toFixed(1)+"K"; }
-
-  function popupComms(who,msg){
-    const box=document.createElement("div");
-    box.className="pop";
-    box.innerHTML=`<div class="who">${who}</div><div class="msg">${msg}</div>`;
-    $("popHost").prepend(box);
-
-    let closed=false;
-    function close(){
-      if(closed) return;
-      closed=true;
-      box.classList.add("fade");
-      setTimeout(()=>box.remove(),200);
-    }
-
-    box.addEventListener("pointerdown",e=>{
-      e.stopPropagation();
-      close();
-    });
-
-    setTimeout(close,9000);
-  }
-
-  function uiMood(){
-    const c=state.corruption;
-    if(c<0.15) return "calm";
-    if(c<0.4) return "tense";
-    if(c<0.75) return "unstable";
-    return "hostile";
-  }
-
-  function applyUiMood(){
-    document.body.className="mood-"+uiMood();
-  }
-
-  function reorderStats(){
-    const row=$("statsRow");
-    const s=$("statSignal");
-    const p=$("statSps");
-    const b=$("statBw");
-
-    s.classList.remove("primary");
-    p.classList.remove("primary");
-    b.classList.remove("primary");
-
-    let order=[s,p,b];
-    let primary=s;
-
-    if(state.phase===2){ order=[p,s,b]; primary=p; }
-    if(state.phase>=3){ order=[b,p,s]; primary=b; }
-
-    order.forEach(el=>row.appendChild(el));
-    primary.classList.add("primary");
-  }
-
-  function labelDrift(){
-    const btn=$("ping");
-    let text="PING THE VOID";
-    if(state.phase>=2) text="LISTEN";
-    if(state.phase>=3) text="ACKNOWLEDGE";
-    if(state.corruption>0.6) text="RESPOND";
-    if(state.corruption>0.85) text="CONFIRM";
-    btn.textContent=text;
-  }
-
-  function maybeFlicker(){
-    if(Math.random() < 0.003 + state.corruption*0.01){
-      document.body.classList.add("flicker");
-      setTimeout(()=>document.body.classList.remove("flicker"),140);
-    }
-  }
-
-  $("ping").onclick = () => {
-    state.signal += 1 * state.bandwidth;
-    state.total += 1;
-    state.sps = Math.max(state.sps, state.signal/10);
-    state.corruption = Math.min(1, state.corruption + 0.002);
-    if(state.total>50) state.phase=2;
-    if(state.total>200) state.phase=3;
-
-    $("signal").textContent = fmt(state.signal);
-    $("sps").textContent = fmt(state.sps);
-    $("bw").textContent = state.bandwidth.toFixed(2)+"×";
-
-    applyUiMood();
-    reorderStats();
-    labelDrift();
-    maybeFlicker();
-
-    if(Math.random()<0.08){
-      popupComms("OPS","Signal coherence shifting. No source lock.");
-    }
-  };
+updateUI();
 
 })();
 </script>
