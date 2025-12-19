@@ -13,7 +13,6 @@
   --border:rgba(57,255,106,.25);
   --radius:16px; --shadow:0 10px 22px rgba(0,0,0,.55);
   --glow:0 0 18px rgba(57,255,106,.25);
-  --glow2:0 0 34px rgba(57,255,106,.14);
 }
 
 html{ background:var(--bg0); -webkit-text-size-adjust:100%; }
@@ -234,14 +233,61 @@ button:disabled{ opacity:.5; cursor:not-allowed; box-shadow:none; }
 canvas#scope{
   display:block;
   width:100%;
-  height:84px; /* CSS height; actual pixels set in JS for crispness */
+  height:84px;
   background:rgba(0,0,0,.25);
+}
+
+/* Popup comm bubbles */
+.popHost{
+  position:fixed;
+  top:12px;
+  left:12px;
+  right:12px;
+  z-index:999;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  pointer-events:none;
+}
+.pop{
+  pointer-events:none;
+  max-width:860px;
+  margin:0 auto;
+  border:1px solid rgba(57,255,106,.25);
+  border-radius:14px;
+  background:rgba(0,0,0,.72);
+  box-shadow:0 10px 26px rgba(0,0,0,.55), 0 0 20px rgba(57,255,106,.15);
+  padding:10px 12px;
+  animation: popin .14s ease-out;
+}
+@keyframes popin{
+  from{ transform:translateY(-6px); opacity:0; }
+  to{ transform:translateY(0); opacity:1; }
+}
+.pop .who{
+  font-size:10px;
+  letter-spacing:.14em;
+  color:rgba(126,219,146,.95);
+  margin-bottom:6px;
+  text-transform:uppercase;
+}
+.pop .msg{
+  font-size:12px;
+  line-height:1.5;
+  color:rgba(207,255,214,.94);
+}
+.pop.fade{
+  animation: popout .18s ease-in forwards;
+}
+@keyframes popout{
+  to{ transform:translateY(-4px); opacity:0; }
 }
 </style>
 </head>
 
 <body>
 <div class="fx scanlines"></div>
+<div class="popHost" id="popHost"></div>
 
 <div class="wrap">
 
@@ -300,6 +346,11 @@ canvas#scope{
         <button id="feedbackBtn">FEEDBACK: ON</button>
       </div>
 
+      <div class="grid2">
+        <button id="aiBtn">DYNAMIC COMMS: ON</button>
+        <span class="chip" id="aiChip">AI: READY</span>
+      </div>
+
       <div class="muted" id="objective">
         OBJECTIVE: ACQUIRE DISH CALIBRATION. REACH 100 TOTAL SIGNAL TO UNLOCK DEEP SCAN.
       </div>
@@ -338,24 +389,23 @@ canvas#scope{
 
 </div>
 
-<!-- Supabase JS (CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
 
-  // Prevent desktop double-click zoom on buttons
+  // Prevent double-click zoom on buttons
   document.addEventListener("dblclick", (e) => {
     if (e.target && e.target.closest("button")) e.preventDefault();
   }, { passive: false });
 
-  // ---------------- Supabase Config (your project)
+  // Supabase Config (yours)
   const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // ---------------- Feedback (vibrate where possible, else tiny click)
+  // ===== Feedback (vibrate if possible, else tiny click)
   let feedbackOn = true;
   let audioCtx = null;
 
@@ -378,7 +428,6 @@ canvas#scope{
       o.stop(t + 0.055);
     } catch(_){}
   }
-
   function hapticPulse(ms=10){
     if (!feedbackOn) return false;
     if (navigator.vibrate){
@@ -387,7 +436,6 @@ canvas#scope{
     }
     return false;
   }
-
   function feedback(el, strength="light"){
     if (el){
       el.classList.remove("flash");
@@ -402,9 +450,10 @@ canvas#scope{
     feedbackOn = !feedbackOn;
     e.currentTarget.textContent = feedbackOn ? "FEEDBACK: ON" : "FEEDBACK: OFF";
     feedback(e.currentTarget, "light");
+    markActive("toggle_feedback");
   };
 
-  // ---------------- Utils
+  // ===== Utils
   function fmt(n){
     if (n < 1000) return n.toFixed(0);
     const units = ["K","M","B","T","Qa","Qi"];
@@ -420,76 +469,88 @@ canvas#scope{
     $(elId).prepend(p);
   }
 
-  // ---------------- State
+  function popupComms(who, msg){
+    const host = $("popHost");
+    const box = document.createElement("div");
+    box.className = "pop";
+    box.innerHTML = `<div class="who">${who}</div><div class="msg">${escapeHtml(msg)}</div>`;
+    host.prepend(box);
+    setTimeout(() => box.classList.add("fade"), 4700);
+    setTimeout(() => box.remove(), 5200);
+  }
+
+  function escapeHtml(s){
+    return String(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  // ===== Activity gating (AI never triggers while idling)
+  let lastUserActionAt = 0;
+  function markActive(reason){
+    lastUserActionAt = Date.now();
+  }
+  // Treat any pointerdown/keydown as “active use”
+  window.addEventListener("pointerdown", () => markActive("pointer"), { passive:true });
+  window.addEventListener("keydown", () => markActive("key"), { passive:true });
+
+  function isActivelyUsed(){
+    // “Active” means a user action in the last 15 seconds
+    return (Date.now() - lastUserActionAt) <= 15000;
+  }
+
+  // ===== State
   const state = {
     build: 1,
     relics: 0,
-
     signal: 0,
     total: 0,
 
     baseSPS: 0,
     clickPower: 1,
-
-    // derived
     bandwidth: 1.0,
     autoPingsPerSec: 0,
 
-    corruption: 0, // 0..1
+    corruption: 0,
     phase: 1,
 
-    flags: {
-      sawPhase2: false,
-      sawPhase3: false,
-      sawPrestigeHint: false
-    },
+    flags: { sawPhase2:false, sawPhase3:false, sawPrestigeHint:false },
 
     upgrades: {
-      dish: 0,
-      probes: 0,
-      scan: 0,
-      tuning: 0,
-      autopinger: 0,
-      echo: 0,
-      dark: 0,
-      lattice: 0,
+      dish: 0, probes: 0, scan: 0, tuning: 0,
+      autopinger: 0, echo: 0, dark: 0, lattice: 0,
       relicAmp: 0
     },
 
-    // save metadata
-    updatedAtMs: 0
-  };
+    updatedAtMs: 0,
 
-  // Expose for visibilitychange autosave
+    // AI comm settings
+    aiEnabled: true,
+    lastAiAtMs: 0
+  };
   window.SYGN1L_STATE = state;
 
-  // ---------------- Upgrades
+  // ===== Upgrades
   const UPG = [
     { id:"dish", name:"DISH CALIBRATION", unlockAt:0, baseCost:10, costMult:1.18,
       desc:"+1 SIGNAL/SEC PER LEVEL.", buy(){ state.upgrades.dish++; } },
-
     { id:"probes", name:"PROBE SWARM", unlockAt:120, baseCost:80, costMult:1.22,
       desc:"+1 CLICK POWER PER LEVEL.", buy(){ state.upgrades.probes++; } },
-
     { id:"scan", name:"DEEP SCAN", unlockAt:100, baseCost:50, costMult:1.25,
       desc:"+10% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.scan++; } },
-
     { id:"tuning", name:"HARMONIC TUNING", unlockAt:240, baseCost:140, costMult:1.27,
       desc:"+0.3 SIGNAL/SEC AND +1% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.tuning++; } },
-
     { id:"autopinger", name:"AUTO-PINGER ROUTINE", unlockAt:600, baseCost:520, costMult:1.30,
       desc:"ADDS AUTO-PINGS/SEC. SCALES WITH PROBES (SYNERGY).", buy(){ state.upgrades.autopinger++; } },
-
     { id:"echo", name:"ECHO INTEGRATOR", unlockAt:1800, baseCost:1400, costMult:1.35,
       desc:"BANDWIDTH BONUS: + (3%*LV) * LOG10(SIGNAL+1).", buy(){ state.upgrades.echo++; } },
-
     { id:"lattice", name:"HARMONIC LATTICE", unlockAt:3500, baseCost:3200, costMult:1.38,
       desc:"SPS MULT: (1 + 0.06*LV*SQRT(CORRUPTION*10)).", buy(){ state.upgrades.lattice++; } },
-
     { id:"dark", name:"DARK LISTENING", unlockAt:7000, baseCost:9000, costMult:1.45,
-      desc:"IF CORRUPTION>30%: GAINS × (1 + 0.12*LV).", buy(){ state.upgrades.dark++; }, },
-
-    // Prestige currency upgrade
+      desc:"IF CORRUPTION>30%: GAINS × (1 + 0.12*LV).", buy(){ state.upgrades.dark++; } },
     { id:"relicAmp", name:"RELIC AMPLIFIER", unlockAt:0, baseCost:3, costMult:1.65, currency:"relics",
       desc:"SPEND RELICS. PER LV: GLOBAL MULT +8% (PERMANENT).", buy(){ state.upgrades.relicAmp++; } }
   ];
@@ -500,7 +561,7 @@ canvas#scope{
     return Math.floor(u.baseCost * Math.pow(u.costMult, lvl));
   }
 
-  // ---------------- Derived math (stable, recomputed)
+  // ===== Derived math
   function computeBaseSPS(){
     return upgradeLevel("dish") * 1.0 + upgradeLevel("tuning") * 0.3;
   }
@@ -547,7 +608,6 @@ canvas#scope{
     state.bandwidth = computeBaseBandwidth() * computeEchoMultiplier() * computeRelicMultiplier();
     state.autoPingsPerSec = computeAutoPingsPerSec();
   }
-
   function computeSPS(){
     return state.baseSPS * state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
   }
@@ -555,7 +615,7 @@ canvas#scope{
     return state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
   }
 
-  // ---------------- Corruption
+  // ===== Corruption
   function updateCorruption(dt){
     const creep = 0.0000025 * Math.log10(state.total + 10);
     const tech = (upgradeLevel("echo") * 0.0000015) + (upgradeLevel("lattice") * 0.0000018) + (upgradeLevel("dark") * 0.0000022);
@@ -570,7 +630,7 @@ canvas#scope{
     return "OVERRUN";
   }
 
-  // ---------------- Objectives & milestones
+  // ===== Objectives & milestones
   function setObjective(text){ $("objective").innerHTML = "OBJECTIVE: " + text; }
 
   function milestoneCheck(){
@@ -612,14 +672,13 @@ canvas#scope{
     }
   }
 
-  // ---------------- Prestige
+  // ===== Prestige
   function prestigeGain(){
     const over = Math.max(0, state.total - 12000);
     const base = 1;
     const extra = Math.floor(Math.sqrt(over / 6000));
     return base + extra;
   }
-
   function doPrestige(){
     const gainRelics = prestigeGain();
     state.relics += gainRelics;
@@ -644,17 +703,16 @@ canvas#scope{
     touchLocalUpdated();
     recomputeDerived();
     updateObjectiveFallback();
-    renderUpgrades();
   }
 
-  // ---------------- Gain
+  // ===== Gain
   function gain(amount){
     state.signal += amount;
     state.total += amount;
   }
 
-  // ---------------- Save Manager (Local + Supabase cloud)
-  const LOCAL_KEY = "sygn1l_cloudsave_v2";
+  // ===== Save Manager (Local + Cloud)
+  const LOCAL_KEY = "sygn1l_cloudsave_v3";
   let userId = null;
   let cloudReady = false;
   let lastCloudSaveAt = 0;
@@ -680,7 +738,6 @@ canvas#scope{
   }
 
   function mergeIntoState(data){
-    // cautious merge to preserve structure
     for (const k in data){
       if (data[k] && typeof data[k] === "object" && state[k] && typeof state[k] === "object"){
         Object.assign(state[k], data[k]);
@@ -706,7 +763,7 @@ canvas#scope{
     } catch(err){
       cloudReady = false;
       $("syncChip").textContent = "SYNC: OFFLINE";
-      pushLog("log","SYS","CLOUD SYNC UNAVAILABLE (OFFLINE OR AUTH BLOCKED). LOCAL MODE ACTIVE.");
+      pushLog("log","SYS","CLOUD SYNC UNAVAILABLE. LOCAL MODE ACTIVE.");
       return null;
     }
   }
@@ -738,7 +795,7 @@ canvas#scope{
     if (!cloudReady || !userId) return false;
 
     const now = Date.now();
-    if (!force && (now - lastCloudSaveAt) < 60000) return false; // 60s throttle
+    if (!force && (now - lastCloudSaveAt) < 60000) return false;
     lastCloudSaveAt = now;
 
     try{
@@ -763,10 +820,7 @@ canvas#scope{
   }
 
   async function initSaves(){
-    // Step A: load local immediately (fast)
     const hasLocal = loadLocal();
-
-    // Step B: sign in anon + attempt cloud load
     await ensureSession();
     const cloud = await loadCloud();
 
@@ -776,7 +830,6 @@ canvas#scope{
         mergeIntoState(cloud.cloudState);
         pushLog("log","SYS","CLOUD SAVE LOADED (NEWER THAN LOCAL).");
       } else if (cloudReady) {
-        // local is newer: push it up once
         await saveCloud(true);
         pushLog("log","SYS","LOCAL SAVE PUSHED TO CLOUD (NEWER).");
       }
@@ -789,23 +842,87 @@ canvas#scope{
         pushLog("comms","DR KESS","We’re not mining a signal. We’re excavating intent.");
       }
     }
-
-    recomputeDerived();
-    updateObjectiveFallback();
-    renderUpgrades();
-    renderHUD();
   }
 
-  // Save on backgrounding
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden"){
-      // best effort, no await
       saveLocal();
       saveCloud(true);
     }
   });
 
-  // ---------------- Rendering HUD + Upgrades
+  // ===== AI integration (via Supabase Edge Function)
+  // IMPORTANT: AI messages are gated:
+  // - only on user actions (never from the idle loop)
+  // - max once per 3 minutes
+  // - only if "active use" in last 15 seconds
+  const AI_COOLDOWN_MS = 180000;
+
+  function setAiChip(text){ $("aiChip").textContent = text; }
+
+  $("aiBtn").onclick = (e) => {
+    state.aiEnabled = !state.aiEnabled;
+    e.currentTarget.textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
+    setAiChip(state.aiEnabled ? "AI: READY" : "AI: DISABLED");
+    touchLocalUpdated();
+    saveLocal();
+    feedback(e.currentTarget, "light");
+    markActive("toggle_ai");
+  };
+
+  function aiReadyNow(){
+    if (!state.aiEnabled) return false;
+    if (!cloudReady) return false; // edge invoke needs auth; you can relax this later if you want
+    if (!isActivelyUsed()) return false;
+    const now = Date.now();
+    if ((now - (state.lastAiAtMs || 0)) < AI_COOLDOWN_MS) return false;
+    return true;
+  }
+
+  async function maybeAiComms(eventName, speakerHint){
+    // NEVER call from idle ticks; only call from user actions.
+    if (!aiReadyNow()) return;
+
+    // Set immediately to prevent double-fire if user taps quickly
+    state.lastAiAtMs = Date.now();
+    touchLocalUpdated();
+    saveLocal();
+
+    setAiChip("AI: THINKING");
+
+    try{
+      // Send compact state summary. Keep this small.
+      const payload = {
+        event: eventName,
+        speaker_hint: speakerHint || "OPS",
+        phase: state.phase,
+        build: state.build,
+        signal: Math.floor(state.signal),
+        total: Math.floor(state.total),
+        sps: Math.floor(computeSPS()),
+        bandwidth: Number(state.bandwidth.toFixed(2)),
+        corruption: Number(state.corruption.toFixed(3))
+      };
+
+      const { data, error } = await supabase.functions.invoke("sygn1l-comms", { body: payload });
+      if (error) throw error;
+
+      const who = data?.who || speakerHint || "COMMS";
+      const msg = data?.text || "…";
+
+      // Popup + log
+      popupComms(who, msg);
+      pushLog("comms", who, msg);
+
+      setAiChip("AI: READY");
+    } catch(err){
+      // If it fails, we back off but keep the cooldown (prevents spam)
+      setAiChip("AI: OFFLINE");
+      pushLog("log","SYS","AI COMMS FAILED. (EDGE FUNCTION OR KEY NOT CONFIGURED)");
+    }
+  }
+
+  // ===== UI render
   function renderHUD(){
     $("signal").textContent = fmt(state.signal);
     $("sps").textContent = fmt(computeSPS());
@@ -825,6 +942,12 @@ canvas#scope{
 
     updateScopeLabel();
   }
+
+  // ===== Locked buttons fix
+  // Instead of rendering upgrades only once, we refresh them periodically.
+  // This guarantees affordability state matches current signal.
+  let upgradesRefreshAcc = 0;
+  const UPGRADES_REFRESH_EVERY = 0.25; // seconds
 
   function renderUpgrades(){
     const root = $("upgrades");
@@ -868,6 +991,7 @@ canvas#scope{
 
       btn.onclick = async () => {
         if (!affordable) return;
+        markActive("buy_upgrade");
         feedback(btn, "light");
 
         if (currency === "relics") state.relics -= cost;
@@ -876,9 +1000,14 @@ canvas#scope{
         u.buy();
         touchLocalUpdated();
         recomputeDerived();
-        renderUpgrades();
+        renderHUD();
+        renderUpgrades(); // immediate refresh
         saveLocal();
         await saveCloud(false);
+
+        // AI: upgrade purchase is a great “alive” moment
+        // We keep it rare: only if cooldown allows.
+        await maybeAiComms("buy_upgrade:" + u.id, u.id === "dark" ? "MOTHERLINE" : "OPS");
       };
 
       row.appendChild(meta);
@@ -887,62 +1016,65 @@ canvas#scope{
     }
   }
 
-  // ---------------- Controls
+  // ===== Controls
   $("ping").addEventListener("click", async (e) => {
+    markActive("ping");
     feedback(e.currentTarget, "light");
+
     gain(state.clickPower * globalMultiplier());
     state.corruption = clamp(state.corruption + 0.0006, 0, 1);
 
-    // autosave lightly (local always, cloud throttled)
+    touchLocalUpdated();
+    renderHUD();
+    renderUpgrades(); // immediate afford refresh feels snappy
     saveLocal();
     await saveCloud(false);
+
+    // AI: small chance on ping, gated by cooldown and active use
+    if (Math.random() < 0.10) {
+      await maybeAiComms("ping_void", "OPS");
+    }
   }, { passive:true });
 
   $("prestige").onclick = async (e) => {
     if (e.currentTarget.disabled) return;
+    markActive("prestige");
     feedback(e.currentTarget, "strong");
+
     doPrestige();
     renderHUD();
+    renderUpgrades();
     saveLocal();
     await saveCloud(true);
+
+    await maybeAiComms("rite_reset", "MOTHERLINE");
   };
 
   $("save").onclick = async (e) => {
+    markActive("manual_save");
     feedback(e.currentTarget, "light");
     saveLocal();
-    const ok = await saveCloud(true);
-    $("syncChip").textContent = ok ? "SYNC: CLOUD+LOCAL" : $("syncChip").textContent;
+    await saveCloud(true);
     pushLog("log","SYS","STATE SAVED.");
+    await maybeAiComms("manual_save", "OPS");
   };
 
   $("wipe").onclick = async (e) => {
+    markActive("wipe");
     feedback(e.currentTarget, "strong");
-    // Local wipe
     localStorage.removeItem(LOCAL_KEY);
-
-    // Cloud wipe (best effort: set blank state)
     if (cloudReady && userId){
-      try{
-        await supabase.from("saves").delete().eq("player_id", userId);
-      } catch(_){}
+      try{ await supabase.from("saves").delete().eq("player_id", userId); } catch(_){}
     }
-
     location.reload();
   };
 
-  // ---------------- Array Scope (Noise -> Signal lock)
+  // ===== Array Scope (Noise -> Signal lock)
   const scope = $("scope");
   const ctx = scope.getContext("2d", { alpha: false });
-
-  // internal resolution set on resize
   let sw = 0, sh = 0, dpr = 1;
 
-  // A slowly-evolving “signature” that stabilizes with progress
-  const signature = {
-    cols: [],
-    vel: [],
-    phase: 0
-  };
+  const signature = { cols: [], vel: [], phase: 0 };
 
   function resizeScope(){
     dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
@@ -959,11 +1091,9 @@ canvas#scope{
     signature.vel  = new Array(cols).fill(0);
     signature.phase = 0;
   }
-
   window.addEventListener("resize", resizeScope);
 
   function lockValue(){
-    // lock rises with bandwidth, sps and total, but is harmed by corruption
     const bw = state.bandwidth;
     const sps = computeSPS();
     const t = state.total;
@@ -975,14 +1105,12 @@ canvas#scope{
     const corrupted = raw * (1 - 0.55*state.corruption);
     return clamp(corrupted, 0, 1);
   }
-
   function updateScopeLabel(){
     const lk = lockValue();
     $("scopeLabel").textContent = "LOCK: " + Math.round(lk * 100) + "%";
   }
 
   function rand01(seed){
-    // deterministic-ish hash
     seed = (seed ^ 0x6D2B79F5) >>> 0;
     seed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
     seed ^= seed + Math.imul(seed ^ (seed >>> 7), 61 | seed);
@@ -995,15 +1123,12 @@ canvas#scope{
     const lk = lockValue();
     const corr = state.corruption;
 
-    // background
     ctx.fillStyle = "rgb(0,0,0)";
     ctx.fillRect(0,0,sw,sh);
 
-    // noise intensity drops as lock improves, but corruption re-injects it
     const noiseAmt = clamp(0.85 - 0.70*lk + 0.35*corr, 0.15, 0.95);
     const spikeProb = clamp(0.04 + 0.36*lk + 0.10*(state.bandwidth-1)/4, 0.04, 0.70);
 
-    // signature evolves: stabilizes with lock, destabilizes with corruption
     const cols = signature.cols.length;
     signature.phase += dt * (0.6 + 1.8*lk) * (1 + 0.8*corr);
 
@@ -1012,7 +1137,6 @@ canvas#scope{
       const chaos = (rand01((timeMs|0) + i*9973) - 0.5) * (0.45 + 0.9*corr);
       const target = base + chaos;
 
-      // smoothing: higher lock = more stable, higher corruption = less stable
       const stiffness = 0.08 + 0.22*lk;
       const damping = 0.82 - 0.35*corr;
 
@@ -1020,14 +1144,11 @@ canvas#scope{
       signature.cols[i] += signature.vel[i];
     }
 
-    // draw noise scan
     const midY = Math.floor(sh * 0.60);
-    const px = Math.max(1, Math.floor(dpr)); // pixel size
-
-    // phosphor green
+    const px = Math.max(1, Math.floor(dpr));
     const baseG = 190;
+
     for (let y=0;y<sh;y+=px){
-      // faint horizontal falloff
       const lineFade = 0.72 + 0.28*Math.sin((y/sh)*Math.PI);
       for (let x=0;x<sw;x+=px){
         const n = rand01((x*131 + y*977 + (timeMs|0))|0);
@@ -1039,7 +1160,6 @@ canvas#scope{
       }
     }
 
-    // waveform / spikes
     ctx.lineWidth = Math.max(1, 1*dpr);
     ctx.strokeStyle = "rgba(57,255,106,0.85)";
     ctx.beginPath();
@@ -1048,14 +1168,12 @@ canvas#scope{
       const x = Math.floor((i/(cols-1)) * (sw-1));
       const s = signature.cols[i];
 
-      // focused “spike height” increases with lock
       const focus = lk;
       const spike = (rand01((timeMs|0) + i*71) < spikeProb) ? 1 : 0;
 
       const spikeH = spike * (0.15 + 0.85*focus) * (0.75 + 0.25*Math.abs(s));
       const noiseH = (s * (0.35 + 0.65*(1-focus))) * 0.35;
 
-      // corruption smear: add echo/ghost
       const echo = corr > 0.28 ? (0.10 + 0.35*corr) * Math.sin(signature.phase*2 + i*0.12) : 0;
 
       const y = midY - (spikeH + noiseH + echo) * (sh * 0.70);
@@ -1064,14 +1182,12 @@ canvas#scope{
     }
     ctx.stroke();
 
-    // glow pass
     ctx.globalCompositeOperation = "lighter";
     ctx.strokeStyle = "rgba(57,255,106,0.18)";
     ctx.lineWidth = Math.max(2, 3*dpr);
     ctx.stroke();
     ctx.globalCompositeOperation = "source-over";
 
-    // corruption artifacts: vertical tearing lines
     if (corr > 0.45){
       const tears = Math.floor(2 + 8*corr);
       for (let t=0;t<tears;t++){
@@ -1082,13 +1198,12 @@ canvas#scope{
       }
     }
 
-    // border inner
     ctx.strokeStyle = "rgba(57,255,106,0.18)";
     ctx.lineWidth = Math.max(1, 1*dpr);
     ctx.strokeRect(Math.floor(0.5*dpr), Math.floor(0.5*dpr), sw - Math.floor(1*dpr), sh - Math.floor(1*dpr));
   }
 
-  // ---------------- Boot narrative
+  // ===== Init narrative
   function bootNarrativeIfEmpty(){
     if ($("log").children.length === 0){
       pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
@@ -1097,7 +1212,7 @@ canvas#scope{
     }
   }
 
-  // ---------------- Main loop
+  // ===== Main loop (NO AI calls here)
   let last = performance.now();
 
   function loop(now){
@@ -1106,11 +1221,9 @@ canvas#scope{
 
     recomputeDerived();
 
-    // passive SPS
     const sps = computeSPS();
     if (sps > 0) gain(sps * dt);
 
-    // auto pings
     if (state.autoPingsPerSec > 0){
       const pings = state.autoPingsPerSec * dt;
       gain(pings * (state.clickPower * globalMultiplier()));
@@ -1119,36 +1232,45 @@ canvas#scope{
     updateCorruption(dt);
     milestoneCheck();
 
-    // UI
     renderHUD();
 
-    // scope draw ~30fps: skip every other frame on heavy devices
+    // periodic upgrades refresh (LOCK FIX)
+    upgradesRefreshAcc += dt;
+    if (upgradesRefreshAcc >= UPGRADES_REFRESH_EVERY){
+      upgradesRefreshAcc = 0;
+      renderUpgrades();
+    }
+
     drawScope(dt, now|0);
 
     requestAnimationFrame(loop);
   }
 
-  // ---------------- Init
+  // ===== Startup render
   function renderUpfront(){
+    // sync AI UI
+    $("aiBtn").textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
+    setAiChip(state.aiEnabled ? "AI: READY" : "AI: DISABLED");
+
     recomputeDerived();
-    renderUpgrades();
     updateObjectiveFallback();
     renderHUD();
+    renderUpgrades();
     bootNarrativeIfEmpty();
   }
 
-  // set up scope canvas
+  // ===== Start
   resizeScope();
-
-  // Start: render quickly, then init saves (cloud may arrive)
   renderUpfront();
-  initSaves().then(() => {
+
+  initSaves().then(async () => {
     recomputeDerived();
-    renderUpgrades();
-    renderHUD();
+    renderUpfront();
     pushLog("log","SYS","SAVE SYSTEM ONLINE: LOCAL + CLOUD (WHEN AVAILABLE).");
+    // AI readiness
+    setAiChip(cloudReady ? (state.aiEnabled ? "AI: READY" : "AI: DISABLED") : "AI: OFFLINE");
   }).catch(() => {
-    // still fine, local mode
+    setAiChip("AI: OFFLINE");
   }).finally(() => {
     requestAnimationFrame(loop);
   });
