@@ -1,9 +1,10 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
 <title>SYGN1L</title>
+
 <style>
 :root{
   --bg0:#020402; --bg1:#010701;
@@ -53,7 +54,7 @@ body::before{
 
 .wrap{
   position:relative; z-index:1;
-  max-width:780px; margin:0 auto;
+  max-width:860px; margin:0 auto;
   display:grid; gap:18px;
 }
 
@@ -90,7 +91,7 @@ h1{ margin:0; letter-spacing:.25em; font-size:18px; }
   padding:10px;
   background:rgba(0,0,0,.30);
 }
-.stat .k{ font-size:11px; color:var(--muted); letter-spacing:.10em; }
+.stat .k{ font-size:11px; color:var(--muted); letter-spacing:.10em; text-transform:uppercase; }
 .stat .v{ margin-top:6px; font-size:18px; overflow-wrap:anywhere; text-shadow:0 0 10px rgba(57,255,106,.10); }
 
 .hd{
@@ -109,6 +110,7 @@ h1{ margin:0; letter-spacing:.25em; font-size:18px; }
   font-size:10px; letter-spacing:.14em;
   display:inline-flex; align-items:center; gap:8px;
   background:rgba(0,0,0,.22);
+  white-space:nowrap;
 }
 .dot{ width:8px;height:8px;border-radius:50%; background:var(--accent); box-shadow:var(--glow); }
 
@@ -155,7 +157,6 @@ button:disabled{ opacity:.5; cursor:not-allowed; box-shadow:none; }
   background:linear-gradient(90deg, rgba(57,255,106,.55), rgba(57,255,106,.20));
   box-shadow:0 0 18px rgba(57,255,106,.20);
 }
-
 .fill.danger{
   background:linear-gradient(90deg, rgba(255,59,107,.55), rgba(255,59,107,.18));
   box-shadow:0 0 18px rgba(255,59,107,.18);
@@ -207,10 +208,34 @@ button:disabled{ opacity:.5; cursor:not-allowed; box-shadow:none; }
   to{ box-shadow:none; }
 }
 
-hr.sep{
-  border:none; height:1px;
-  background:rgba(57,255,106,.18);
-  margin:10px 0 0;
+/* Array Scope canvas panel */
+.scopeWrap{
+  margin-top:10px;
+  border:1px solid rgba(57,255,106,.22);
+  border-radius:12px;
+  background:rgba(0,0,0,.35);
+  overflow:hidden;
+}
+.scopeTop{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:8px 10px;
+  border-bottom:1px solid rgba(57,255,106,.14);
+  font-size:10px;
+  letter-spacing:.12em;
+  color:rgba(207,255,214,.92);
+}
+.scopeMeta{
+  color:var(--muted);
+  letter-spacing:.10em;
+  text-transform:uppercase;
+}
+canvas#scope{
+  display:block;
+  width:100%;
+  height:84px; /* CSS height; actual pixels set in JS for crispness */
+  background:rgba(0,0,0,.25);
 }
 </style>
 </head>
@@ -231,6 +256,14 @@ hr.sep{
         <div class="stat"><div class="k">BANDWIDTH</div><div class="v" id="bw">1.00×</div></div>
       </div>
 
+      <div class="scopeWrap">
+        <div class="scopeTop">
+          <div>ARRAY SCOPE</div>
+          <div class="scopeMeta" id="scopeLabel">LOCK: 0%</div>
+        </div>
+        <canvas id="scope"></canvas>
+      </div>
+
       <div style="height:10px"></div>
       <div class="stat">
         <div class="k">CORRUPTION</div>
@@ -248,7 +281,10 @@ hr.sep{
         <span class="chip" id="buildChip">BUILD: 1</span>
         <span class="chip" id="relicChip">RELICS: 0</span>
       </div>
-      <span class="chip" id="saveState">NO LINK</span>
+      <div>
+        <span class="chip" id="syncChip">SYNC: LOCAL</span>
+        <span class="chip" id="userChip">USER: ----</span>
+      </div>
     </div>
 
     <div class="pad">
@@ -261,7 +297,7 @@ hr.sep{
 
       <div class="grid2">
         <button id="prestige" disabled>RITE RESET (LOCKED)</button>
-        <button id="mute">FEEDBACK: ON</button>
+        <button id="feedbackBtn">FEEDBACK: ON</button>
       </div>
 
       <div class="muted" id="objective">
@@ -302,6 +338,9 @@ hr.sep{
 
 </div>
 
+<!-- Supabase JS (CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -311,7 +350,12 @@ hr.sep{
     if (e.target && e.target.closest("button")) e.preventDefault();
   }, { passive: false });
 
-  // ---------------- Feedback (best possible in browser)
+  // ---------------- Supabase Config (your project)
+  const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ---------------- Feedback (vibrate where possible, else tiny click)
   let feedbackOn = true;
   let audioCtx = null;
 
@@ -332,7 +376,7 @@ hr.sep{
       g.gain.exponentialRampToValueAtTime(0.028, t + 0.006);
       g.gain.exponentialRampToValueAtTime(0.00001, t + 0.050);
       o.stop(t + 0.055);
-    }catch(_){}
+    } catch(_){}
   }
 
   function hapticPulse(ms=10){
@@ -350,14 +394,14 @@ hr.sep{
       void el.offsetWidth;
       el.classList.add("flash");
     }
-    const h = strength === "strong" ? hapticPulse(18) : hapticPulse(10);
+    const h = (strength === "strong") ? hapticPulse(18) : hapticPulse(10);
     if (!h) tinyClickSound();
   }
 
-  $("mute").onclick = (e) => {
+  $("feedbackBtn").onclick = (e) => {
     feedbackOn = !feedbackOn;
-    e.target.textContent = feedbackOn ? "FEEDBACK: ON" : "FEEDBACK: OFF";
-    feedback(e.target, "light");
+    e.currentTarget.textContent = feedbackOn ? "FEEDBACK: ON" : "FEEDBACK: OFF";
+    feedback(e.currentTarget, "light");
   };
 
   // ---------------- Utils
@@ -368,7 +412,6 @@ hr.sep{
     while (n >= 1000 && u < units.length-1){ n /= 1000; u++; }
     return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + units[u];
   }
-
   function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
 
   function pushLog(elId, tag, msg){
@@ -377,7 +420,7 @@ hr.sep{
     $(elId).prepend(p);
   }
 
-  // ---------------- Core State
+  // ---------------- State
   const state = {
     build: 1,
     relics: 0,
@@ -388,12 +431,11 @@ hr.sep{
     baseSPS: 0,
     clickPower: 1,
 
-    // derived each frame
+    // derived
     bandwidth: 1.0,
     autoPingsPerSec: 0,
 
     corruption: 0, // 0..1
-
     phase: 1,
 
     flags: {
@@ -412,150 +454,86 @@ hr.sep{
       dark: 0,
       lattice: 0,
       relicAmp: 0
-    }
+    },
+
+    // save metadata
+    updatedAtMs: 0
   };
 
-  // ---------------- Upgrades with algorithmic effects + unlock milestones
+  // Expose for visibilitychange autosave
+  window.SYGN1L_STATE = state;
+
+  // ---------------- Upgrades
   const UPG = [
-    {
-      id:"dish",
-      name:"DISH CALIBRATION",
-      unlockAt: 0,
-      baseCost: 10,
-      costMult: 1.18,
-      desc: "+1 SIGNAL/SEC PER LEVEL.",
-      buy(){ state.upgrades.dish++; }
-    },
-    {
-      id:"probes",
-      name:"PROBE SWARM",
-      unlockAt: 120,
-      baseCost: 80,
-      costMult: 1.22,
-      desc: "+1 CLICK POWER PER LEVEL.",
-      buy(){ state.upgrades.probes++; }
-    },
-    {
-      id:"scan",
-      name:"DEEP SCAN",
-      unlockAt: 100,
-      baseCost: 50,
-      costMult: 1.25,
-      desc: "+10% BASE BANDWIDTH PER LEVEL.",
-      buy(){ state.upgrades.scan++; }
-    },
-    {
-      id:"tuning",
-      name:"HARMONIC TUNING",
-      unlockAt: 240,
-      baseCost: 140,
-      costMult: 1.27,
-      desc: "+0.3 SIGNAL/SEC AND +1% BASE BANDWIDTH PER LEVEL.",
-      buy(){ state.upgrades.tuning++; }
-    },
+    { id:"dish", name:"DISH CALIBRATION", unlockAt:0, baseCost:10, costMult:1.18,
+      desc:"+1 SIGNAL/SEC PER LEVEL.", buy(){ state.upgrades.dish++; } },
 
-    // Algorithmic + synergy
-    {
-      id:"autopinger",
-      name:"AUTO-PINGER ROUTINE",
-      unlockAt: 600,
-      baseCost: 520,
-      costMult: 1.30,
-      desc: "ADDS AUTO-PINGS/SEC. SCALES WITH PROBES (SYNERGY).",
-      buy(){ state.upgrades.autopinger++; }
-    },
-    {
-      id:"echo",
-      name:"ECHO INTEGRATOR",
-      unlockAt: 1800,
-      baseCost: 1400,
-      costMult: 1.35,
-      desc: "BANDWIDTH GAINS BONUS: + (3% * LV) * LOG10(SIGNAL+1).",
-      buy(){ state.upgrades.echo++; }
-    },
-    {
-      id:"lattice",
-      name:"HARMONIC LATTICE",
-      unlockAt: 3500,
-      baseCost: 3200,
-      costMult: 1.38,
-      desc: "SPS MULTIPLIES BY (1 + 0.06*LV*SQRT(CORRUPTION*10)).",
-      buy(){ state.upgrades.lattice++; }
-    },
-    {
-      id:"dark",
-      name:"DARK LISTENING",
-      unlockAt: 7000,
-      baseCost: 9000,
-      costMult: 1.45,
-      desc: "IF CORRUPTION > 30%, GLOBAL GAINS × (1 + 0.12*LV).",
-      buy(){ state.upgrades.dark++; }
-    },
+    { id:"probes", name:"PROBE SWARM", unlockAt:120, baseCost:80, costMult:1.22,
+      desc:"+1 CLICK POWER PER LEVEL.", buy(){ state.upgrades.probes++; } },
 
-    // Prestige-only permanent-ish upgrade
-    {
-      id:"relicAmp",
-      name:"RELIC AMPLIFIER",
-      unlockAt: 0, // but we gate in render by requiring relics > 0
-      baseCost: 3, // costs RELICS
-      costMult: 1.65,
-      desc: "SPEND RELICS. PER LEVEL: GLOBAL MULTIPLIER +8% (PERMANENT).",
-      currency: "relics",
-      buy(){ state.upgrades.relicAmp++; }
-    }
+    { id:"scan", name:"DEEP SCAN", unlockAt:100, baseCost:50, costMult:1.25,
+      desc:"+10% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.scan++; } },
+
+    { id:"tuning", name:"HARMONIC TUNING", unlockAt:240, baseCost:140, costMult:1.27,
+      desc:"+0.3 SIGNAL/SEC AND +1% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.tuning++; } },
+
+    { id:"autopinger", name:"AUTO-PINGER ROUTINE", unlockAt:600, baseCost:520, costMult:1.30,
+      desc:"ADDS AUTO-PINGS/SEC. SCALES WITH PROBES (SYNERGY).", buy(){ state.upgrades.autopinger++; } },
+
+    { id:"echo", name:"ECHO INTEGRATOR", unlockAt:1800, baseCost:1400, costMult:1.35,
+      desc:"BANDWIDTH BONUS: + (3%*LV) * LOG10(SIGNAL+1).", buy(){ state.upgrades.echo++; } },
+
+    { id:"lattice", name:"HARMONIC LATTICE", unlockAt:3500, baseCost:3200, costMult:1.38,
+      desc:"SPS MULT: (1 + 0.06*LV*SQRT(CORRUPTION*10)).", buy(){ state.upgrades.lattice++; } },
+
+    { id:"dark", name:"DARK LISTENING", unlockAt:7000, baseCost:9000, costMult:1.45,
+      desc:"IF CORRUPTION>30%: GAINS × (1 + 0.12*LV).", buy(){ state.upgrades.dark++; }, },
+
+    // Prestige currency upgrade
+    { id:"relicAmp", name:"RELIC AMPLIFIER", unlockAt:0, baseCost:3, costMult:1.65, currency:"relics",
+      desc:"SPEND RELICS. PER LV: GLOBAL MULT +8% (PERMANENT).", buy(){ state.upgrades.relicAmp++; } }
   ];
 
   function upgradeLevel(id){ return state.upgrades[id] || 0; }
-
   function upgradeCost(u){
     const lvl = upgradeLevel(u.id);
-    const base = u.baseCost;
-    const mult = u.costMult;
-    return Math.floor(base * Math.pow(mult, lvl));
+    return Math.floor(u.baseCost * Math.pow(u.costMult, lvl));
   }
 
-  // ---------------- Derived math (kept stable, not compounding)
+  // ---------------- Derived math (stable, recomputed)
   function computeBaseSPS(){
     return upgradeLevel("dish") * 1.0 + upgradeLevel("tuning") * 0.3;
   }
-
   function computeClickPower(){
     return 1 + upgradeLevel("probes") * 1.0;
   }
-
   function computeBaseBandwidth(){
-    // base bandwidth from scan/tuning
     let bw = 1.0;
     bw *= Math.pow(1.10, upgradeLevel("scan"));
     bw *= Math.pow(1.01, upgradeLevel("tuning"));
     return bw;
   }
-
   function computeEchoMultiplier(){
     const lv = upgradeLevel("echo");
     if (lv <= 0) return 1.0;
     const logBonus = Math.log10(state.signal + 1);
     return 1 + (0.03 * lv * logBonus);
   }
-
   function computeRelicMultiplier(){
     const lv = upgradeLevel("relicAmp");
     return 1 + 0.08 * lv;
   }
-
   function computeLatticeMultiplier(){
     const lv = upgradeLevel("lattice");
     if (lv <= 0) return 1.0;
     const term = Math.sqrt(clamp(state.corruption,0,1) * 10);
     return 1 + 0.06 * lv * term;
   }
-
   function computeDarkMultiplier(){
     const lv = upgradeLevel("dark");
     if (lv <= 0) return 1.0;
     return state.corruption > 0.30 ? (1 + 0.12 * lv) : 1.0;
   }
-
   function computeAutoPingsPerSec(){
     const lv = upgradeLevel("autopinger");
     if (lv <= 0) return 0;
@@ -573,24 +551,17 @@ hr.sep{
   function computeSPS(){
     return state.baseSPS * state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
   }
-
   function globalMultiplier(){
-    // Used for click + auto too
     return state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
   }
 
-  // ---------------- Corruption system
-  // Increases slowly with total earned and with certain “forbidden” upgrades
+  // ---------------- Corruption
   function updateCorruption(dt){
-    // baseline creep: depends on total progress
-    const creep = 0.0000025 * Math.log10(state.total + 10); // slow
-    // tech creep: higher when you have echo/dark/lattice
+    const creep = 0.0000025 * Math.log10(state.total + 10);
     const tech = (upgradeLevel("echo") * 0.0000015) + (upgradeLevel("lattice") * 0.0000018) + (upgradeLevel("dark") * 0.0000022);
-    // pressing the void “invites” it: tiny increase per second while active
     const invite = 0.0000010;
     state.corruption = clamp(state.corruption + (creep + tech + invite) * dt, 0, 1);
   }
-
   function corruptionLabel(c){
     if (c < 0.10) return "DORMANT";
     if (c < 0.30) return "WHISPERING";
@@ -599,39 +570,32 @@ hr.sep{
     return "OVERRUN";
   }
 
-  // ---------------- Narrative milestones & objectives
+  // ---------------- Objectives & milestones
   function setObjective(text){ $("objective").innerHTML = "OBJECTIVE: " + text; }
 
   function milestoneCheck(){
-    // Phase II
     if (!state.flags.sawPhase2 && state.total >= 500){
       state.flags.sawPhase2 = true;
       state.phase = Math.max(state.phase, 2);
       $("phase").textContent = "PHASE II";
       $("status").textContent = "ARRAY: DRIFT";
-
-      pushLog("log", "SYS", "PHASE II ENGAGED. THE ARRAY BEGINS RETURN TRANSMISSIONS.");
-      pushLog("comms", "LT VANCE", "If this thing talks back, we log it. If it begs, we mute it.");
+      pushLog("log","SYS","PHASE II ENGAGED. THE ARRAY BEGINS RETURN TRANSMISSIONS.");
+      pushLog("comms","LT VANCE","If this thing talks back, we log it. If it begs, we mute it.");
       setObjective("REACH 600 TOTAL SIGNAL TO UNLOCK AUTO-PINGER ROUTINE. INCREASE SIGNAL/SEC.");
     }
-
-    // Phase III
     if (!state.flags.sawPhase3 && state.total >= 1800){
       state.flags.sawPhase3 = true;
       state.phase = Math.max(state.phase, 3);
       $("phase").textContent = "PHASE III";
       $("status").textContent = "ARRAY: ACTIVE";
-
-      pushLog("log", "SYS", "PHASE III: RESPONSE PATTERNS DETECTED. NOT RANDOM. NOT FRIENDLY.");
-      pushLog("comms", "DR KESS", "It’s not a signal. It’s an instruction set pretending to be noise.");
+      pushLog("log","SYS","PHASE III: RESPONSE PATTERNS DETECTED. NOT RANDOM. NOT FRIENDLY.");
+      pushLog("comms","DR KESS","It’s not a signal. It’s an instruction set pretending to be noise.");
       setObjective("REACH 3500 TOTAL SIGNAL TO UNLOCK HARMONIC LATTICE. WATCH CORRUPTION.");
     }
-
-    // Prestige hint
     if (!state.flags.sawPrestigeHint && state.total >= 9000){
       state.flags.sawPrestigeHint = true;
-      pushLog("comms", "OPS", "We can reset the Array and keep the residue. Call it a Rite. We’ll call it insurance.");
-      pushLog("log", "SYS", "RITE RESET PROTOCOL DISCOVERED. RELICS MAY PERSIST BETWEEN BUILDS.");
+      pushLog("comms","OPS","We can reset the Array and keep the residue. Call it a Rite. We’ll call it insurance.");
+      pushLog("log","SYS","RITE RESET PROTOCOL DISCOVERED. RELICS MAY PERSIST BETWEEN BUILDS.");
       setObjective("REACH 12,000 TOTAL SIGNAL TO UNLOCK RITE RESET.");
     }
   }
@@ -648,7 +612,200 @@ hr.sep{
     }
   }
 
-  // ---------------- Rendering
+  // ---------------- Prestige
+  function prestigeGain(){
+    const over = Math.max(0, state.total - 12000);
+    const base = 1;
+    const extra = Math.floor(Math.sqrt(over / 6000));
+    return base + extra;
+  }
+
+  function doPrestige(){
+    const gainRelics = prestigeGain();
+    state.relics += gainRelics;
+    state.build += 1;
+
+    pushLog("log","SYS",`RITE RESET EXECUTED. +${gainRelics} RELICS RECOVERED.`);
+    pushLog("comms","MOTHERLINE","THE ARRAY FORGETS. YOU DO NOT.");
+
+    const keepRelicAmp = state.upgrades.relicAmp || 0;
+
+    state.signal = 0;
+    state.total = 0;
+    state.corruption = Math.max(0, state.corruption * 0.25);
+    state.phase = 1;
+    state.flags.sawPhase2 = false;
+    state.flags.sawPhase3 = false;
+    state.flags.sawPrestigeHint = false;
+
+    for (const k in state.upgrades) state.upgrades[k] = 0;
+    state.upgrades.relicAmp = keepRelicAmp;
+
+    touchLocalUpdated();
+    recomputeDerived();
+    updateObjectiveFallback();
+    renderUpgrades();
+  }
+
+  // ---------------- Gain
+  function gain(amount){
+    state.signal += amount;
+    state.total += amount;
+  }
+
+  // ---------------- Save Manager (Local + Supabase cloud)
+  const LOCAL_KEY = "sygn1l_cloudsave_v2";
+  let userId = null;
+  let cloudReady = false;
+  let lastCloudSaveAt = 0;
+
+  function touchLocalUpdated(){
+    state.updatedAtMs = Date.now();
+  }
+
+  function saveLocal(){
+    touchLocalUpdated();
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
+    $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
+  }
+
+  function loadLocal(){
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if (!raw) return false;
+    try{
+      const data = JSON.parse(raw);
+      mergeIntoState(data);
+      return true;
+    }catch(_){ return false; }
+  }
+
+  function mergeIntoState(data){
+    // cautious merge to preserve structure
+    for (const k in data){
+      if (data[k] && typeof data[k] === "object" && state[k] && typeof state[k] === "object"){
+        Object.assign(state[k], data[k]);
+      } else {
+        state[k] = data[k];
+      }
+    }
+  }
+
+  async function ensureSession(){
+    try{
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session){
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) throw error;
+        session = data.session;
+      }
+      userId = session.user.id;
+      $("userChip").textContent = "USER: " + userId.slice(0, 4) + "…" + userId.slice(-4);
+      cloudReady = true;
+      $("syncChip").textContent = "SYNC: CLOUD";
+      return userId;
+    } catch(err){
+      cloudReady = false;
+      $("syncChip").textContent = "SYNC: OFFLINE";
+      pushLog("log","SYS","CLOUD SYNC UNAVAILABLE (OFFLINE OR AUTH BLOCKED). LOCAL MODE ACTIVE.");
+      return null;
+    }
+  }
+
+  async function loadCloud(){
+    if (!cloudReady || !userId) return null;
+    try{
+      const { data, error } = await supabase
+        .from("saves")
+        .select("state, updated_at")
+        .eq("player_id", userId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data || !data.state) return null;
+
+      const cloudState = data.state;
+      const cloudUpdatedMs = cloudState.updatedAtMs || (data.updated_at ? Date.parse(data.updated_at) : 0);
+      return { cloudState, cloudUpdatedMs };
+    } catch(err){
+      $("syncChip").textContent = "SYNC: OFFLINE";
+      cloudReady = false;
+      pushLog("log","SYS","CLOUD LOAD FAILED. CONTINUING LOCAL.");
+      return null;
+    }
+  }
+
+  async function saveCloud(force=false){
+    if (!cloudReady || !userId) return false;
+
+    const now = Date.now();
+    if (!force && (now - lastCloudSaveAt) < 60000) return false; // 60s throttle
+    lastCloudSaveAt = now;
+
+    try{
+      touchLocalUpdated();
+      const payload = {
+        player_id: userId,
+        updated_at: new Date().toISOString(),
+        state: JSON.parse(JSON.stringify(state))
+      };
+
+      const { error } = await supabase.from("saves").upsert(payload);
+      if (error) throw error;
+
+      $("syncChip").textContent = "SYNC: CLOUD+LOCAL";
+      return true;
+    } catch(err){
+      $("syncChip").textContent = "SYNC: OFFLINE";
+      cloudReady = false;
+      pushLog("log","SYS","CLOUD SAVE FAILED. LOCAL CONTINUES.");
+      return false;
+    }
+  }
+
+  async function initSaves(){
+    // Step A: load local immediately (fast)
+    const hasLocal = loadLocal();
+
+    // Step B: sign in anon + attempt cloud load
+    await ensureSession();
+    const cloud = await loadCloud();
+
+    if (cloud && cloud.cloudState){
+      const localUpdated = state.updatedAtMs || 0;
+      if (cloud.cloudUpdatedMs > localUpdated){
+        mergeIntoState(cloud.cloudState);
+        pushLog("log","SYS","CLOUD SAVE LOADED (NEWER THAN LOCAL).");
+      } else if (cloudReady) {
+        // local is newer: push it up once
+        await saveCloud(true);
+        pushLog("log","SYS","LOCAL SAVE PUSHED TO CLOUD (NEWER).");
+      }
+    } else {
+      if (hasLocal){
+        pushLog("log","SYS","LOCAL SAVE LOADED.");
+      } else {
+        pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
+        pushLog("comms","OPS","Start small. Ping it. If it answers, don’t answer back.");
+        pushLog("comms","DR KESS","We’re not mining a signal. We’re excavating intent.");
+      }
+    }
+
+    recomputeDerived();
+    updateObjectiveFallback();
+    renderUpgrades();
+    renderHUD();
+  }
+
+  // Save on backgrounding
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden"){
+      // best effort, no await
+      saveLocal();
+      saveCloud(true);
+    }
+  });
+
+  // ---------------- Rendering HUD + Upgrades
   function renderHUD(){
     $("signal").textContent = fmt(state.signal);
     $("sps").textContent = fmt(computeSPS());
@@ -660,12 +817,13 @@ hr.sep{
     $("corrFill").style.width = (c*100).toFixed(1) + "%";
     $("corrText").textContent = (c*100).toFixed(1) + "% (" + corruptionLabel(c) + ")";
 
-    // Prestige availability
     const canPrestige = state.total >= 12000;
-    const gain = prestigeGain();
+    const gainR = prestigeGain();
     const btn = $("prestige");
     btn.disabled = !canPrestige;
-    btn.textContent = canPrestige ? `RITE RESET (+${gain} RELICS)` : "RITE RESET (LOCKED)";
+    btn.textContent = canPrestige ? `RITE RESET (+${gainR} RELICS)` : "RITE RESET (LOCKED)";
+
+    updateScopeLabel();
   }
 
   function renderUpgrades(){
@@ -673,10 +831,7 @@ hr.sep{
     root.innerHTML = "";
 
     for (const u of UPG){
-      // Relic Amplifier is hidden until you have at least 1 relic OR already bought
-      if (u.id === "relicAmp" && (state.relics <= 0 && upgradeLevel("relicAmp") === 0)){
-        continue;
-      }
+      if (u.id === "relicAmp" && (state.relics <= 0 && upgradeLevel("relicAmp") === 0)) continue;
 
       const unlocked = state.total >= u.unlockAt;
       const lvl = upgradeLevel(u.id);
@@ -711,7 +866,7 @@ hr.sep{
       btn.textContent = unlocked ? (affordable ? "ACQUIRE" : "LOCKED") : "CLASSIFIED";
       btn.disabled = !affordable;
 
-      btn.onclick = () => {
+      btn.onclick = async () => {
         if (!affordable) return;
         feedback(btn, "light");
 
@@ -719,8 +874,11 @@ hr.sep{
         else state.signal -= cost;
 
         u.buy();
+        touchLocalUpdated();
         recomputeDerived();
         renderUpgrades();
+        saveLocal();
+        await saveCloud(false);
       };
 
       row.appendChild(meta);
@@ -729,115 +887,219 @@ hr.sep{
     }
   }
 
-  // ---------------- Core gain
-  function gain(amount){
-    state.signal += amount;
-    state.total += amount;
-  }
-
-  // ---------------- Prestige
-  function prestigeGain(){
-    // Smooth scaling: 0 until 12k, then grows with sqrt
-    const over = Math.max(0, state.total - 12000);
-    const base = 1;
-    const extra = Math.floor(Math.sqrt(over / 6000)); // grows slowly
-    return base + extra;
-  }
-
-  function doPrestige(){
-    const gainRelics = prestigeGain();
-    state.relics += gainRelics;
-    state.build += 1;
-
-    pushLog("log", "SYS", `RITE RESET EXECUTED. +${gainRelics} RELICS RECOVERED.`);
-    pushLog("comms", "MOTHERLINE", "THE ARRAY FORGETS. YOU DO NOT.");
-    pushLog("comms", "LT VANCE", "New build. Same void. Keep your hands inside the protocol.");
-
-    // Reset progression, keep relics + relic amplifier levels (permanent)
-    const keepRelicAmp = state.upgrades.relicAmp || 0;
-
-    state.signal = 0;
-    state.total = 0;
-    state.corruption = Math.max(0, state.corruption * 0.25); // residue remains
-    state.phase = 1;
-    state.flags.sawPhase2 = false;
-    state.flags.sawPhase3 = false;
-    state.flags.sawPrestigeHint = false;
-
-    // wipe upgrades except relicAmp
-    for (const k in state.upgrades) state.upgrades[k] = 0;
-    state.upgrades.relicAmp = keepRelicAmp;
-
-    recomputeDerived();
-    updateObjectiveFallback();
-    renderUpgrades();
-  }
-
   // ---------------- Controls
-  $("ping").addEventListener("click", (e) => {
+  $("ping").addEventListener("click", async (e) => {
     feedback(e.currentTarget, "light");
     gain(state.clickPower * globalMultiplier());
-    // small “invitation” bump
     state.corruption = clamp(state.corruption + 0.0006, 0, 1);
+
+    // autosave lightly (local always, cloud throttled)
+    saveLocal();
+    await saveCloud(false);
   }, { passive:true });
 
-  $("prestige").onclick = (e) => {
+  $("prestige").onclick = async (e) => {
     if (e.currentTarget.disabled) return;
     feedback(e.currentTarget, "strong");
     doPrestige();
+    renderHUD();
+    saveLocal();
+    await saveCloud(true);
   };
 
-  // Save/Load
-  const KEY = "sygn1l_full_v1";
-
-  $("save").onclick = (e) => {
+  $("save").onclick = async (e) => {
     feedback(e.currentTarget, "light");
-    localStorage.setItem(KEY, JSON.stringify(state));
-    $("saveState").textContent = "LOCAL SAVE";
-    pushLog("log", "SYS", "STATE SAVED. THE ARRAY PERSISTS BETWEEN SESSIONS.");
+    saveLocal();
+    const ok = await saveCloud(true);
+    $("syncChip").textContent = ok ? "SYNC: CLOUD+LOCAL" : $("syncChip").textContent;
+    pushLog("log","SYS","STATE SAVED.");
   };
 
-  $("wipe").onclick = (e) => {
+  $("wipe").onclick = async (e) => {
     feedback(e.currentTarget, "strong");
-    localStorage.removeItem(KEY);
+    // Local wipe
+    localStorage.removeItem(LOCAL_KEY);
+
+    // Cloud wipe (best effort: set blank state)
+    if (cloudReady && userId){
+      try{
+        await supabase.from("saves").delete().eq("player_id", userId);
+      } catch(_){}
+    }
+
     location.reload();
   };
 
-  function load(){
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return false;
-    try{
-      const data = JSON.parse(raw);
-      // shallow merge, keep structure
-      for (const k in data){
-        if (typeof data[k] === "object" && data[k] && state[k]){
-          Object.assign(state[k], data[k]);
-        } else {
-          state[k] = data[k];
-        }
-      }
-      return true;
-    }catch(_){ return false; }
+  // ---------------- Array Scope (Noise -> Signal lock)
+  const scope = $("scope");
+  const ctx = scope.getContext("2d", { alpha: false });
+
+  // internal resolution set on resize
+  let sw = 0, sh = 0, dpr = 1;
+
+  // A slowly-evolving “signature” that stabilizes with progress
+  const signature = {
+    cols: [],
+    vel: [],
+    phase: 0
+  };
+
+  function resizeScope(){
+    dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const cssW = scope.clientWidth || 300;
+    const cssH = 84;
+    scope.style.height = cssH + "px";
+    scope.width = Math.floor(cssW * dpr);
+    scope.height = Math.floor(cssH * dpr);
+    sw = scope.width;
+    sh = scope.height;
+
+    const cols = Math.max(120, Math.floor(sw / (2 * dpr)));
+    signature.cols = new Array(cols).fill(0);
+    signature.vel  = new Array(cols).fill(0);
+    signature.phase = 0;
   }
 
-  // Boot narrative
-  const loaded = load();
-  if (!loaded){
-    pushLog("log", "SYS", "SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
-    pushLog("comms", "OPS", "Start small. Ping it. If it answers, don’t answer back.");
-    pushLog("comms", "DR KESS", "We’re not mining a signal. We’re excavating intent.");
-  } else {
-    pushLog("log", "SYS", "RECOVERED PRIOR STATE. THE ARRAY RESUMES LISTENING.");
-    pushLog("comms", "MOTHERLINE", "WELCOME BACK. THE INTERVAL NEVER ENDED.");
+  window.addEventListener("resize", resizeScope);
+
+  function lockValue(){
+    // lock rises with bandwidth, sps and total, but is harmed by corruption
+    const bw = state.bandwidth;
+    const sps = computeSPS();
+    const t = state.total;
+
+    const a = clamp(Math.log10(t + 1) / 5, 0, 1);
+    const b = clamp((bw - 1) / 4, 0, 1);
+    const c = clamp(Math.log10(sps + 1) / 4, 0, 1);
+    const raw = (0.45*a + 0.35*b + 0.20*c);
+    const corrupted = raw * (1 - 0.55*state.corruption);
+    return clamp(corrupted, 0, 1);
+  }
+
+  function updateScopeLabel(){
+    const lk = lockValue();
+    $("scopeLabel").textContent = "LOCK: " + Math.round(lk * 100) + "%";
+  }
+
+  function rand01(seed){
+    // deterministic-ish hash
+    seed = (seed ^ 0x6D2B79F5) >>> 0;
+    seed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    seed ^= seed + Math.imul(seed ^ (seed >>> 7), 61 | seed);
+    return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
+  }
+
+  function drawScope(dt, timeMs){
+    if (!sw || !sh) return;
+
+    const lk = lockValue();
+    const corr = state.corruption;
+
+    // background
+    ctx.fillStyle = "rgb(0,0,0)";
+    ctx.fillRect(0,0,sw,sh);
+
+    // noise intensity drops as lock improves, but corruption re-injects it
+    const noiseAmt = clamp(0.85 - 0.70*lk + 0.35*corr, 0.15, 0.95);
+    const spikeProb = clamp(0.04 + 0.36*lk + 0.10*(state.bandwidth-1)/4, 0.04, 0.70);
+
+    // signature evolves: stabilizes with lock, destabilizes with corruption
+    const cols = signature.cols.length;
+    signature.phase += dt * (0.6 + 1.8*lk) * (1 + 0.8*corr);
+
+    for (let i=0;i<cols;i++){
+      const base = Math.sin(signature.phase + i*0.07) * 0.25;
+      const chaos = (rand01((timeMs|0) + i*9973) - 0.5) * (0.45 + 0.9*corr);
+      const target = base + chaos;
+
+      // smoothing: higher lock = more stable, higher corruption = less stable
+      const stiffness = 0.08 + 0.22*lk;
+      const damping = 0.82 - 0.35*corr;
+
+      signature.vel[i] = signature.vel[i]*damping + (target - signature.cols[i]) * stiffness;
+      signature.cols[i] += signature.vel[i];
+    }
+
+    // draw noise scan
+    const midY = Math.floor(sh * 0.60);
+    const px = Math.max(1, Math.floor(dpr)); // pixel size
+
+    // phosphor green
+    const baseG = 190;
+    for (let y=0;y<sh;y+=px){
+      // faint horizontal falloff
+      const lineFade = 0.72 + 0.28*Math.sin((y/sh)*Math.PI);
+      for (let x=0;x<sw;x+=px){
+        const n = rand01((x*131 + y*977 + (timeMs|0))|0);
+        if (n < noiseAmt){
+          const v = Math.floor((baseG + 55*n) * lineFade);
+          ctx.fillStyle = `rgb(0,${v},0)`;
+          ctx.fillRect(x,y,px,px);
+        }
+      }
+    }
+
+    // waveform / spikes
+    ctx.lineWidth = Math.max(1, 1*dpr);
+    ctx.strokeStyle = "rgba(57,255,106,0.85)";
+    ctx.beginPath();
+
+    for (let i=0;i<cols;i++){
+      const x = Math.floor((i/(cols-1)) * (sw-1));
+      const s = signature.cols[i];
+
+      // focused “spike height” increases with lock
+      const focus = lk;
+      const spike = (rand01((timeMs|0) + i*71) < spikeProb) ? 1 : 0;
+
+      const spikeH = spike * (0.15 + 0.85*focus) * (0.75 + 0.25*Math.abs(s));
+      const noiseH = (s * (0.35 + 0.65*(1-focus))) * 0.35;
+
+      // corruption smear: add echo/ghost
+      const echo = corr > 0.28 ? (0.10 + 0.35*corr) * Math.sin(signature.phase*2 + i*0.12) : 0;
+
+      const y = midY - (spikeH + noiseH + echo) * (sh * 0.70);
+      if (i===0) ctx.moveTo(x,y);
+      else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    // glow pass
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = "rgba(57,255,106,0.18)";
+    ctx.lineWidth = Math.max(2, 3*dpr);
+    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+
+    // corruption artifacts: vertical tearing lines
+    if (corr > 0.45){
+      const tears = Math.floor(2 + 8*corr);
+      for (let t=0;t<tears;t++){
+        const x = Math.floor(rand01((timeMs|0) + t*99991) * sw);
+        const w = Math.max(1, Math.floor(dpr));
+        ctx.fillStyle = `rgba(255,59,107,${0.04 + 0.08*corr})`;
+        ctx.fillRect(x, 0, w, sh);
+      }
+    }
+
+    // border inner
+    ctx.strokeStyle = "rgba(57,255,106,0.18)";
+    ctx.lineWidth = Math.max(1, 1*dpr);
+    ctx.strokeRect(Math.floor(0.5*dpr), Math.floor(0.5*dpr), sw - Math.floor(1*dpr), sh - Math.floor(1*dpr));
+  }
+
+  // ---------------- Boot narrative
+  function bootNarrativeIfEmpty(){
+    if ($("log").children.length === 0){
+      pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
+      pushLog("comms","OPS","Start small. Ping it. If it answers, don’t answer back.");
+      pushLog("comms","DR KESS","We’re not mining a signal. We’re excavating intent.");
+    }
   }
 
   // ---------------- Main loop
-  recomputeDerived();
-  renderUpgrades();
-  updateObjectiveFallback();
-  renderHUD();
-
   let last = performance.now();
+
   function loop(now){
     const dt = Math.min(0.05, (now - last)/1000);
     last = now;
@@ -848,7 +1110,7 @@ hr.sep{
     const sps = computeSPS();
     if (sps > 0) gain(sps * dt);
 
-    // auto pings: they act like fractional “clicks”
+    // auto pings
     if (state.autoPingsPerSec > 0){
       const pings = state.autoPingsPerSec * dt;
       gain(pings * (state.clickPower * globalMultiplier()));
@@ -856,12 +1118,41 @@ hr.sep{
 
     updateCorruption(dt);
     milestoneCheck();
+
+    // UI
     renderHUD();
-    renderUpgrades();
+
+    // scope draw ~30fps: skip every other frame on heavy devices
+    drawScope(dt, now|0);
 
     requestAnimationFrame(loop);
   }
-  requestAnimationFrame(loop);
+
+  // ---------------- Init
+  function renderUpfront(){
+    recomputeDerived();
+    renderUpgrades();
+    updateObjectiveFallback();
+    renderHUD();
+    bootNarrativeIfEmpty();
+  }
+
+  // set up scope canvas
+  resizeScope();
+
+  // Start: render quickly, then init saves (cloud may arrive)
+  renderUpfront();
+  initSaves().then(() => {
+    recomputeDerived();
+    renderUpgrades();
+    renderHUD();
+    pushLog("log","SYS","SAVE SYSTEM ONLINE: LOCAL + CLOUD (WHEN AVAILABLE).");
+  }).catch(() => {
+    // still fine, local mode
+  }).finally(() => {
+    requestAnimationFrame(loop);
+  });
+
 })();
 </script>
 </body>
