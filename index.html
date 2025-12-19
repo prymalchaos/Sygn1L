@@ -1,29 +1,21 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
 <title>SYGN1L</title>
 
 <style>
-/* =========================
-   BASE THEME
-   ========================= */
 :root{
-  --bg0:#020402;
-  --bg1:#010701;
-  --text:#CFFFD6;
-  --muted:#7EDB92;
-  --accent:#39FF6A;
-  --danger:#FF3B6B;
+  --bg0:#020402; --bg1:#010701;
+  --text:#CFFFD6; --muted:#7EDB92;
+  --accent:#39FF6A; --danger:#FF3B6B;
   --border:rgba(57,255,106,.25);
-  --radius:16px;
-  --shadow:0 10px 22px rgba(0,0,0,.55);
+  --radius:16px; --shadow:0 10px 22px rgba(0,0,0,.55);
   --glow:0 0 18px rgba(57,255,106,.25);
 }
 
 html{ background:var(--bg0); -webkit-text-size-adjust:100%; }
-
 body{
   margin:0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -37,24 +29,31 @@ body{
   padding:14px 12px calc(24px + env(safe-area-inset-bottom));
 }
 
-/* Mood layers */
-body.mood-calm{}
-body.mood-tense{ filter: saturate(1.05); }
-body.mood-unstable{ filter: saturate(1.12) contrast(1.05); }
-body.mood-hostile{ filter: saturate(1.2) contrast(1.1) hue-rotate(-4deg); }
+/* Mood layers (subtle) */
+body.mood-calm{ filter:none; }
+body.mood-tense{ filter:saturate(1.04) contrast(1.01); }
+body.mood-unstable{ filter:saturate(1.08) contrast(1.04); }
+body.mood-hostile{ filter:saturate(1.12) contrast(1.06) hue-rotate(-5deg); }
 
-/* CRT effects */
+/* Micro-flicker (very short) */
+@keyframes microflicker{
+  0%{ opacity:1; }
+  35%{ opacity:.84; }
+  100%{ opacity:1; }
+}
+.flicker{ animation: microflicker .12s linear; }
+
+/* CRT vignette */
 body::before{
   content:"";
   position:fixed; inset:0;
   pointer-events:none;
-  background:radial-gradient(1200px 900px at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.65) 100%);
+  background: radial-gradient(1200px 900px at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.65) 100%);
   z-index:0;
 }
 
-.fx{
-  position:fixed; inset:0; pointer-events:none; z-index:0;
-}
+/* scanlines */
+.fx{ position:fixed; inset:0; pointer-events:none; z-index:0; }
 .fx.scanlines{
   background:repeating-linear-gradient(
     to bottom,
@@ -63,10 +62,14 @@ body::before{
     rgba(0,0,0,0) 4px,
     rgba(0,0,0,0) 8px
   );
-  opacity:.25;
+  opacity:.24;
 }
 
-.wrap{ position:relative; z-index:1; max-width:860px; margin:0 auto; display:grid; gap:18px; }
+.wrap{
+  position:relative; z-index:1;
+  max-width:860px; margin:0 auto;
+  display:grid; gap:18px;
+}
 
 .card{
   border:1px solid var(--border);
@@ -74,41 +77,64 @@ body::before{
   box-shadow:var(--shadow);
   background:linear-gradient(180deg, rgba(6,28,12,.62), rgba(3,14,7,.40));
   overflow:hidden;
+  position:relative;
+}
+.card::after{
+  content:"";
+  position:absolute; inset:-2px;
+  pointer-events:none;
+  box-shadow: inset 0 0 0 1px rgba(57,255,106,.08), inset 0 0 22px rgba(57,255,106,.06);
 }
 
-.pad{ padding:14px; }
+.pad{ padding:14px; position:relative; }
 
 h1{ margin:0; letter-spacing:.25em; font-size:18px; }
-.subtitle{ margin-top:6px; font-size:12px; color:var(--muted); }
+.subtitle{ margin-top:6px; font-size:12px; color:var(--muted); letter-spacing:.06em; }
 
-/* =========================
-   STATS
-   ========================= */
-.stats{ margin-top:12px; display:grid; grid-template-columns:1fr; gap:10px; }
-@media(min-width:420px){ .stats{ grid-template-columns:repeat(3,1fr); } }
+.stats{
+  margin-top:12px;
+  display:grid; grid-template-columns:1fr;
+  gap:10px;
+}
+@media(min-width:420px){ .stats{ grid-template-columns:repeat(4,1fr); } }
 
 .stat{
   border:1px solid rgba(57,255,106,.2);
   border-radius:12px;
   padding:10px;
-  background:rgba(0,0,0,.3);
+  background:rgba(0,0,0,.30);
 }
-
 .stat.primary{
-  box-shadow:0 0 22px rgba(57,255,106,.25);
+  box-shadow:0 0 22px rgba(57,255,106,.20);
   border-color:rgba(57,255,106,.45);
 }
+.stat .k{ font-size:11px; color:var(--muted); letter-spacing:.10em; text-transform:uppercase; }
+.stat .v{ margin-top:6px; font-size:18px; overflow-wrap:anywhere; text-shadow:0 0 10px rgba(57,255,106,.10); }
 
-.stat .k{ font-size:11px; color:var(--muted); letter-spacing:.1em; }
-.stat .v{ margin-top:6px; font-size:18px; }
+.hd{
+  display:flex; justify-content:space-between; align-items:center;
+  flex-wrap:wrap; gap:10px;
+  padding:12px 14px;
+  border-bottom:1px solid rgba(57,255,106,.2);
+  background:linear-gradient(180deg, rgba(0,0,0,.22), rgba(0,0,0,0));
+  position:relative;
+}
 
-/* =========================
-   BUTTONS
-   ========================= */
+.chip{
+  border:1px solid rgba(57,255,106,.25);
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:10px; letter-spacing:.14em;
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(0,0,0,.22);
+  white-space:nowrap;
+}
+.dot{ width:8px;height:8px;border-radius:50%; background:var(--accent); box-shadow:var(--glow); }
+
 button{
   font:inherit;
   border-radius:14px;
-  border:1px solid rgba(57,255,106,.3);
+  border:1px solid rgba(57,255,106,.32);
   background:rgba(57,255,106,.08);
   color:var(--text);
   padding:14px;
@@ -119,54 +145,173 @@ button{
 }
 button:hover{ box-shadow:var(--glow); }
 button:active{ transform:translateY(1px); }
-button:disabled{ opacity:.5; cursor:not-allowed; }
+button:disabled{ opacity:.5; cursor:not-allowed; box-shadow:none; }
 
 .big{
   width:100%;
   font-weight:900;
   letter-spacing:.14em;
   font-size:18px;
+  padding:18px 14px;
+  background:linear-gradient(180deg, rgba(57,255,106,.16), rgba(57,255,106,.06));
+  box-shadow: inset 0 0 0 1px rgba(57,255,106,.10);
 }
 
-/* =========================
-   POPUPS
-   ========================= */
+.grid2{ display:grid; gap:10px; margin-top:12px; }
+@media(min-width:420px){ .grid2{ grid-template-columns:1fr 1fr; } }
+
+.muted{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.45; }
+
+.bar{
+  height:10px; border-radius:999px;
+  border:1px solid rgba(57,255,106,.22);
+  background:rgba(0,0,0,.28);
+  overflow:hidden;
+}
+.fill{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg, rgba(57,255,106,.55), rgba(57,255,106,.20));
+  box-shadow:0 0 18px rgba(57,255,106,.20);
+}
+.fill.danger{
+  background:linear-gradient(90deg, rgba(255,59,107,.55), rgba(255,59,107,.18));
+  box-shadow:0 0 18px rgba(255,59,107,.18);
+}
+
+.upgrades{ display:flex; flex-direction:column; gap:12px; }
+.up{
+  border:1px solid rgba(57,255,106,.2);
+  border-radius:14px;
+  padding:12px;
+  background:rgba(0,0,0,.30);
+  display:flex; flex-wrap:wrap;
+  gap:12px; align-items:center;
+  position:relative;
+}
+.up.affordable{ box-shadow:var(--glow); }
+.up.locked{ opacity:.60; border-style:dashed; }
+
+.up .meta{ flex:1; min-width:220px; }
+.up .name{ font-weight:900; letter-spacing:.04em; }
+.up .desc,.up .cost{ font-size:12px; margin-top:6px; color:var(--muted); }
+.up .cost{ color:rgba(207,255,214,.90); }
+
+.log{
+  max-height:320px;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.log p{
+  margin:0 0 10px;
+  font-size:12px;
+  line-height:1.55;
+  color:rgba(207,255,214,.88);
+}
+.tag{
+  display:inline-block;
+  padding:2px 8px;
+  border:1px solid rgba(57,255,106,.22);
+  border-radius:999px;
+  font-size:10px;
+  letter-spacing:.10em;
+  color:rgba(207,255,214,.95);
+  margin-right:8px;
+}
+
+.flash{ animation:flash .18s ease-out; }
+@keyframes flash{
+  from{ box-shadow:0 0 30px rgba(57,255,106,.6); }
+  to{ box-shadow:none; }
+}
+
+/* Array Scope canvas panel */
+.scopeWrap{
+  margin-top:10px;
+  border:1px solid rgba(57,255,106,.22);
+  border-radius:12px;
+  background:rgba(0,0,0,.35);
+  overflow:hidden;
+}
+.scopeTop{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
+  padding:8px 10px;
+  border-bottom:1px solid rgba(57,255,106,.14);
+  font-size:10px;
+  letter-spacing:.12em;
+  color:rgba(207,255,214,.92);
+}
+.scopeMeta{
+  color:var(--muted);
+  letter-spacing:.10em;
+  text-transform:uppercase;
+}
+canvas#scope{
+  display:block;
+  width:100%;
+  height:84px;
+  background:rgba(0,0,0,.25);
+}
+
+/* Containment panel */
+.toggleGrid{ display:grid; gap:10px; margin-top:10px; }
+@media(min-width:420px){ .toggleGrid{ grid-template-columns:1fr 1fr; } }
+.toggleBtn.on{
+  background:linear-gradient(180deg, rgba(57,255,106,.22), rgba(57,255,106,.06));
+  box-shadow:0 0 18px rgba(57,255,106,.18);
+  border-color:rgba(57,255,106,.45);
+}
+.toggleBtn.affordable{ box-shadow:var(--glow); }
+.smallHint{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.45; }
+
+/* Popup comm bubbles */
 .popHost{
   position:fixed;
-  top:12px; left:12px; right:12px;
+  top:12px;
+  left:12px;
+  right:12px;
   z-index:999;
   display:flex;
   flex-direction:column;
   gap:10px;
+  pointer-events:none;
 }
-
 .pop{
-  pointer-events:auto;
+  pointer-events:auto; /* allow tap */
   cursor:pointer;
   max-width:860px;
   margin:0 auto;
   border:1px solid rgba(57,255,106,.25);
   border-radius:14px;
-  background:rgba(0,0,0,.75);
-  box-shadow:0 10px 26px rgba(0,0,0,.55);
+  background:rgba(0,0,0,.72);
+  box-shadow:0 10px 26px rgba(0,0,0,.55), 0 0 20px rgba(57,255,106,.15);
   padding:10px 12px;
-  animation:popin .14s ease-out;
+  animation: popin .14s ease-out;
 }
-
-@keyframes popin{ from{opacity:0;transform:translateY(-6px);} to{opacity:1;} }
-@keyframes popout{ to{opacity:0;transform:translateY(-4px);} }
-
-.pop.fade{ animation:popout .18s forwards; }
-.pop .who{ font-size:10px; letter-spacing:.14em; color:var(--muted); margin-bottom:6px; }
-.pop .msg{ font-size:12px; line-height:1.5; }
-
-/* =========================
-   FLICKER
-   ========================= */
-@keyframes microflicker{
-  0%{opacity:1;} 40%{opacity:.85;} 100%{opacity:1;}
+@keyframes popin{
+  from{ transform:translateY(-6px); opacity:0; }
+  to{ transform:translateY(0); opacity:1; }
 }
-.flicker{ animation:microflicker .12s linear; }
+.pop .who{
+  font-size:10px;
+  letter-spacing:.14em;
+  color:rgba(126,219,146,.95);
+  margin-bottom:6px;
+  text-transform:uppercase;
+}
+.pop .msg{
+  font-size:12px;
+  line-height:1.5;
+  color:rgba(207,255,214,.94);
+}
+.pop.fade{
+  animation: popout .18s ease-in forwards;
+}
+@keyframes popout{
+  to{ transform:translateY(-4px); opacity:0; }
+}
 </style>
 </head>
 
@@ -176,134 +321,1264 @@ button:disabled{ opacity:.5; cursor:not-allowed; }
 
 <div class="wrap">
 
-<header class="card">
-  <div class="pad">
-    <h1>SYGN1L</h1>
-    <div class="subtitle">THE ARRAY LISTENS.</div>
+  <header class="card">
+    <div class="pad">
+      <h1>SYGN1L</h1>
+      <div class="subtitle">THE ARRAY LISTENS. THE VOID REPLIES IN ARITHMETIC.</div>
 
-    <div class="stats" id="statsRow">
-      <div class="stat primary" id="statSignal"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
-      <div class="stat" id="statSps"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
-      <div class="stat" id="statBw"><div class="k">BANDWIDTH</div><div class="v" id="bw">1.00×</div></div>
+      <div class="stats" id="statsRow">
+        <div class="stat primary" id="statSignal"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
+        <div class="stat" id="statSps"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
+        <div class="stat" id="statBw"><div class="k">BANDWIDTH</div><div class="v" id="bw">1.00×</div></div>
+        <div class="stat" id="statStab"><div class="k">STABILITY</div><div class="v" id="stab">100%</div></div>
+      </div>
+
+      <div class="scopeWrap">
+        <div class="scopeTop">
+          <div>ARRAY SCOPE</div>
+          <div class="scopeMeta" id="scopeLabel">LOCK: 0%</div>
+        </div>
+        <canvas id="scope"></canvas>
+      </div>
+
+      <div style="height:10px"></div>
+      <div class="stat">
+        <div class="k">CORRUPTION</div>
+        <div class="bar"><div class="fill danger" id="corrFill"></div></div>
+        <div class="muted" id="corrText">0% (DORMANT)</div>
+      </div>
     </div>
-  </div>
-</header>
+  </header>
 
-<section class="card">
-  <div class="pad">
-    <button class="big" id="ping">PING THE VOID</button>
-  </div>
-</section>
+  <section class="card">
+    <div class="hd">
+      <div>
+        <span class="chip"><span class="dot"></span><span id="phase">PHASE I</span></span>
+        <span class="chip" id="status">ARRAY: STABLE</span>
+        <span class="chip" id="buildChip">BUILD: 1</span>
+        <span class="chip" id="relicChip">RELICS: 0</span>
+      </div>
+      <div>
+        <span class="chip" id="syncChip">SYNC: LOCAL</span>
+        <span class="chip" id="userChip">USER: ----</span>
+      </div>
+    </div>
+
+    <div class="pad">
+      <button class="big" id="ping">PING THE VOID</button>
+
+      <div class="grid2">
+        <button id="save">SAVE</button>
+        <button id="wipe">WIPE</button>
+      </div>
+
+      <div class="grid2">
+        <button id="prestige" disabled>RITE RESET (LOCKED)</button>
+        <button id="feedbackBtn">FEEDBACK: ON</button>
+      </div>
+
+      <div class="grid2">
+        <button id="aiBtn">DYNAMIC COMMS: ON</button>
+        <span class="chip" id="aiChip">AI: READY</span>
+      </div>
+
+      <div class="muted" id="objective">
+        OBJECTIVE: ACQUIRE DISH CALIBRATION. REACH 100 TOTAL SIGNAL TO UNLOCK DEEP SCAN.
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTAINMENT PANEL -->
+  <section class="card">
+    <div class="hd">
+      <div>CONTAINMENT</div>
+      <div class="muted" id="containmentHint">LOCKED UNTIL PHASE II</div>
+    </div>
+    <div class="pad">
+      <div class="toggleGrid">
+        <button class="toggleBtn" id="filterBtn" disabled>FILTER NOISE</button>
+        <button class="toggleBtn" id="suppressBtn" disabled>SUPPRESS FEEDBACK</button>
+        <button class="toggleBtn" id="quarantineBtn" disabled>QUARANTINE CHANNEL</button>
+        <div class="chip" id="containmentCostChip">COST: 250 SIGNAL (TOGGLE)</div>
+      </div>
+      <div class="smallHint" id="containmentDesc">
+        Containment does not erase Corruption. It reduces leakage into the interface and stabilizes output.
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="hd">
+      <div>BUFFS</div>
+      <div class="muted">UNLOCKED BY MILESTONES. AVAILABLE BUFFS GLOW.</div>
+    </div>
+    <div class="pad">
+      <div class="upgrades" id="upgrades"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="hd">
+      <div>COMMUNICATIONS</div>
+      <div class="muted">ANCILLARY CHANNELS REPORT STATUS</div>
+    </div>
+    <div class="pad">
+      <div class="log" id="comms"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="hd">
+      <div>TRANSMISSION LOG</div>
+      <div class="muted">MILESTONES REVEAL CONTEXT</div>
+    </div>
+    <div class="pad">
+      <div class="log" id="log"></div>
+    </div>
+  </section>
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <script>
 (() => {
-  const $ = id => document.getElementById(id);
+  const $ = (id) => document.getElementById(id);
 
+  // Prevent double-click zoom on buttons
+  document.addEventListener("dblclick", (e) => {
+    if (e.target && e.target.closest("button")) e.preventDefault();
+  }, { passive: false });
+
+  // Supabase Config (yours)
+  const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ===== Feedback (vibrate if possible, else tiny click)
+  let feedbackOn = true;
+  let audioCtx = null;
+
+  function tinyClickSound(intensity=1){
+    if (!feedbackOn) return;
+    try{
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = audioCtx;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "square";
+      o.frequency.value = 820 - (intensity*60);
+      g.gain.value = 0.00001;
+      o.connect(g); g.connect(ctx.destination);
+      o.start();
+      const t = ctx.currentTime;
+      g.gain.setValueAtTime(0.00001, t);
+      g.gain.exponentialRampToValueAtTime(0.020 * intensity, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.00001, t + 0.050);
+      o.stop(t + 0.055);
+    } catch(_){}
+  }
+  function hapticPulse(ms=10){
+    if (!feedbackOn) return false;
+    if (navigator.vibrate){
+      navigator.vibrate([ms]);
+      return true;
+    }
+    return false;
+  }
+
+  // ===== Utils
+  function fmt(n){
+    if (n < 1000) return n.toFixed(0);
+    const units = ["K","M","B","T","Qa","Qi"];
+    let u = -1;
+    while (n >= 1000 && u < units.length-1){ n /= 1000; u++; }
+    return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + units[u];
+  }
+  function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+
+  function pushLog(elId, tag, msg){
+    const p = document.createElement("p");
+    p.innerHTML = `<span class="tag">${tag}</span>${msg}`;
+    $(elId).prepend(p);
+  }
+
+  function escapeHtml(s){
+    return String(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  // ===== Activity gating (AI never triggers while idling)
+  let lastUserActionAt = 0;
+  function markActive(reason){
+    lastUserActionAt = Date.now();
+  }
+  window.addEventListener("pointerdown", () => markActive("pointer"), { passive:true });
+  window.addEventListener("keydown", () => markActive("key"), { passive:true });
+
+  function isActivelyUsed(){
+    return (Date.now() - lastUserActionAt) <= 15000;
+  }
+
+  // ===== State
   const state = {
-    signal:0,
-    total:0,
-    sps:0,
-    bandwidth:1,
-    corruption:0,
-    phase:1
+    build: 1,
+    relics: 0,
+    signal: 0,
+    total: 0,
+
+    baseSPS: 0,
+    clickPower: 1,
+    bandwidth: 1.0,
+    autoPingsPerSec: 0,
+
+    corruption: 0,
+    phase: 1,
+
+    flags: {
+      sawPhase2:false, sawPhase3:false, sawPrestigeHint:false,
+      sawContainment:false
+    },
+
+    // containment toggles (do NOT reduce corruption, only reduce leakage)
+    containment: { filter:false, suppress:false, quarantine:false },
+
+    upgrades: {
+      dish: 0, probes: 0, scan: 0, tuning: 0,
+      autopinger: 0, echo: 0, dark: 0, lattice: 0,
+      relicAmp: 0
+    },
+
+    updatedAtMs: 0,
+
+    aiEnabled: true,
+    lastAiAtMs: 0
   };
+  window.SYGN1L_STATE = state;
 
-  function fmt(n){ return n < 1000 ? n.toFixed(0) : (n/1000).toFixed(1)+"K"; }
+  // ===== Containment math
+  const CONTAINMENT_UNLOCK_TOTAL = 500; // aligns with Phase II
+  const CONTAINMENT_TOGGLE_COST = 250;
 
-  function popupComms(who,msg){
-    const box=document.createElement("div");
-    box.className="pop";
-    box.innerHTML=`<div class="who">${who}</div><div class="msg">${msg}</div>`;
-    $("popHost").prepend(box);
+  function containmentUnlocked(){
+    return state.total >= CONTAINMENT_UNLOCK_TOTAL || state.flags.sawPhase2;
+  }
 
-    let closed=false;
-    function close(){
-      if(closed) return;
-      closed=true;
-      box.classList.add("fade");
-      setTimeout(()=>box.remove(),200);
+  function stability(){
+    // Stability is derived from bandwidth + containment layers.
+    // It suppresses UI leakage and reduces the "severity" of corruption effects.
+    let s = 0.55;
+    // bandwidth gently helps stability (more control)
+    s += clamp((state.bandwidth - 1) / 6, 0, 0.25);
+    // relic amp implies familiarity/control
+    s += clamp(state.relics * 0.02, 0, 0.12);
+
+    if (state.containment.filter) s += 0.10;
+    if (state.containment.suppress) s += 0.10;
+    if (state.containment.quarantine) s += 0.14;
+
+    return clamp(s, 0, 1);
+  }
+
+  function leakage(){
+    // How much corruption bleeds into the interface.
+    // High stability suppresses it, but never eliminates it.
+    const stab = stability();
+    const base = state.corruption;
+    // quarantine specifically reduces leakage more
+    const q = state.containment.quarantine ? 0.75 : 1.0;
+    return clamp(base * (1 - 0.78*stab) * q, 0, 1);
+  }
+
+  function corruptionSpsMultiplier(){
+    // Temptation: corruption increases throughput slightly
+    // but leakage worsens presentation/feedback unless stabilized.
+    // Keep it modest so it feels like a choice, not "always go max corruption".
+    const c = state.corruption;
+    // small curve: up to +35% at max corruption
+    return 1 + 0.35 * Math.pow(c, 0.85);
+  }
+
+  function applyContainmentUI(){
+    const unlocked = containmentUnlocked();
+    $("containmentHint").textContent = unlocked ? "MANAGE LEAKAGE. CORRUPTION PERSISTS." : "LOCKED UNTIL PHASE II";
+    $("filterBtn").disabled = !unlocked;
+    $("suppressBtn").disabled = !unlocked;
+    $("quarantineBtn").disabled = !unlocked;
+
+    // glow if affordable
+    const canPay = state.signal >= CONTAINMENT_TOGGLE_COST;
+    for (const id of ["filterBtn","suppressBtn","quarantineBtn"]){
+      const el = $(id);
+      el.classList.toggle("affordable", unlocked && canPay);
     }
 
-    box.addEventListener("pointerdown",e=>{
+    $("filterBtn").classList.toggle("on", !!state.containment.filter);
+    $("suppressBtn").classList.toggle("on", !!state.containment.suppress);
+    $("quarantineBtn").classList.toggle("on", !!state.containment.quarantine);
+
+    $("containmentCostChip").textContent = `COST: ${CONTAINMENT_TOGGLE_COST} SIGNAL (TOGGLE)`;
+    $("stab").textContent = Math.round(stability() * 100) + "%";
+  }
+
+  function toggleContainment(key){
+    if (!containmentUnlocked()) return false;
+    if (state.signal < CONTAINMENT_TOGGLE_COST) return false;
+
+    state.signal -= CONTAINMENT_TOGGLE_COST;
+    state.containment[key] = !state.containment[key];
+    state.flags.sawContainment = true;
+
+    pushLog("log","SYS",`CONTAINMENT LAYER ${key.toUpperCase()} ${(state.containment[key] ? "ENGAGED" : "DISENGAGED")}.`);
+    pushLog("comms","OPS", state.containment[key] ? "Containment engaged. Keep your hands off the gain." : "Containment relaxed. Don’t celebrate.");
+
+    touchLocalUpdated();
+    saveLocal();
+    saveCloud(false);
+
+    return true;
+  }
+
+  // ===== Popup comms (tap to close, longer fallback)
+  function popupComms(who, msg){
+    const host = $("popHost");
+    const box = document.createElement("div");
+    box.className = "pop";
+    box.innerHTML = `<div class="who">${escapeHtml(who)}</div><div class="msg">${escapeHtml(msg)}</div>`;
+    host.prepend(box);
+
+    let closed = false;
+    function closeNow(){
+      if (closed) return;
+      closed = true;
+      box.classList.add("fade");
+      setTimeout(() => box.remove(), 220);
+    }
+
+    box.addEventListener("pointerdown", (e) => {
       e.stopPropagation();
-      close();
+      closeNow();
     });
 
-    setTimeout(close,9000);
+    // fallback auto-dismiss (longer)
+    setTimeout(closeNow, 9000);
   }
 
+  // ===== UI evolution (mood + stat order + label drift + microflicker)
   function uiMood(){
-    const c=state.corruption;
-    if(c<0.15) return "calm";
-    if(c<0.4) return "tense";
-    if(c<0.75) return "unstable";
+    const c = state.corruption;
+    if (c < 0.14) return "calm";
+    if (c < 0.38) return "tense";
+    if (c < 0.74) return "unstable";
     return "hostile";
   }
-
   function applyUiMood(){
-    document.body.className="mood-"+uiMood();
+    document.body.classList.remove("mood-calm","mood-tense","mood-unstable","mood-hostile");
+    document.body.classList.add("mood-" + uiMood());
   }
-
   function reorderStats(){
-    const row=$("statsRow");
-    const s=$("statSignal");
-    const p=$("statSps");
-    const b=$("statBw");
+    const row = $("statsRow");
+    const a = $("statSignal");
+    const b = $("statSps");
+    const c = $("statBw");
+    const d = $("statStab");
+    if (!row || !a || !b || !c || !d) return;
 
-    s.classList.remove("primary");
-    p.classList.remove("primary");
-    b.classList.remove("primary");
+    // clear primary
+    for (const el of [a,b,c,d]) el.classList.remove("primary");
 
-    let order=[s,p,b];
-    let primary=s;
+    // hierarchy drift by phase
+    let order = [a,b,c,d];
+    let primary = a;
 
-    if(state.phase===2){ order=[p,s,b]; primary=p; }
-    if(state.phase>=3){ order=[b,p,s]; primary=b; }
+    if (state.phase === 2){
+      order = [b,a,c,d];
+      primary = b;
+    } else if (state.phase >= 3){
+      order = [c,b,a,d];
+      primary = c;
+    }
 
-    order.forEach(el=>row.appendChild(el));
+    for (const el of order) row.appendChild(el);
+
+    // stability becomes primary when leakage is high
+    if (leakage() > 0.35) primary = d;
     primary.classList.add("primary");
   }
-
   function labelDrift(){
-    const btn=$("ping");
-    let text="PING THE VOID";
-    if(state.phase>=2) text="LISTEN";
-    if(state.phase>=3) text="ACKNOWLEDGE";
-    if(state.corruption>0.6) text="RESPOND";
-    if(state.corruption>0.85) text="CONFIRM";
-    btn.textContent=text;
+    const ping = $("ping");
+    if (!ping) return;
+    let t = "PING THE VOID";
+    if (state.phase >= 2) t = "LISTEN";
+    if (state.phase >= 3) t = "ACKNOWLEDGE";
+    if (state.corruption >= 0.60) t = "RESPOND";
+    if (state.corruption >= 0.85) t = "CONFIRM";
+    if (ping.textContent !== t) ping.textContent = t;
   }
-
-  function maybeFlicker(){
-    if(Math.random() < 0.003 + state.corruption*0.01){
-      document.body.classList.add("flicker");
-      setTimeout(()=>document.body.classList.remove("flicker"),140);
+  function maybeMicroFlicker(){
+    // Rare flicker based on leakage (not pure corruption)
+    const l = leakage();
+    const chance = 0.0015 + 0.010 * l; // tuned to be subtle
+    if (Math.random() < chance){
+      const target = document.body;
+      target.classList.add("flicker");
+      setTimeout(() => target.classList.remove("flicker"), 140);
     }
   }
 
-  $("ping").onclick = () => {
-    state.signal += 1 * state.bandwidth;
-    state.total += 1;
-    state.sps = Math.max(state.sps, state.signal/10);
-    state.corruption = Math.min(1, state.corruption + 0.002);
-    if(state.total>50) state.phase=2;
-    if(state.total>200) state.phase=3;
+  // ===== Feedback mutation
+  function feedback(el, strength="light"){
+    if (el){
+      el.classList.remove("flash");
+      void el.offsetWidth;
+      el.classList.add("flash");
+    }
 
+    // Suppress feedback toggle dampens mutation
+    const suppressed = state.containment.suppress;
+    const l = leakage();
+    const intensity = suppressed ? 0.9 : (1 + 0.9*l);
+    const ms = strength === "strong"
+      ? Math.round(18 * intensity)
+      : Math.round(10 * intensity);
+
+    const didVibe = hapticPulse(ms);
+
+    if (!didVibe) tinyClickSound(intensity);
+
+    // Occasional "echo" at high leakage unless suppressed
+    if (!suppressed && l > 0.45 && Math.random() < (0.06 + 0.10*l)){
+      setTimeout(() => {
+        if (navigator.vibrate) navigator.vibrate([Math.round(8 * intensity)]);
+        else tinyClickSound(0.8 * intensity);
+      }, 70 + Math.floor(40*l));
+    }
+  }
+
+  $("feedbackBtn").onclick = (e) => {
+    feedbackOn = !feedbackOn;
+    e.currentTarget.textContent = feedbackOn ? "FEEDBACK: ON" : "FEEDBACK: OFF";
+    feedback(e.currentTarget, "light");
+    markActive("toggle_feedback");
+  };
+
+  // ===== Upgrades
+  const UPG = [
+    { id:"dish", name:"DISH CALIBRATION", unlockAt:0, baseCost:10, costMult:1.18,
+      desc:"+1 SIGNAL/SEC PER LEVEL.", buy(){ state.upgrades.dish++; } },
+    { id:"probes", name:"PROBE SWARM", unlockAt:120, baseCost:80, costMult:1.22,
+      desc:"+1 CLICK POWER PER LEVEL.", buy(){ state.upgrades.probes++; } },
+    { id:"scan", name:"DEEP SCAN", unlockAt:100, baseCost:50, costMult:1.25,
+      desc:"+10% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.scan++; } },
+    { id:"tuning", name:"HARMONIC TUNING", unlockAt:240, baseCost:140, costMult:1.27,
+      desc:"+0.3 SIGNAL/SEC AND +1% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.tuning++; } },
+    { id:"autopinger", name:"AUTO-PINGER ROUTINE", unlockAt:600, baseCost:520, costMult:1.30,
+      desc:"ADDS AUTO-PINGS/SEC. SCALES WITH PROBES (SYNERGY).", buy(){ state.upgrades.autopinger++; } },
+    { id:"echo", name:"ECHO INTEGRATOR", unlockAt:1800, baseCost:1400, costMult:1.35,
+      desc:"BANDWIDTH BONUS: + (3%*LV) * LOG10(SIGNAL+1).", buy(){ state.upgrades.echo++; } },
+    { id:"lattice", name:"HARMONIC LATTICE", unlockAt:3500, baseCost:3200, costMult:1.38,
+      desc:"SPS MULT: (1 + 0.06*LV*SQRT(CORRUPTION*10)).", buy(){ state.upgrades.lattice++; } },
+    { id:"dark", name:"DARK LISTENING", unlockAt:7000, baseCost:9000, costMult:1.45,
+      desc:"IF CORRUPTION>30%: GAINS × (1 + 0.12*LV).", buy(){ state.upgrades.dark++; } },
+    { id:"relicAmp", name:"RELIC AMPLIFIER", unlockAt:0, baseCost:3, costMult:1.65, currency:"relics",
+      desc:"SPEND RELICS. PER LV: GLOBAL MULT +8% (PERMANENT).", buy(){ state.upgrades.relicAmp++; } }
+  ];
+
+  function upgradeLevel(id){ return state.upgrades[id] || 0; }
+  function upgradeCost(u){
+    const lvl = upgradeLevel(u.id);
+    return Math.floor(u.baseCost * Math.pow(u.costMult, lvl));
+  }
+
+  // ===== Derived math
+  function computeBaseSPS(){
+    return upgradeLevel("dish") * 1.0 + upgradeLevel("tuning") * 0.3;
+  }
+  function computeClickPower(){
+    return 1 + upgradeLevel("probes") * 1.0;
+  }
+  function computeBaseBandwidth(){
+    let bw = 1.0;
+    bw *= Math.pow(1.10, upgradeLevel("scan"));
+    bw *= Math.pow(1.01, upgradeLevel("tuning"));
+    return bw;
+  }
+  function computeEchoMultiplier(){
+    const lv = upgradeLevel("echo");
+    if (lv <= 0) return 1.0;
+    const logBonus = Math.log10(state.signal + 1);
+    return 1 + (0.03 * lv * logBonus);
+  }
+  function computeRelicMultiplier(){
+    const lv = upgradeLevel("relicAmp");
+    return 1 + 0.08 * lv;
+  }
+  function computeLatticeMultiplier(){
+    const lv = upgradeLevel("lattice");
+    if (lv <= 0) return 1.0;
+    const term = Math.sqrt(clamp(state.corruption,0,1) * 10);
+    return 1 + 0.06 * lv * term;
+  }
+  function computeDarkMultiplier(){
+    const lv = upgradeLevel("dark");
+    if (lv <= 0) return 1.0;
+    return state.corruption > 0.30 ? (1 + 0.12 * lv) : 1.0;
+  }
+  function computeAutoPingsPerSec(){
+    const lv = upgradeLevel("autopinger");
+    if (lv <= 0) return 0;
+    const probeFactor = 1 + upgradeLevel("probes") * 0.15;
+    return lv * 0.65 * probeFactor;
+  }
+
+  function recomputeDerived(){
+    state.baseSPS = computeBaseSPS();
+    state.clickPower = computeClickPower();
+    state.bandwidth = computeBaseBandwidth() * computeEchoMultiplier() * computeRelicMultiplier();
+    state.autoPingsPerSec = computeAutoPingsPerSec();
+  }
+
+  function computeSPS(){
+    // Corruption temptation layer is applied here
+    return state.baseSPS
+      * state.bandwidth
+      * computeLatticeMultiplier()
+      * computeDarkMultiplier()
+      * corruptionSpsMultiplier();
+  }
+
+  function globalMultiplier(){
+    return state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
+  }
+
+  // ===== Corruption
+  function updateCorruption(dt){
+    const creep = 0.0000025 * Math.log10(state.total + 10);
+    const tech = (upgradeLevel("echo") * 0.0000015) + (upgradeLevel("lattice") * 0.0000018) + (upgradeLevel("dark") * 0.0000022);
+    const invite = 0.0000010;
+    state.corruption = clamp(state.corruption + (creep + tech + invite) * dt, 0, 1);
+  }
+  function corruptionLabel(c){
+    if (c < 0.10) return "DORMANT";
+    if (c < 0.30) return "WHISPERING";
+    if (c < 0.60) return "INCIDENT";
+    if (c < 0.85) return "BREACH";
+    return "OVERRUN";
+  }
+
+  // ===== Objectives & milestones
+  function setObjective(text){ $("objective").innerHTML = "OBJECTIVE: " + text; }
+
+  function milestoneCheck(){
+    if (!state.flags.sawPhase2 && state.total >= 500){
+      state.flags.sawPhase2 = true;
+      state.phase = Math.max(state.phase, 2);
+      $("phase").textContent = "PHASE II";
+      $("status").textContent = "ARRAY: DRIFT";
+      pushLog("log","SYS","PHASE II ENGAGED. THE ARRAY BEGINS RETURN TRANSMISSIONS.");
+      pushLog("comms","LT VANCE","If this thing talks back, we log it. If it begs, we mute it.");
+      pushLog("comms","OPS","Containment protocols are available. They won’t clean it. They’ll just keep it in the walls.");
+      setObjective("CONTAINMENT UNLOCKED. REACH 600 TOTAL SIGNAL TO UNLOCK AUTO-PINGER ROUTINE.");
+    }
+    if (!state.flags.sawPhase3 && state.total >= 1800){
+      state.flags.sawPhase3 = true;
+      state.phase = Math.max(state.phase, 3);
+      $("phase").textContent = "PHASE III";
+      $("status").textContent = "ARRAY: ACTIVE";
+      pushLog("log","SYS","PHASE III: RESPONSE PATTERNS DETECTED. NOT RANDOM. NOT FRIENDLY.");
+      pushLog("comms","DR KESS","It’s not a signal. It’s an instruction set pretending to be noise.");
+      setObjective("UNLOCK HARMONIC LATTICE AT 3500 TOTAL SIGNAL. MANAGE LEAKAGE.");
+    }
+    if (!state.flags.sawPrestigeHint && state.total >= 9000){
+      state.flags.sawPrestigeHint = true;
+      pushLog("comms","OPS","We can reset the Array and keep the residue. Call it a Rite. We’ll call it insurance.");
+      pushLog("log","SYS","RITE RESET PROTOCOL DISCOVERED. RELICS MAY PERSIST BETWEEN BUILDS.");
+      setObjective("REACH 12,000 TOTAL SIGNAL TO UNLOCK RITE RESET.");
+    }
+  }
+
+  function updateObjectiveFallback(){
+    if (!state.flags.sawPhase2){
+      setObjective("ACQUIRE DISH CALIBRATION. REACH 100 TOTAL SIGNAL TO UNLOCK DEEP SCAN.");
+    } else if (!state.flags.sawPhase3){
+      setObjective("CONTAINMENT IS LIVE. UNLOCK AUTO-PINGER ROUTINE AT 600 TOTAL SIGNAL.");
+    } else if (state.total < 12000){
+      setObjective("UNLOCK HARMONIC LATTICE AT 3500 TOTAL SIGNAL. PREPARE FOR RITE RESET AT 12,000.");
+    } else {
+      setObjective("RITE RESET AVAILABLE. CONSIDER RESETTING FOR RELICS (PERMANENT POWER).");
+    }
+  }
+
+  // ===== Prestige
+  function prestigeGain(){
+    const over = Math.max(0, state.total - 12000);
+    const base = 1;
+    const extra = Math.floor(Math.sqrt(over / 6000));
+    return base + extra;
+  }
+  function doPrestige(){
+    const gainRelics = prestigeGain();
+    state.relics += gainRelics;
+    state.build += 1;
+
+    pushLog("log","SYS",`RITE RESET EXECUTED. +${gainRelics} RELICS RECOVERED.`);
+    pushLog("comms","MOTHERLINE","THE ARRAY FORGETS. YOU DO NOT.");
+
+    const keepRelicAmp = state.upgrades.relicAmp || 0;
+
+    state.signal = 0;
+    state.total = 0;
+    // Corruption reduces but never vanishes, and leakage may still occur in flashes
+    state.corruption = Math.max(0, state.corruption * 0.25);
+
+    state.phase = 1;
+    state.flags.sawPhase2 = false;
+    state.flags.sawPhase3 = false;
+    state.flags.sawPrestigeHint = false;
+    state.flags.sawContainment = false;
+
+    // containment resets, but relic familiarity remains
+    state.containment = { filter:false, suppress:false, quarantine:false };
+
+    for (const k in state.upgrades) state.upgrades[k] = 0;
+    state.upgrades.relicAmp = keepRelicAmp;
+
+    touchLocalUpdated();
+    recomputeDerived();
+    updateObjectiveFallback();
+  }
+
+  // ===== Gain
+  function gain(amount){
+    state.signal += amount;
+    state.total += amount;
+  }
+
+  // ===== Save Manager (Local + Cloud)
+  const LOCAL_KEY = "sygn1l_cloudsave_v3";
+  let userId = null;
+  let cloudReady = false;
+  let lastCloudSaveAt = 0;
+
+  function touchLocalUpdated(){
+    state.updatedAtMs = Date.now();
+  }
+
+  function saveLocal(){
+    touchLocalUpdated();
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
+    $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
+  }
+
+  function loadLocal(){
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if (!raw) return false;
+    try{
+      const data = JSON.parse(raw);
+      mergeIntoState(data);
+      return true;
+    }catch(_){ return false; }
+  }
+
+  function mergeIntoState(data){
+    for (const k in data){
+      if (data[k] && typeof data[k] === "object" && state[k] && typeof state[k] === "object"){
+        Object.assign(state[k], data[k]);
+      } else {
+        state[k] = data[k];
+      }
+    }
+  }
+
+  async function ensureSession(){
+    try{
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session){
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) throw error;
+        session = data.session;
+      }
+      userId = session.user.id;
+      $("userChip").textContent = "USER: " + userId.slice(0, 4) + "…" + userId.slice(-4);
+      cloudReady = true;
+      $("syncChip").textContent = "SYNC: CLOUD";
+      return userId;
+    } catch(err){
+      cloudReady = false;
+      $("syncChip").textContent = "SYNC: OFFLINE";
+      pushLog("log","SYS","CLOUD SYNC UNAVAILABLE. LOCAL MODE ACTIVE.");
+      return null;
+    }
+  }
+
+  async function loadCloud(){
+    if (!cloudReady || !userId) return null;
+    try{
+      const { data, error } = await supabase
+        .from("saves")
+        .select("state, updated_at")
+        .eq("player_id", userId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data || !data.state) return null;
+
+      const cloudState = data.state;
+      const cloudUpdatedMs = cloudState.updatedAtMs || (data.updated_at ? Date.parse(data.updated_at) : 0);
+      return { cloudState, cloudUpdatedMs };
+    } catch(err){
+      $("syncChip").textContent = "SYNC: OFFLINE";
+      cloudReady = false;
+      pushLog("log","SYS","CLOUD LOAD FAILED. CONTINUING LOCAL.");
+      return null;
+    }
+  }
+
+  async function saveCloud(force=false){
+    if (!cloudReady || !userId) return false;
+
+    const now = Date.now();
+    if (!force && (now - lastCloudSaveAt) < 60000) return false;
+    lastCloudSaveAt = now;
+
+    try{
+      touchLocalUpdated();
+      const payload = {
+        player_id: userId,
+        updated_at: new Date().toISOString(),
+        state: JSON.parse(JSON.stringify(state))
+      };
+
+      const { error } = await supabase.from("saves").upsert(payload);
+      if (error) throw error;
+
+      $("syncChip").textContent = "SYNC: CLOUD+LOCAL";
+      return true;
+    } catch(err){
+      $("syncChip").textContent = "SYNC: OFFLINE";
+      cloudReady = false;
+      pushLog("log","SYS","CLOUD SAVE FAILED. LOCAL CONTINUES.");
+      return false;
+    }
+  }
+
+  async function initSaves(){
+    const hasLocal = loadLocal();
+    await ensureSession();
+    const cloud = await loadCloud();
+
+    if (cloud && cloud.cloudState){
+      const localUpdated = state.updatedAtMs || 0;
+      if (cloud.cloudUpdatedMs > localUpdated){
+        mergeIntoState(cloud.cloudState);
+        pushLog("log","SYS","CLOUD SAVE LOADED (NEWER THAN LOCAL).");
+      } else if (cloudReady) {
+        await saveCloud(true);
+        pushLog("log","SYS","LOCAL SAVE PUSHED TO CLOUD (NEWER).");
+      }
+    } else {
+      if (hasLocal){
+        pushLog("log","SYS","LOCAL SAVE LOADED.");
+      } else {
+        pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
+        pushLog("comms","OPS","Start small. Ping it. If it answers, don’t answer back.");
+        pushLog("comms","DR KESS","We’re not mining a signal. We’re excavating intent.");
+      }
+    }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden"){
+      saveLocal();
+      saveCloud(true);
+    }
+  });
+
+  // ===== AI integration (via Supabase Edge Function)
+  const AI_COOLDOWN_MS = 180000;
+  function setAiChip(text){ $("aiChip").textContent = text; }
+
+  $("aiBtn").onclick = (e) => {
+    state.aiEnabled = !state.aiEnabled;
+    e.currentTarget.textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
+    setAiChip(state.aiEnabled ? "AI: READY" : "AI: DISABLED");
+    touchLocalUpdated();
+    saveLocal();
+    feedback(e.currentTarget, "light");
+    markActive("toggle_ai");
+  };
+
+  function aiReadyNow(){
+    if (!state.aiEnabled) return false;
+    if (!cloudReady) return false;
+    if (!isActivelyUsed()) return false;
+    const now = Date.now();
+    if ((now - (state.lastAiAtMs || 0)) < AI_COOLDOWN_MS) return false;
+    return true;
+  }
+
+  async function maybeAiComms(eventName, speakerHint){
+    if (!aiReadyNow()) return;
+
+    state.lastAiAtMs = Date.now();
+    touchLocalUpdated();
+    saveLocal();
+
+    setAiChip("AI: THINKING");
+
+    try{
+      const payload = {
+        event: eventName,
+        speaker_hint: speakerHint || "OPS",
+        phase: state.phase,
+        build: state.build,
+        signal: Math.floor(state.signal),
+        total: Math.floor(state.total),
+        sps: Math.floor(computeSPS()),
+        bandwidth: Number(state.bandwidth.toFixed(2)),
+        corruption: Number(state.corruption.toFixed(3))
+      };
+
+      const { data, error } = await supabase.functions.invoke("sygn1l-comms", { body: payload });
+      if (error) throw error;
+
+      const who = data?.who || speakerHint || "COMMS";
+      const msg = data?.text || "…";
+
+      popupComms(who, msg);
+      pushLog("comms", who, msg);
+
+      setAiChip("AI: READY");
+    } catch(err){
+      setAiChip("AI: OFFLINE");
+      pushLog("log","SYS","AI COMMS FAILED. (EDGE FUNCTION OR KEY NOT CONFIGURED)");
+    }
+  }
+
+  // ===== HUD render
+  function renderHUD(){
     $("signal").textContent = fmt(state.signal);
-    $("sps").textContent = fmt(state.sps);
-    $("bw").textContent = state.bandwidth.toFixed(2)+"×";
+    $("sps").textContent = fmt(computeSPS());
+    $("bw").textContent = state.bandwidth.toFixed(2) + "×";
+    $("buildChip").textContent = "BUILD: " + state.build;
+    $("relicChip").textContent = "RELICS: " + state.relics;
 
+    const c = state.corruption;
+    $("corrFill").style.width = (c*100).toFixed(1) + "%";
+    $("corrText").textContent = (c*100).toFixed(1) + "% (" + corruptionLabel(c) + ")";
+
+    const canPrestige = state.total >= 12000;
+    const gainR = prestigeGain();
+    const btn = $("prestige");
+    btn.disabled = !canPrestige;
+    btn.textContent = canPrestige ? `RITE RESET (+${gainR} RELICS)` : "RITE RESET (LOCKED)";
+
+    applyContainmentUI();
     applyUiMood();
     reorderStats();
     labelDrift();
-    maybeFlicker();
+    updateScopeLabel();
+  }
 
-    if(Math.random()<0.08){
-      popupComms("OPS","Signal coherence shifting. No source lock.");
+  // ===== Locked buttons fix (kept)
+  let upgradesRefreshAcc = 0;
+  const UPGRADES_REFRESH_EVERY = 0.25;
+
+  function renderUpgrades(){
+    const root = $("upgrades");
+    root.innerHTML = "";
+
+    for (const u of UPG){
+      if (u.id === "relicAmp" && (state.relics <= 0 && upgradeLevel("relicAmp") === 0)) continue;
+
+      const unlocked = state.total >= u.unlockAt;
+      const lvl = upgradeLevel(u.id);
+      const cost = upgradeCost(u);
+      const currency = u.currency || "signal";
+      const have = currency === "relics" ? state.relics : state.signal;
+      const affordable = unlocked && have >= cost;
+
+      const row = document.createElement("div");
+      row.className = "up" + (affordable ? " affordable" : "") + (!unlocked ? " locked" : "");
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = `${u.name} (LV ${lvl})`;
+
+      const desc = document.createElement("div");
+      desc.className = "desc";
+      desc.textContent = unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlockAt)} TOTAL SIGNAL.`;
+
+      const costEl = document.createElement("div");
+      costEl.className = "cost";
+      costEl.textContent = unlocked ? `COST: ${fmt(cost)} ${currency.toUpperCase()}` : "STATUS: LOCKED";
+
+      meta.appendChild(name);
+      meta.appendChild(desc);
+      meta.appendChild(costEl);
+
+      const btn = document.createElement("button");
+      btn.textContent = unlocked ? (affordable ? "ACQUIRE" : "LOCKED") : "CLASSIFIED";
+      btn.disabled = !affordable;
+
+      btn.onclick = async () => {
+        if (!affordable) return;
+        markActive("buy_upgrade");
+        feedback(btn, "light");
+
+        if (currency === "relics") state.relics -= cost;
+        else state.signal -= cost;
+
+        u.buy();
+        touchLocalUpdated();
+        recomputeDerived();
+        renderHUD();
+        renderUpgrades();
+        saveLocal();
+        await saveCloud(false);
+
+        await maybeAiComms("buy_upgrade:" + u.id, u.id === "dark" ? "MOTHERLINE" : "OPS");
+      };
+
+      row.appendChild(meta);
+      row.appendChild(btn);
+      root.appendChild(row);
     }
+  }
+
+  // ===== Controls
+  $("ping").addEventListener("click", async (e) => {
+    markActive("ping");
+    feedback(e.currentTarget, "light");
+
+    gain(state.clickPower * globalMultiplier());
+    // ping adds a tiny corruption tick, but leakage governs how much it "shows"
+    state.corruption = clamp(state.corruption + 0.0006, 0, 1);
+
+    touchLocalUpdated();
+    renderHUD();
+    renderUpgrades();
+    saveLocal();
+    await saveCloud(false);
+
+    if (Math.random() < 0.10) {
+      await maybeAiComms("ping_void", "OPS");
+    }
+
+    // occasional microflicker (presentation only)
+    maybeMicroFlicker();
+  }, { passive:true });
+
+  $("prestige").onclick = async (e) => {
+    if (e.currentTarget.disabled) return;
+    markActive("prestige");
+    feedback(e.currentTarget, "strong");
+
+    doPrestige();
+    renderHUD();
+    renderUpgrades();
+    saveLocal();
+    await saveCloud(true);
+
+    await maybeAiComms("rite_reset", "MOTHERLINE");
   };
+
+  $("save").onclick = async (e) => {
+    markActive("manual_save");
+    feedback(e.currentTarget, "light");
+    saveLocal();
+    await saveCloud(true);
+    pushLog("log","SYS","STATE SAVED.");
+    await maybeAiComms("manual_save", "OPS");
+  };
+
+  $("wipe").onclick = async (e) => {
+    markActive("wipe");
+    feedback(e.currentTarget, "strong");
+    localStorage.removeItem(LOCAL_KEY);
+    if (cloudReady && userId){
+      try{ await supabase.from("saves").delete().eq("player_id", userId); } catch(_){}
+    }
+    location.reload();
+  };
+
+  // ===== Containment button bindings
+  $("filterBtn").onclick = (e) => {
+    markActive("containment_filter");
+    if (!containmentUnlocked()){
+      popupComms("OPS","Containment locked. Wait for Phase II.");
+      return;
+    }
+    if (state.signal < CONTAINMENT_TOGGLE_COST){
+      popupComms("OPS",`Need ${CONTAINMENT_TOGGLE_COST} signal to toggle.`);
+      return;
+    }
+    feedback(e.currentTarget, "light");
+    const ok = toggleContainment("filter");
+    if (ok) popupComms("OPS", state.containment.filter ? "Filter engaged. Noise floor reduced." : "Filter disengaged. Expect drift.");
+    renderHUD();
+  };
+
+  $("suppressBtn").onclick = (e) => {
+    markActive("containment_suppress");
+    if (!containmentUnlocked()){
+      popupComms("OPS","Containment locked. Wait for Phase II.");
+      return;
+    }
+    if (state.signal < CONTAINMENT_TOGGLE_COST){
+      popupComms("OPS",`Need ${CONTAINMENT_TOGGLE_COST} signal to toggle.`);
+      return;
+    }
+    feedback(e.currentTarget, "light");
+    const ok = toggleContainment("suppress");
+    if (ok) popupComms("OPS", state.containment.suppress ? "Feedback suppression engaged." : "Suppression released.");
+    renderHUD();
+  };
+
+  $("quarantineBtn").onclick = (e) => {
+    markActive("containment_quarantine");
+    if (!containmentUnlocked()){
+      popupComms("OPS","Containment locked. Wait for Phase II.");
+      return;
+    }
+    if (state.signal < CONTAINMENT_TOGGLE_COST){
+      popupComms("OPS",`Need ${CONTAINMENT_TOGGLE_COST} signal to toggle.`);
+      return;
+    }
+    feedback(e.currentTarget, "strong");
+    const ok = toggleContainment("quarantine");
+    if (ok) popupComms("LT VANCE", state.containment.quarantine ? "Quarantine set. Keep it in the channel." : "Quarantine lifted. Don’t flinch.");
+    renderHUD();
+  };
+
+  // ===== Array Scope (Noise -> Signal lock)
+  const scope = $("scope");
+  const ctx = scope.getContext("2d", { alpha: false });
+  let sw = 0, sh = 0, dpr = 1;
+
+  const signature = { cols: [], vel: [], phase: 0 };
+
+  function resizeScope(){
+    dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const cssW = scope.clientWidth || 300;
+    const cssH = 84;
+    scope.style.height = cssH + "px";
+    scope.width = Math.floor(cssW * dpr);
+    scope.height = Math.floor(cssH * dpr);
+    sw = scope.width;
+    sh = scope.height;
+
+    const cols = Math.max(120, Math.floor(sw / (2 * dpr)));
+    signature.cols = new Array(cols).fill(0);
+    signature.vel  = new Array(cols).fill(0);
+    signature.phase = 0;
+  }
+  window.addEventListener("resize", resizeScope);
+
+  function lockValue(){
+    const bw = state.bandwidth;
+    const sps = computeSPS();
+    const t = state.total;
+
+    const a = clamp(Math.log10(t + 1) / 5, 0, 1);
+    const b = clamp((bw - 1) / 4, 0, 1);
+    const c = clamp(Math.log10(sps + 1) / 4, 0, 1);
+    const raw = (0.45*a + 0.35*b + 0.20*c);
+
+    // containment filter improves apparent lock slightly
+    const filt = state.containment.filter ? 1.06 : 1.0;
+
+    const corrupted = raw * filt * (1 - 0.55*state.corruption);
+    return clamp(corrupted, 0, 1);
+  }
+  function updateScopeLabel(){
+    const lk = lockValue();
+    $("scopeLabel").textContent = "LOCK: " + Math.round(lk * 100) + "%";
+  }
+
+  function rand01(seed){
+    seed = (seed ^ 0x6D2B79F5) >>> 0;
+    seed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    seed ^= seed + Math.imul(seed ^ (seed >>> 7), 61 | seed);
+    return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
+  }
+
+  function drawScope(dt, timeMs){
+    if (!sw || !sh) return;
+
+    const lk = lockValue();
+    const corr = state.corruption;
+    const leak = leakage();
+
+    ctx.fillStyle = "rgb(0,0,0)";
+    ctx.fillRect(0,0,sw,sh);
+
+    // Filter reduces noiseAmt; stability reduces visual volatility
+    const filterBonus = state.containment.filter ? 0.14 : 0.0;
+    const stab = stability();
+    const noiseAmt = clamp((0.85 - 0.70*lk + 0.35*corr) - filterBonus - 0.10*stab, 0.12, 0.95);
+
+    const spikeProb = clamp(0.04 + 0.36*lk + 0.10*(state.bandwidth-1)/4, 0.04, 0.70);
+
+    const cols = signature.cols.length;
+    signature.phase += dt * (0.6 + 1.8*lk) * (1 + 0.8*corr);
+
+    for (let i=0;i<cols;i++){
+      const base = Math.sin(signature.phase + i*0.07) * 0.25;
+      const chaos = (rand01((timeMs|0) + i*9973) - 0.5) * (0.45 + 0.9*corr);
+      const target = base + chaos;
+
+      const stiffness = 0.08 + 0.22*lk;
+      const damping = 0.82 - 0.35*corr;
+
+      signature.vel[i] = signature.vel[i]*damping + (target - signature.cols[i]) * stiffness;
+      signature.cols[i] += signature.vel[i];
+    }
+
+    const midY = Math.floor(sh * 0.60);
+    const px = Math.max(1, Math.floor(dpr));
+    const baseG = 190;
+
+    for (let y=0;y<sh;y+=px){
+      const lineFade = 0.72 + 0.28*Math.sin((y/sh)*Math.PI);
+      for (let x=0;x<sw;x+=px){
+        const n = rand01((x*131 + y*977 + (timeMs|0))|0);
+        if (n < noiseAmt){
+          const v = Math.floor((baseG + 55*n) * lineFade);
+          ctx.fillStyle = `rgb(0,${v},0)`;
+          ctx.fillRect(x,y,px,px);
+        }
+      }
+    }
+
+    ctx.lineWidth = Math.max(1, 1*dpr);
+    ctx.strokeStyle = "rgba(57,255,106,0.85)";
+    ctx.beginPath();
+
+    for (let i=0;i<cols;i++){
+      const x = Math.floor((i/(cols-1)) * (sw-1));
+      const s = signature.cols[i];
+
+      const focus = lk;
+      const spike = (rand01((timeMs|0) + i*71) < spikeProb) ? 1 : 0;
+
+      const spikeH = spike * (0.15 + 0.85*focus) * (0.75 + 0.25*Math.abs(s));
+      const noiseH = (s * (0.35 + 0.65*(1-focus))) * 0.35;
+
+      const echo = corr > 0.28 ? (0.10 + 0.35*corr) * Math.sin(signature.phase*2 + i*0.12) : 0;
+
+      const y = midY - (spikeH + noiseH + echo) * (sh * 0.70);
+      if (i===0) ctx.moveTo(x,y);
+      else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = "rgba(57,255,106,0.18)";
+    ctx.lineWidth = Math.max(2, 3*dpr);
+    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+
+    // Tears are driven by leakage, and quarantine reduces them
+    if (leak > 0.35){
+      const q = state.containment.quarantine ? 0.55 : 1.0;
+      const tears = Math.floor((2 + 10*leak) * q);
+      for (let t=0;t<tears;t++){
+        const x = Math.floor(rand01((timeMs|0) + t*99991) * sw);
+        const w = Math.max(1, Math.floor(dpr));
+        ctx.fillStyle = `rgba(255,59,107,${0.03 + 0.10*leak})`;
+        ctx.fillRect(x, 0, w, sh);
+      }
+    }
+
+    ctx.strokeStyle = "rgba(57,255,106,0.18)";
+    ctx.lineWidth = Math.max(1, 1*dpr);
+    ctx.strokeRect(Math.floor(0.5*dpr), Math.floor(0.5*dpr), sw - Math.floor(1*dpr), sh - Math.floor(1*dpr));
+  }
+
+  // ===== Init narrative
+  function bootNarrativeIfEmpty(){
+    if ($("log").children.length === 0){
+      pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
+      pushLog("comms","OPS","Start small. Ping it. If it answers, don’t answer back.");
+      pushLog("comms","DR KESS","We’re not mining a signal. We’re excavating intent.");
+    }
+  }
+
+  // ===== Main loop (NO AI calls here)
+  let last = performance.now();
+
+  function loop(now){
+    const dt = Math.min(0.05, (now - last)/1000);
+    last = now;
+
+    recomputeDerived();
+
+    const sps = computeSPS();
+    if (sps > 0) gain(sps * dt);
+
+    if (state.autoPingsPerSec > 0){
+      const pings = state.autoPingsPerSec * dt;
+      gain(pings * (state.clickPower * globalMultiplier()));
+    }
+
+    updateCorruption(dt);
+    milestoneCheck();
+
+    renderHUD();
+    applyContainmentUI();
+
+    upgradesRefreshAcc += dt;
+    if (upgradesRefreshAcc >= UPGRADES_REFRESH_EVERY){
+      upgradesRefreshAcc = 0;
+      renderUpgrades();
+    }
+
+    drawScope(dt, now|0);
+
+    // presentation-only flicker, gated by leakage
+    maybeMicroFlicker();
+
+    requestAnimationFrame(loop);
+  }
+
+  // ===== Startup render
+  function renderUpfront(){
+    $("aiBtn").textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
+    setAiChip(state.aiEnabled ? "AI: READY" : "AI: DISABLED");
+
+    recomputeDerived();
+    updateObjectiveFallback();
+    renderHUD();
+    renderUpgrades();
+    bootNarrativeIfEmpty();
+    applyContainmentUI();
+    applyUiMood();
+    reorderStats();
+    labelDrift();
+  }
+
+  // ===== Start
+  resizeScope();
+  renderUpfront();
+
+  initSaves().then(async () => {
+    recomputeDerived();
+    renderUpfront();
+    pushLog("log","SYS","SAVE SYSTEM ONLINE: LOCAL + CLOUD (WHEN AVAILABLE).");
+    setAiChip(cloudReady ? (state.aiEnabled ? "AI: READY" : "AI: DISABLED") : "AI: OFFLINE");
+  }).catch(() => {
+    setAiChip("AI: OFFLINE");
+  }).finally(() => {
+    requestAnimationFrame(loop);
+  });
 
 })();
 </script>
