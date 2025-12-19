@@ -2,31 +2,20 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>SYGN1L</title>
-
 <style>
-/* =========================
-   RETRO CRT THEME
-   ========================= */
 :root{
-  --bg0:#020402;
-  --bg1:#010701;
-
-  --text:#CFFFD6;
-  --muted:#7EDB92;
-  --accent:#39FF6A;
-  --danger:#FF3B6B;
-
+  --bg0:#020402; --bg1:#010701;
+  --text:#CFFFD6; --muted:#7EDB92;
+  --accent:#39FF6A; --danger:#FF3B6B;
   --border:rgba(57,255,106,.25);
-  --radius:16px;
-  --shadow:0 10px 22px rgba(0,0,0,.55);
+  --radius:16px; --shadow:0 10px 22px rgba(0,0,0,.55);
   --glow:0 0 18px rgba(57,255,106,.25);
+  --glow2:0 0 34px rgba(57,255,106,.14);
 }
 
-html{ background:var(--bg0); }
-
+html{ background:var(--bg0); -webkit-text-size-adjust:100%; }
 body{
   margin:0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -43,23 +32,14 @@ body{
 /* CRT vignette */
 body::before{
   content:"";
-  position:fixed;
-  inset:0;
+  position:fixed; inset:0;
   pointer-events:none;
-  background:
-    radial-gradient(1200px 900px at 50% 50%,
-      rgba(0,0,0,0) 55%,
-      rgba(0,0,0,.65) 100%);
+  background: radial-gradient(1200px 900px at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.65) 100%);
   z-index:0;
 }
 
 /* scanlines */
-.fx{
-  position:fixed;
-  inset:0;
-  pointer-events:none;
-  z-index:0;
-}
+.fx{ position:fixed; inset:0; pointer-events:none; z-index:0; }
 .fx.scanlines{
   background:repeating-linear-gradient(
     to bottom,
@@ -68,97 +48,74 @@ body::before{
     rgba(0,0,0,0) 4px,
     rgba(0,0,0,0) 8px
   );
-  opacity:.25;
+  opacity:.24;
 }
 
 .wrap{
-  position:relative;
-  z-index:1;
-  max-width:720px;
-  margin:0 auto;
-  display:grid;
-  gap:18px;
+  position:relative; z-index:1;
+  max-width:780px; margin:0 auto;
+  display:grid; gap:18px;
 }
 
 .card{
   border:1px solid var(--border);
   border-radius:var(--radius);
   box-shadow:var(--shadow);
-  background:linear-gradient(180deg, rgba(6,28,12,.6), rgba(3,14,7,.4));
+  background:linear-gradient(180deg, rgba(6,28,12,.62), rgba(3,14,7,.40));
   overflow:hidden;
+  position:relative;
+}
+.card::after{
+  content:"";
+  position:absolute; inset:-2px;
+  pointer-events:none;
+  box-shadow: inset 0 0 0 1px rgba(57,255,106,.08), inset 0 0 22px rgba(57,255,106,.06);
 }
 
-.pad{ padding:14px; }
+.pad{ padding:14px; position:relative; }
 
-h1{
-  margin:0;
-  letter-spacing:.25em;
-  font-size:18px;
-}
-
-.subtitle{
-  margin-top:6px;
-  font-size:12px;
-  color:var(--muted);
-}
+h1{ margin:0; letter-spacing:.25em; font-size:18px; }
+.subtitle{ margin-top:6px; font-size:12px; color:var(--muted); letter-spacing:.06em; }
 
 .stats{
   margin-top:12px;
-  display:grid;
-  grid-template-columns:1fr;
+  display:grid; grid-template-columns:1fr;
   gap:10px;
 }
-@media(min-width:420px){
-  .stats{ grid-template-columns:repeat(3,1fr); }
-}
+@media(min-width:420px){ .stats{ grid-template-columns:repeat(3,1fr); } }
 
 .stat{
   border:1px solid rgba(57,255,106,.2);
   border-radius:12px;
   padding:10px;
-  background:rgba(0,0,0,.3);
+  background:rgba(0,0,0,.30);
 }
-.stat .k{
-  font-size:11px;
-  color:var(--muted);
-  letter-spacing:.1em;
-}
-.stat .v{
-  margin-top:6px;
-  font-size:18px;
-}
+.stat .k{ font-size:11px; color:var(--muted); letter-spacing:.10em; }
+.stat .v{ margin-top:6px; font-size:18px; overflow-wrap:anywhere; text-shadow:0 0 10px rgba(57,255,106,.10); }
 
 .hd{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  flex-wrap:wrap;
-  gap:10px;
+  display:flex; justify-content:space-between; align-items:center;
+  flex-wrap:wrap; gap:10px;
   padding:12px 14px;
   border-bottom:1px solid rgba(57,255,106,.2);
+  background:linear-gradient(180deg, rgba(0,0,0,.22), rgba(0,0,0,0));
+  position:relative;
 }
 
 .chip{
   border:1px solid rgba(57,255,106,.25);
   border-radius:999px;
   padding:6px 10px;
-  font-size:10px;
-  letter-spacing:.14em;
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
+  font-size:10px; letter-spacing:.14em;
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(0,0,0,.22);
 }
-
-.dot{
-  width:8px;height:8px;border-radius:50%;
-  background:var(--accent);
-  box-shadow:var(--glow);
-}
+.dot{ width:8px;height:8px;border-radius:50%; background:var(--accent); box-shadow:var(--glow); }
 
 button{
   font:inherit;
   border-radius:14px;
-  border:1px solid rgba(57,255,106,.3);
+  border:1px solid rgba(57,255,106,.32);
   background:rgba(57,255,106,.08);
   color:var(--text);
   padding:14px;
@@ -169,64 +126,91 @@ button{
 }
 button:hover{ box-shadow:var(--glow); }
 button:active{ transform:translateY(1px); }
-button:disabled{ opacity:.5; }
+button:disabled{ opacity:.5; cursor:not-allowed; box-shadow:none; }
 
 .big{
   width:100%;
-  font-weight:800;
-  letter-spacing:.12em;
+  font-weight:900;
+  letter-spacing:.14em;
   font-size:18px;
+  padding:18px 14px;
+  background:linear-gradient(180deg, rgba(57,255,106,.16), rgba(57,255,106,.06));
+  box-shadow: inset 0 0 0 1px rgba(57,255,106,.10);
 }
 
-.grid2{
-  display:grid;
-  gap:10px;
-  margin-top:12px;
+.grid2{ display:grid; gap:10px; margin-top:12px; }
+@media(min-width:420px){ .grid2{ grid-template-columns:1fr 1fr; } }
+
+.muted{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.45; }
+
+.bar{
+  height:10px; border-radius:999px;
+  border:1px solid rgba(57,255,106,.22);
+  background:rgba(0,0,0,.28);
+  overflow:hidden;
 }
-@media(min-width:420px){
-  .grid2{ grid-template-columns:1fr 1fr; }
+.fill{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg, rgba(57,255,106,.55), rgba(57,255,106,.20));
+  box-shadow:0 0 18px rgba(57,255,106,.20);
 }
 
-.muted{
-  margin-top:12px;
-  font-size:12px;
-  color:var(--muted);
+.fill.danger{
+  background:linear-gradient(90deg, rgba(255,59,107,.55), rgba(255,59,107,.18));
+  box-shadow:0 0 18px rgba(255,59,107,.18);
 }
 
 .upgrades{ display:flex; flex-direction:column; gap:12px; }
-
 .up{
   border:1px solid rgba(57,255,106,.2);
   border-radius:14px;
   padding:12px;
-  background:rgba(0,0,0,.3);
-  display:flex;
-  flex-wrap:wrap;
-  gap:12px;
-  align-items:center;
+  background:rgba(0,0,0,.30);
+  display:flex; flex-wrap:wrap;
+  gap:12px; align-items:center;
+  position:relative;
 }
 .up.affordable{ box-shadow:var(--glow); }
-.up.locked{ opacity:.6; border-style:dashed; }
+.up.locked{ opacity:.60; border-style:dashed; }
 
-.up .meta{ flex:1; min-width:200px; }
-.up .name{ font-weight:800; }
+.up .meta{ flex:1; min-width:220px; }
+.up .name{ font-weight:900; letter-spacing:.04em; }
 .up .desc,.up .cost{ font-size:12px; margin-top:6px; color:var(--muted); }
+.up .cost{ color:rgba(207,255,214,.90); }
 
 .log{
-  max-height:300px;
+  max-height:320px;
   overflow:auto;
+  -webkit-overflow-scrolling:touch;
 }
 .log p{
   margin:0 0 10px;
   font-size:12px;
-  line-height:1.5;
+  line-height:1.55;
+  color:rgba(207,255,214,.88);
+}
+.tag{
+  display:inline-block;
+  padding:2px 8px;
+  border:1px solid rgba(57,255,106,.22);
+  border-radius:999px;
+  font-size:10px;
+  letter-spacing:.10em;
+  color:rgba(207,255,214,.95);
+  margin-right:8px;
 }
 
-/* flash feedback */
 .flash{ animation:flash .18s ease-out; }
 @keyframes flash{
   from{ box-shadow:0 0 30px rgba(57,255,106,.6); }
   to{ box-shadow:none; }
+}
+
+hr.sep{
+  border:none; height:1px;
+  background:rgba(57,255,106,.18);
+  margin:10px 0 0;
 }
 </style>
 </head>
@@ -236,191 +220,649 @@ button:disabled{ opacity:.5; }
 
 <div class="wrap">
 
-<header class="card">
-  <div class="pad">
-    <h1>SYGN1L</h1>
-    <div class="subtitle">THE ARRAY LISTENS. THE VOID REPLIES IN ARITHMETIC.</div>
+  <header class="card">
+    <div class="pad">
+      <h1>SYGN1L</h1>
+      <div class="subtitle">THE ARRAY LISTENS. THE VOID REPLIES IN ARITHMETIC.</div>
 
-    <div class="stats">
-      <div class="stat"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
-      <div class="stat"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
-      <div class="stat"><div class="k">BANDWIDTH</div><div class="v" id="bw">1.00×</div></div>
+      <div class="stats">
+        <div class="stat"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
+        <div class="stat"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
+        <div class="stat"><div class="k">BANDWIDTH</div><div class="v" id="bw">1.00×</div></div>
+      </div>
+
+      <div style="height:10px"></div>
+      <div class="stat">
+        <div class="k">CORRUPTION</div>
+        <div class="bar"><div class="fill danger" id="corrFill"></div></div>
+        <div class="muted" id="corrText">0% (DORMANT)</div>
+      </div>
     </div>
-  </div>
-</header>
+  </header>
 
-<section class="card">
-  <div class="hd">
-    <div>
-      <span class="chip"><span class="dot"></span><span id="phase">PHASE I</span></span>
-      <span class="chip" id="status">ARRAY: STABLE</span>
-    </div>
-    <span class="chip" id="saveState">NO LINK</span>
-  </div>
-
-  <div class="pad">
-    <button class="big" id="ping">PING THE VOID</button>
-
-    <div class="grid2">
-      <button id="save">SAVE</button>
-      <button id="wipe">WIPE</button>
+  <section class="card">
+    <div class="hd">
+      <div>
+        <span class="chip"><span class="dot"></span><span id="phase">PHASE I</span></span>
+        <span class="chip" id="status">ARRAY: STABLE</span>
+        <span class="chip" id="buildChip">BUILD: 1</span>
+        <span class="chip" id="relicChip">RELICS: 0</span>
+      </div>
+      <span class="chip" id="saveState">NO LINK</span>
     </div>
 
-    <div class="muted" id="hint">
-      ACQUIRE DISH CALIBRATION TO BEGIN PASSIVE SIGNAL.
+    <div class="pad">
+      <button class="big" id="ping">PING THE VOID</button>
+
+      <div class="grid2">
+        <button id="save">SAVE</button>
+        <button id="wipe">WIPE</button>
+      </div>
+
+      <div class="grid2">
+        <button id="prestige" disabled>RITE RESET (LOCKED)</button>
+        <button id="mute">FEEDBACK: ON</button>
+      </div>
+
+      <div class="muted" id="objective">
+        OBJECTIVE: ACQUIRE DISH CALIBRATION. REACH 100 TOTAL SIGNAL TO UNLOCK DEEP SCAN.
+      </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<section class="card">
-  <div class="hd">
-    <div>BUFFS</div>
-    <div class="muted">AVAILABLE BUFFS GLOW</div>
-  </div>
-  <div class="pad">
-    <div class="upgrades" id="upgrades"></div>
-  </div>
-</section>
+  <section class="card">
+    <div class="hd">
+      <div>BUFFS</div>
+      <div class="muted">UNLOCKED BY MILESTONES. AVAILABLE BUFFS GLOW.</div>
+    </div>
+    <div class="pad">
+      <div class="upgrades" id="upgrades"></div>
+    </div>
+  </section>
 
-<section class="card">
-  <div class="hd">
-    <div>TRANSMISSION LOG</div>
-    <div class="muted">MILESTONES REVEAL CONTEXT</div>
-  </div>
-  <div class="pad">
-    <div class="log" id="log"></div>
-  </div>
-</section>
+  <section class="card">
+    <div class="hd">
+      <div>COMMUNICATIONS</div>
+      <div class="muted">ANCILLARY CHANNELS REPORT STATUS</div>
+    </div>
+    <div class="pad">
+      <div class="log" id="comms"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="hd">
+      <div>TRANSMISSION LOG</div>
+      <div class="muted">MILESTONES REVEAL CONTEXT</div>
+    </div>
+    <div class="pad">
+      <div class="log" id="log"></div>
+    </div>
+  </section>
 
 </div>
 
 <script>
-/* =========================
-   GAME LOGIC
-   ========================= */
-const $=id=>document.getElementById(id);
+(() => {
+  const $ = (id) => document.getElementById(id);
 
-const state={
-  signal:0,
-  bandwidth:1,
-  baseSPS:0,
-  click:1,
-  total:0,
-  upgrades:{ dish:0, scan:0 }
-};
+  // Prevent desktop double-click zoom on buttons
+  document.addEventListener("dblclick", (e) => {
+    if (e.target && e.target.closest("button")) e.preventDefault();
+  }, { passive: false });
 
-const upgrades=[
-  {
-    id:"dish",
-    name:"DISH CALIBRATION",
-    desc:"+1 SIGNAL/SEC",
-    base:10,
-    mult:1.2,
-    unlock:0,
-    apply(){ state.baseSPS+=1; }
-  },
-  {
-    id:"scan",
-    name:"DEEP SCAN",
-    desc:"+10% BANDWIDTH",
-    base:50,
-    mult:1.3,
-    unlock:100,
-    apply(){ state.bandwidth*=1.1; }
+  // ---------------- Feedback (best possible in browser)
+  let feedbackOn = true;
+  let audioCtx = null;
+
+  function tinyClickSound(){
+    if (!feedbackOn) return;
+    try{
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = audioCtx;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "square";
+      o.frequency.value = 820;
+      g.gain.value = 0.00001;
+      o.connect(g); g.connect(ctx.destination);
+      o.start();
+      const t = ctx.currentTime;
+      g.gain.setValueAtTime(0.00001, t);
+      g.gain.exponentialRampToValueAtTime(0.028, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.00001, t + 0.050);
+      o.stop(t + 0.055);
+    }catch(_){}
   }
-];
 
-function cost(u){
-  return Math.floor(u.base*Math.pow(u.mult,state.upgrades[u.id]));
-}
+  function hapticPulse(ms=10){
+    if (!feedbackOn) return false;
+    if (navigator.vibrate){
+      navigator.vibrate([ms]);
+      return true;
+    }
+    return false;
+  }
 
-function fmt(n){
-  if(n<1000) return Math.floor(n);
-  const u=["K","M","B","T"];let i=0;
-  while(n>=1000&&i<u.length-1){n/=1000;i++;}
-  return n.toFixed(1)+u[i];
-}
+  function feedback(el, strength="light"){
+    if (el){
+      el.classList.remove("flash");
+      void el.offsetWidth;
+      el.classList.add("flash");
+    }
+    const h = strength === "strong" ? hapticPulse(18) : hapticPulse(10);
+    if (!h) tinyClickSound();
+  }
 
-function log(msg){
-  const p=document.createElement("p");
-  p.textContent=msg;
-  $("log").prepend(p);
-}
+  $("mute").onclick = (e) => {
+    feedbackOn = !feedbackOn;
+    e.target.textContent = feedbackOn ? "FEEDBACK: ON" : "FEEDBACK: OFF";
+    feedback(e.target, "light");
+  };
 
-function feedback(el){
-  if(navigator.vibrate) navigator.vibrate(10);
-  el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
-}
+  // ---------------- Utils
+  function fmt(n){
+    if (n < 1000) return n.toFixed(0);
+    const units = ["K","M","B","T","Qa","Qi"];
+    let u = -1;
+    while (n >= 1000 && u < units.length-1){ n /= 1000; u++; }
+    return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + units[u];
+  }
 
-function render(){
-  $("signal").textContent=fmt(state.signal);
-  $("sps").textContent=fmt(state.baseSPS*state.bandwidth);
-  $("bw").textContent=state.bandwidth.toFixed(2)+"×";
+  function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
 
-  const root=$("upgrades");
-  root.innerHTML="";
-  upgrades.forEach(u=>{
-    const unlocked=state.total>=u.unlock;
-    const c=cost(u);
-    const affordable=unlocked && state.signal>=c;
+  function pushLog(elId, tag, msg){
+    const p = document.createElement("p");
+    p.innerHTML = `<span class="tag">${tag}</span>${msg}`;
+    $(elId).prepend(p);
+  }
 
-    const d=document.createElement("div");
-    d.className="up"+(affordable?" affordable":"")+(unlocked?"":" locked");
+  // ---------------- Core State
+  const state = {
+    build: 1,
+    relics: 0,
 
-    d.innerHTML=`
-      <div class="meta">
-        <div class="name">${u.name} (LV ${state.upgrades[u.id]})</div>
-        <div class="desc">${unlocked?u.desc:"CLASSIFIED"}</div>
-        <div class="cost">${unlocked?"COST "+fmt(c):"LOCKED"}</div>
-      </div>
-    `;
+    signal: 0,
+    total: 0,
 
-    const b=document.createElement("button");
-    b.textContent=affordable?"ACQUIRE":"LOCKED";
-    b.disabled=!affordable;
-    b.onclick=()=>{
-      feedback(b);
-      state.signal-=c;
-      state.upgrades[u.id]++;
-      u.apply();
-      render();
-    };
+    baseSPS: 0,
+    clickPower: 1,
 
-    d.appendChild(b);
-    root.appendChild(d);
-  });
-}
+    // derived each frame
+    bandwidth: 1.0,
+    autoPingsPerSec: 0,
 
-$("ping").onclick=e=>{
-  feedback(e.target);
-  const gain=state.click*state.bandwidth;
-  state.signal+=gain;
-  state.total+=gain;
-};
+    corruption: 0, // 0..1
 
-$("save").onclick=()=>{
-  localStorage.setItem("sygn1l",JSON.stringify(state));
-  $("saveState").textContent="LOCAL SAVE";
-  log("STATE SAVED.");
-};
+    phase: 1,
 
-$("wipe").onclick=()=>{
-  localStorage.removeItem("sygn1l");
-  location.reload();
-};
+    flags: {
+      sawPhase2: false,
+      sawPhase3: false,
+      sawPrestigeHint: false
+    },
 
-const saved=localStorage.getItem("sygn1l");
-if(saved) Object.assign(state,JSON.parse(saved));
-else log("SYGN1L INITIALIZED.");
+    upgrades: {
+      dish: 0,
+      probes: 0,
+      scan: 0,
+      tuning: 0,
+      autopinger: 0,
+      echo: 0,
+      dark: 0,
+      lattice: 0,
+      relicAmp: 0
+    }
+  };
 
-setInterval(()=>{
-  const gain=state.baseSPS*state.bandwidth/10;
-  state.signal+=gain;
-  state.total+=gain;
-  render();
-},100);
+  // ---------------- Upgrades with algorithmic effects + unlock milestones
+  const UPG = [
+    {
+      id:"dish",
+      name:"DISH CALIBRATION",
+      unlockAt: 0,
+      baseCost: 10,
+      costMult: 1.18,
+      desc: "+1 SIGNAL/SEC PER LEVEL.",
+      buy(){ state.upgrades.dish++; }
+    },
+    {
+      id:"probes",
+      name:"PROBE SWARM",
+      unlockAt: 120,
+      baseCost: 80,
+      costMult: 1.22,
+      desc: "+1 CLICK POWER PER LEVEL.",
+      buy(){ state.upgrades.probes++; }
+    },
+    {
+      id:"scan",
+      name:"DEEP SCAN",
+      unlockAt: 100,
+      baseCost: 50,
+      costMult: 1.25,
+      desc: "+10% BASE BANDWIDTH PER LEVEL.",
+      buy(){ state.upgrades.scan++; }
+    },
+    {
+      id:"tuning",
+      name:"HARMONIC TUNING",
+      unlockAt: 240,
+      baseCost: 140,
+      costMult: 1.27,
+      desc: "+0.3 SIGNAL/SEC AND +1% BASE BANDWIDTH PER LEVEL.",
+      buy(){ state.upgrades.tuning++; }
+    },
 
-render();
+    // Algorithmic + synergy
+    {
+      id:"autopinger",
+      name:"AUTO-PINGER ROUTINE",
+      unlockAt: 600,
+      baseCost: 520,
+      costMult: 1.30,
+      desc: "ADDS AUTO-PINGS/SEC. SCALES WITH PROBES (SYNERGY).",
+      buy(){ state.upgrades.autopinger++; }
+    },
+    {
+      id:"echo",
+      name:"ECHO INTEGRATOR",
+      unlockAt: 1800,
+      baseCost: 1400,
+      costMult: 1.35,
+      desc: "BANDWIDTH GAINS BONUS: + (3% * LV) * LOG10(SIGNAL+1).",
+      buy(){ state.upgrades.echo++; }
+    },
+    {
+      id:"lattice",
+      name:"HARMONIC LATTICE",
+      unlockAt: 3500,
+      baseCost: 3200,
+      costMult: 1.38,
+      desc: "SPS MULTIPLIES BY (1 + 0.06*LV*SQRT(CORRUPTION*10)).",
+      buy(){ state.upgrades.lattice++; }
+    },
+    {
+      id:"dark",
+      name:"DARK LISTENING",
+      unlockAt: 7000,
+      baseCost: 9000,
+      costMult: 1.45,
+      desc: "IF CORRUPTION > 30%, GLOBAL GAINS × (1 + 0.12*LV).",
+      buy(){ state.upgrades.dark++; }
+    },
+
+    // Prestige-only permanent-ish upgrade
+    {
+      id:"relicAmp",
+      name:"RELIC AMPLIFIER",
+      unlockAt: 0, // but we gate in render by requiring relics > 0
+      baseCost: 3, // costs RELICS
+      costMult: 1.65,
+      desc: "SPEND RELICS. PER LEVEL: GLOBAL MULTIPLIER +8% (PERMANENT).",
+      currency: "relics",
+      buy(){ state.upgrades.relicAmp++; }
+    }
+  ];
+
+  function upgradeLevel(id){ return state.upgrades[id] || 0; }
+
+  function upgradeCost(u){
+    const lvl = upgradeLevel(u.id);
+    const base = u.baseCost;
+    const mult = u.costMult;
+    return Math.floor(base * Math.pow(mult, lvl));
+  }
+
+  // ---------------- Derived math (kept stable, not compounding)
+  function computeBaseSPS(){
+    return upgradeLevel("dish") * 1.0 + upgradeLevel("tuning") * 0.3;
+  }
+
+  function computeClickPower(){
+    return 1 + upgradeLevel("probes") * 1.0;
+  }
+
+  function computeBaseBandwidth(){
+    // base bandwidth from scan/tuning
+    let bw = 1.0;
+    bw *= Math.pow(1.10, upgradeLevel("scan"));
+    bw *= Math.pow(1.01, upgradeLevel("tuning"));
+    return bw;
+  }
+
+  function computeEchoMultiplier(){
+    const lv = upgradeLevel("echo");
+    if (lv <= 0) return 1.0;
+    const logBonus = Math.log10(state.signal + 1);
+    return 1 + (0.03 * lv * logBonus);
+  }
+
+  function computeRelicMultiplier(){
+    const lv = upgradeLevel("relicAmp");
+    return 1 + 0.08 * lv;
+  }
+
+  function computeLatticeMultiplier(){
+    const lv = upgradeLevel("lattice");
+    if (lv <= 0) return 1.0;
+    const term = Math.sqrt(clamp(state.corruption,0,1) * 10);
+    return 1 + 0.06 * lv * term;
+  }
+
+  function computeDarkMultiplier(){
+    const lv = upgradeLevel("dark");
+    if (lv <= 0) return 1.0;
+    return state.corruption > 0.30 ? (1 + 0.12 * lv) : 1.0;
+  }
+
+  function computeAutoPingsPerSec(){
+    const lv = upgradeLevel("autopinger");
+    if (lv <= 0) return 0;
+    const probeFactor = 1 + upgradeLevel("probes") * 0.15;
+    return lv * 0.65 * probeFactor;
+  }
+
+  function recomputeDerived(){
+    state.baseSPS = computeBaseSPS();
+    state.clickPower = computeClickPower();
+    state.bandwidth = computeBaseBandwidth() * computeEchoMultiplier() * computeRelicMultiplier();
+    state.autoPingsPerSec = computeAutoPingsPerSec();
+  }
+
+  function computeSPS(){
+    return state.baseSPS * state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
+  }
+
+  function globalMultiplier(){
+    // Used for click + auto too
+    return state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
+  }
+
+  // ---------------- Corruption system
+  // Increases slowly with total earned and with certain “forbidden” upgrades
+  function updateCorruption(dt){
+    // baseline creep: depends on total progress
+    const creep = 0.0000025 * Math.log10(state.total + 10); // slow
+    // tech creep: higher when you have echo/dark/lattice
+    const tech = (upgradeLevel("echo") * 0.0000015) + (upgradeLevel("lattice") * 0.0000018) + (upgradeLevel("dark") * 0.0000022);
+    // pressing the void “invites” it: tiny increase per second while active
+    const invite = 0.0000010;
+    state.corruption = clamp(state.corruption + (creep + tech + invite) * dt, 0, 1);
+  }
+
+  function corruptionLabel(c){
+    if (c < 0.10) return "DORMANT";
+    if (c < 0.30) return "WHISPERING";
+    if (c < 0.60) return "INCIDENT";
+    if (c < 0.85) return "BREACH";
+    return "OVERRUN";
+  }
+
+  // ---------------- Narrative milestones & objectives
+  function setObjective(text){ $("objective").innerHTML = "OBJECTIVE: " + text; }
+
+  function milestoneCheck(){
+    // Phase II
+    if (!state.flags.sawPhase2 && state.total >= 500){
+      state.flags.sawPhase2 = true;
+      state.phase = Math.max(state.phase, 2);
+      $("phase").textContent = "PHASE II";
+      $("status").textContent = "ARRAY: DRIFT";
+
+      pushLog("log", "SYS", "PHASE II ENGAGED. THE ARRAY BEGINS RETURN TRANSMISSIONS.");
+      pushLog("comms", "LT VANCE", "If this thing talks back, we log it. If it begs, we mute it.");
+      setObjective("REACH 600 TOTAL SIGNAL TO UNLOCK AUTO-PINGER ROUTINE. INCREASE SIGNAL/SEC.");
+    }
+
+    // Phase III
+    if (!state.flags.sawPhase3 && state.total >= 1800){
+      state.flags.sawPhase3 = true;
+      state.phase = Math.max(state.phase, 3);
+      $("phase").textContent = "PHASE III";
+      $("status").textContent = "ARRAY: ACTIVE";
+
+      pushLog("log", "SYS", "PHASE III: RESPONSE PATTERNS DETECTED. NOT RANDOM. NOT FRIENDLY.");
+      pushLog("comms", "DR KESS", "It’s not a signal. It’s an instruction set pretending to be noise.");
+      setObjective("REACH 3500 TOTAL SIGNAL TO UNLOCK HARMONIC LATTICE. WATCH CORRUPTION.");
+    }
+
+    // Prestige hint
+    if (!state.flags.sawPrestigeHint && state.total >= 9000){
+      state.flags.sawPrestigeHint = true;
+      pushLog("comms", "OPS", "We can reset the Array and keep the residue. Call it a Rite. We’ll call it insurance.");
+      pushLog("log", "SYS", "RITE RESET PROTOCOL DISCOVERED. RELICS MAY PERSIST BETWEEN BUILDS.");
+      setObjective("REACH 12,000 TOTAL SIGNAL TO UNLOCK RITE RESET.");
+    }
+  }
+
+  function updateObjectiveFallback(){
+    if (!state.flags.sawPhase2){
+      setObjective("ACQUIRE DISH CALIBRATION. REACH 100 TOTAL SIGNAL TO UNLOCK DEEP SCAN.");
+    } else if (!state.flags.sawPhase3){
+      setObjective("UNLOCK AUTO-PINGER ROUTINE AT 600 TOTAL SIGNAL. PUSH SIGNAL/SEC UP.");
+    } else if (state.total < 12000){
+      setObjective("UNLOCK HARMONIC LATTICE AT 3500 TOTAL SIGNAL. PREPARE FOR RITE RESET AT 12,000.");
+    } else {
+      setObjective("RITE RESET AVAILABLE. CONSIDER RESETTING FOR RELICS (PERMANENT POWER).");
+    }
+  }
+
+  // ---------------- Rendering
+  function renderHUD(){
+    $("signal").textContent = fmt(state.signal);
+    $("sps").textContent = fmt(computeSPS());
+    $("bw").textContent = state.bandwidth.toFixed(2) + "×";
+    $("buildChip").textContent = "BUILD: " + state.build;
+    $("relicChip").textContent = "RELICS: " + state.relics;
+
+    const c = state.corruption;
+    $("corrFill").style.width = (c*100).toFixed(1) + "%";
+    $("corrText").textContent = (c*100).toFixed(1) + "% (" + corruptionLabel(c) + ")";
+
+    // Prestige availability
+    const canPrestige = state.total >= 12000;
+    const gain = prestigeGain();
+    const btn = $("prestige");
+    btn.disabled = !canPrestige;
+    btn.textContent = canPrestige ? `RITE RESET (+${gain} RELICS)` : "RITE RESET (LOCKED)";
+  }
+
+  function renderUpgrades(){
+    const root = $("upgrades");
+    root.innerHTML = "";
+
+    for (const u of UPG){
+      // Relic Amplifier is hidden until you have at least 1 relic OR already bought
+      if (u.id === "relicAmp" && (state.relics <= 0 && upgradeLevel("relicAmp") === 0)){
+        continue;
+      }
+
+      const unlocked = state.total >= u.unlockAt;
+      const lvl = upgradeLevel(u.id);
+      const cost = upgradeCost(u);
+      const currency = u.currency || "signal";
+      const have = currency === "relics" ? state.relics : state.signal;
+      const affordable = unlocked && have >= cost;
+
+      const row = document.createElement("div");
+      row.className = "up" + (affordable ? " affordable" : "") + (!unlocked ? " locked" : "");
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = `${u.name} (LV ${lvl})`;
+
+      const desc = document.createElement("div");
+      desc.className = "desc";
+      desc.textContent = unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlockAt)} TOTAL SIGNAL.`;
+
+      const costEl = document.createElement("div");
+      costEl.className = "cost";
+      costEl.textContent = unlocked ? `COST: ${fmt(cost)} ${currency.toUpperCase()}` : "STATUS: LOCKED";
+
+      meta.appendChild(name);
+      meta.appendChild(desc);
+      meta.appendChild(costEl);
+
+      const btn = document.createElement("button");
+      btn.textContent = unlocked ? (affordable ? "ACQUIRE" : "LOCKED") : "CLASSIFIED";
+      btn.disabled = !affordable;
+
+      btn.onclick = () => {
+        if (!affordable) return;
+        feedback(btn, "light");
+
+        if (currency === "relics") state.relics -= cost;
+        else state.signal -= cost;
+
+        u.buy();
+        recomputeDerived();
+        renderUpgrades();
+      };
+
+      row.appendChild(meta);
+      row.appendChild(btn);
+      root.appendChild(row);
+    }
+  }
+
+  // ---------------- Core gain
+  function gain(amount){
+    state.signal += amount;
+    state.total += amount;
+  }
+
+  // ---------------- Prestige
+  function prestigeGain(){
+    // Smooth scaling: 0 until 12k, then grows with sqrt
+    const over = Math.max(0, state.total - 12000);
+    const base = 1;
+    const extra = Math.floor(Math.sqrt(over / 6000)); // grows slowly
+    return base + extra;
+  }
+
+  function doPrestige(){
+    const gainRelics = prestigeGain();
+    state.relics += gainRelics;
+    state.build += 1;
+
+    pushLog("log", "SYS", `RITE RESET EXECUTED. +${gainRelics} RELICS RECOVERED.`);
+    pushLog("comms", "MOTHERLINE", "THE ARRAY FORGETS. YOU DO NOT.");
+    pushLog("comms", "LT VANCE", "New build. Same void. Keep your hands inside the protocol.");
+
+    // Reset progression, keep relics + relic amplifier levels (permanent)
+    const keepRelicAmp = state.upgrades.relicAmp || 0;
+
+    state.signal = 0;
+    state.total = 0;
+    state.corruption = Math.max(0, state.corruption * 0.25); // residue remains
+    state.phase = 1;
+    state.flags.sawPhase2 = false;
+    state.flags.sawPhase3 = false;
+    state.flags.sawPrestigeHint = false;
+
+    // wipe upgrades except relicAmp
+    for (const k in state.upgrades) state.upgrades[k] = 0;
+    state.upgrades.relicAmp = keepRelicAmp;
+
+    recomputeDerived();
+    updateObjectiveFallback();
+    renderUpgrades();
+  }
+
+  // ---------------- Controls
+  $("ping").addEventListener("click", (e) => {
+    feedback(e.currentTarget, "light");
+    gain(state.clickPower * globalMultiplier());
+    // small “invitation” bump
+    state.corruption = clamp(state.corruption + 0.0006, 0, 1);
+  }, { passive:true });
+
+  $("prestige").onclick = (e) => {
+    if (e.currentTarget.disabled) return;
+    feedback(e.currentTarget, "strong");
+    doPrestige();
+  };
+
+  // Save/Load
+  const KEY = "sygn1l_full_v1";
+
+  $("save").onclick = (e) => {
+    feedback(e.currentTarget, "light");
+    localStorage.setItem(KEY, JSON.stringify(state));
+    $("saveState").textContent = "LOCAL SAVE";
+    pushLog("log", "SYS", "STATE SAVED. THE ARRAY PERSISTS BETWEEN SESSIONS.");
+  };
+
+  $("wipe").onclick = (e) => {
+    feedback(e.currentTarget, "strong");
+    localStorage.removeItem(KEY);
+    location.reload();
+  };
+
+  function load(){
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return false;
+    try{
+      const data = JSON.parse(raw);
+      // shallow merge, keep structure
+      for (const k in data){
+        if (typeof data[k] === "object" && data[k] && state[k]){
+          Object.assign(state[k], data[k]);
+        } else {
+          state[k] = data[k];
+        }
+      }
+      return true;
+    }catch(_){ return false; }
+  }
+
+  // Boot narrative
+  const loaded = load();
+  if (!loaded){
+    pushLog("log", "SYS", "SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
+    pushLog("comms", "OPS", "Start small. Ping it. If it answers, don’t answer back.");
+    pushLog("comms", "DR KESS", "We’re not mining a signal. We’re excavating intent.");
+  } else {
+    pushLog("log", "SYS", "RECOVERED PRIOR STATE. THE ARRAY RESUMES LISTENING.");
+    pushLog("comms", "MOTHERLINE", "WELCOME BACK. THE INTERVAL NEVER ENDED.");
+  }
+
+  // ---------------- Main loop
+  recomputeDerived();
+  renderUpgrades();
+  updateObjectiveFallback();
+  renderHUD();
+
+  let last = performance.now();
+  function loop(now){
+    const dt = Math.min(0.05, (now - last)/1000);
+    last = now;
+
+    recomputeDerived();
+
+    // passive SPS
+    const sps = computeSPS();
+    if (sps > 0) gain(sps * dt);
+
+    // auto pings: they act like fractional “clicks”
+    if (state.autoPingsPerSec > 0){
+      const pings = state.autoPingsPerSec * dt;
+      gain(pings * (state.clickPower * globalMultiplier()));
+    }
+
+    updateCorruption(dt);
+    milestoneCheck();
+    renderHUD();
+    renderUpgrades();
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
 </script>
 </body>
 </html>
