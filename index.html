@@ -895,12 +895,10 @@ input.texty{
 
   // ===== Decoder mechanic
   function decoderCost(){
-    // Gets more expensive each letter
     const n = state.decoder.lettersRevealed;
     return Math.floor(900 * Math.pow(1.28, n));
   }
   function scrambledView(text){
-    // Show revealed letters in correct positions, unrevealed as ▒ and keep the whole line scrambled until cipher solved
     const clean = text.toUpperCase();
     const totalChars = clean.length;
     const reveal = clamp(state.decoder.lettersRevealed, 0, totalChars);
@@ -947,15 +945,18 @@ input.texty{
     const preview = scrambledView(state.decoder.message);
     const solved = state.decoder.cipherSolved;
 
+    // Fixed: use case-insensitive regex for counting letters
+    const lettersTotal = state.decoder.message.replace(/[^A-Z]/gi, '').length;
+
     openModal("DECODER INTERFACE", `
       <p><span class="tag">SYS</span>Engrams detected in carrier noise. Decrypting is computationally expensive.</p>
       <p><span class="tag">DEC</span><strong>OUTPUT:</strong><br><span style="letter-spacing:.12em">${escapeHtml(preview)}</span></p>
-      <p><span class="tag">STAT</span>Revealed: <strong>${state.decoder.lettersRevealed}</strong> / ${state.decoder.message.length}</p>
+      <p><span class="tag">STAT</span>Revealed: <strong>${state.decoder.lettersRevealed}</strong> / ${lettersTotal}</p>
       <p><span class="tag">COST</span>Next Engram: <strong>${fmt(cost)}</strong> SIGNAL</p>
 
       <div class="inputRow">
         <button class="smallBtn" id="decryptBtn" ${canBuy ? "" : "disabled"}>${solved ? "CIPHER SOLVED" : (canBuy ? "DECRYPT ENGRAM" : "INSUFFICIENT SIGNAL")}</button>
-        <button class="smallBtn" id="cipherBtn" ${state.decoder.lettersRevealed >= state.decoder.message.replace(/[^A-Z]/g,'').length ? "" : "disabled"}>
+        <button class="smallBtn" id="cipherBtn" ${state.decoder.lettersRevealed >= lettersTotal ? "" : "disabled"}>
           SOLVE CIPHER KEY
         </button>
       </div>
@@ -972,8 +973,6 @@ input.texty{
         if (state.signal < c) return;
         state.signal -= c;
 
-        // advance reveals (letters only)
-        const lettersTotal = state.decoder.message.replace(/[^A-Z]/gi,'').length;
         state.decoder.lettersRevealed = Math.min(lettersTotal, state.decoder.lettersRevealed + 1);
 
         pushLog("log","DEC","Engram decrypted. Pattern density increased.");
@@ -989,7 +988,7 @@ input.texty{
         state.decoder.cipherSolved = true;
         state.decoder.scrambled = false;
         pushLog("comms","DR KESS","Cipher key resolved. The message is coherent.");
-        pushLog("log","SYS",`ALIEN MESSAGE: "${escapeHtml(state.decoder.message)}"`);
+        pushLog("log","SYS",`ALIEN MESSAGE: ${escapeHtml(state.decoder.message)}`);
         popupComms("ALIEN CHANNEL", state.decoder.message);
         touchLocalUpdated();
         saveLocal();
