@@ -1,1499 +1,421 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-<title>SYGN1L</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <title>SYGN1L</title>
 
-<style>
-:root{
-  --bg0:#020402; --bg1:#010701;
-  --text:#CFFFD6; --muted:#7EDB92;
-  --accent:#39FF6A; --danger:#FF3B6B;
-  --border:rgba(57,255,106,.25);
-  --radius:16px; --shadow:0 10px 22px rgba(0,0,0,.55);
-  --glow:0 0 18px rgba(57,255,106,.25);
-}
+  <style>
+    :root{
+      --bg:#020402;
+      --panel: rgba(0,0,0,.35);
+      --border: rgba(60,255,120,.22);
+      --text: #CFFFD6;
+      --muted:#7EDB92;
 
-html{ background:var(--bg0); -webkit-text-size-adjust:100%; }
-body{
-  margin:0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  color:var(--text);
-  background:
-    radial-gradient(900px 600px at 60% 15%, rgba(57,255,106,.10), transparent 60%),
-    linear-gradient(180deg, var(--bg1), var(--bg0));
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
-  touch-action:manipulation;
-  padding:14px 12px calc(24px + env(safe-area-inset-bottom));
-}
+      --p0:#39FF6A;   /* phase tints */
+      --p1:#62FF9D;
+      --p2:#A0FFD0;
+      --p3:#8CFFF2;
+      --p4:#FF6BE5;
+      --p5:#FF3B6B;
 
-/* CRT vignette */
-body::before{
-  content:"";
-  position:fixed; inset:0;
-  pointer-events:none;
-  background: radial-gradient(1200px 900px at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.65) 100%);
-  z-index:0;
-}
+      --accent: var(--p0);
+      --danger: #FF3B6B;
 
-/* scanlines */
-.fx{ position:fixed; inset:0; pointer-events:none; z-index:0; }
-.fx.scanlines{
-  background:repeating-linear-gradient(
-    to bottom,
-    rgba(57,255,106,.05),
-    rgba(57,255,106,.05) 1px,
-    rgba(0,0,0,0) 4px,
-    rgba(0,0,0,0) 8px
-  );
-  opacity:.24;
-}
+      --r: 16px;
+      --shadow: 0 10px 24px rgba(0,0,0,.55);
+      --glow: 0 0 18px rgba(60,255,120,.22);
+    }
 
-.wrap{
-  position:relative; z-index:1;
-  max-width:860px; margin:0 auto;
-  display:grid; gap:18px;
-}
+    html{ background:var(--bg); -webkit-text-size-adjust:100%; }
+    body{
+      margin:0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color:var(--text);
+      background:
+        radial-gradient(900px 600px at 60% 10%, rgba(60,255,120,.12), transparent 60%),
+        linear-gradient(180deg, #010701, var(--bg));
+      overflow-y:auto;
+      -webkit-overflow-scrolling:touch;
+      touch-action:manipulation;
+      padding: 12px 12px calc(24px + env(safe-area-inset-bottom));
+    }
 
-.card{
-  border:1px solid var(--border);
-  border-radius:var(--radius);
-  box-shadow:var(--shadow);
-  background:linear-gradient(180deg, rgba(6,28,12,.62), rgba(3,14,7,.40));
-  overflow:hidden;
-  position:relative;
-}
-.card::after{
-  content:"";
-  position:absolute; inset:-2px;
-  pointer-events:none;
-  box-shadow: inset 0 0 0 1px rgba(57,255,106,.08), inset 0 0 22px rgba(57,255,106,.06);
-}
+    /* CRT vignette + scanlines */
+    body::before{
+      content:"";
+      position:fixed; inset:0;
+      pointer-events:none;
+      background: radial-gradient(1200px 900px at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.68) 100%);
+      z-index:0;
+    }
+    .scan{
+      position:fixed; inset:0;
+      pointer-events:none;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(60,255,120,.06),
+        rgba(60,255,120,.06) 1px,
+        rgba(0,0,0,0) 4px,
+        rgba(0,0,0,0) 8px
+      );
+      opacity:.22;
+      z-index:0;
+    }
 
-.pad{ padding:14px; position:relative; }
+    .wrap{ position:relative; z-index:1; max-width:860px; margin:0 auto; display:grid; gap:14px; }
 
-h1{ margin:0; letter-spacing:.25em; font-size:18px; }
-.subtitle{ margin-top:6px; font-size:12px; color:var(--muted); letter-spacing:.06em; }
+    .card{
+      border:1px solid var(--border);
+      border-radius:var(--r);
+      box-shadow:var(--shadow);
+      background: linear-gradient(180deg, rgba(6,28,12,.62), rgba(3,14,7,.40));
+      overflow:hidden;
+      position:relative;
+    }
+    .card::after{
+      content:"";
+      position:absolute; inset:-2px;
+      pointer-events:none;
+      box-shadow: inset 0 0 0 1px rgba(60,255,120,.08), inset 0 0 22px rgba(60,255,120,.06);
+    }
 
-.stats{
-  margin-top:12px;
-  display:grid; grid-template-columns:1fr;
-  gap:10px;
-}
-@media(min-width:420px){ .stats{ grid-template-columns:repeat(3,1fr); } }
+    .hd{
+      display:flex; justify-content:space-between; align-items:center;
+      flex-wrap:wrap; gap:10px;
+      padding:10px 12px;
+      border-bottom:1px solid rgba(60,255,120,.2);
+      background: linear-gradient(180deg, rgba(0,0,0,.22), rgba(0,0,0,0));
+    }
+    .pad{ padding:12px; position:relative; }
 
-.stat{
-  border:1px solid rgba(57,255,106,.2);
-  border-radius:12px;
-  padding:10px;
-  background:rgba(0,0,0,.30);
-}
-.stat .k{ font-size:11px; color:var(--muted); letter-spacing:.10em; text-transform:uppercase; }
-.stat .v{ margin-top:6px; font-size:18px; overflow-wrap:anywhere; text-shadow:0 0 10px rgba(57,255,106,.10); }
+    h1{ margin:0; letter-spacing:.22em; font-size:18px; }
+    .sub{ margin-top:6px; font-size:12px; color:var(--muted); letter-spacing:.06em; }
 
-.hd{
-  display:flex; justify-content:space-between; align-items:center;
-  flex-wrap:wrap; gap:10px;
-  padding:12px 14px;
-  border-bottom:1px solid rgba(57,255,106,.2);
-  background:linear-gradient(180deg, rgba(0,0,0,.22), rgba(0,0,0,0));
-  position:relative;
-}
+    .chip{
+      border:1px solid rgba(60,255,120,.25);
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:10px;
+      letter-spacing:.14em;
+      display:inline-flex; align-items:center; gap:8px;
+      background: rgba(0,0,0,.22);
+      white-space:nowrap;
+      user-select:none;
+    }
+    .dot{
+      width:8px;height:8px;border-radius:50%;
+      background: var(--accent);
+      box-shadow: 0 0 14px rgba(60,255,120,.25);
+    }
+    .chip.clicky{ cursor:pointer; }
+    .chip.clicky:active{ transform: translateY(1px); }
 
-.chip{
-  border:1px solid rgba(57,255,106,.25);
-  border-radius:999px;
-  padding:6px 10px;
-  font-size:10px; letter-spacing:.14em;
-  display:inline-flex; align-items:center; gap:8px;
-  background:rgba(0,0,0,.22);
-  white-space:nowrap;
-  user-select:none;
-  -webkit-tap-highlight-color:transparent;
-}
-.chip.clickable{ cursor:pointer; }
-.dot{ width:8px;height:8px;border-radius:50%; background:var(--accent); box-shadow:var(--glow); }
+    .stats{ display:grid; grid-template-columns:1fr; gap:10px; margin-top:10px; }
+    @media(min-width:420px){ .stats{ grid-template-columns:repeat(3,1fr); } }
 
-button{
-  font:inherit;
-  border-radius:14px;
-  border:1px solid rgba(57,255,106,.32);
-  background:rgba(57,255,106,.08);
-  color:var(--text);
-  padding:14px;
-  cursor:pointer;
-  user-select:none;
-  -webkit-tap-highlight-color:transparent;
-  transition:.15s;
-}
-button:hover{ box-shadow:var(--glow); }
-button:active{ transform:translateY(1px); }
-button:disabled{ opacity:.5; cursor:not-allowed; box-shadow:none; }
+    .stat{
+      border:1px solid rgba(60,255,120,.2);
+      border-radius:12px;
+      padding:10px;
+      background: rgba(0,0,0,.30);
+    }
+    .k{ font-size:11px; color:var(--muted); letter-spacing:.10em; text-transform:uppercase; }
+    .v{ margin-top:6px; font-size:18px; text-shadow:0 0 10px rgba(60,255,120,.10); overflow-wrap:anywhere; }
 
-.big{
-  width:100%;
-  font-weight:900;
-  letter-spacing:.14em;
-  font-size:18px;
-  padding:18px 14px;
-  background:linear-gradient(180deg, rgba(57,255,106,.16), rgba(57,255,106,.06));
-  box-shadow: inset 0 0 0 1px rgba(57,255,106,.10);
-}
+    .bar{
+      height:10px; border-radius:999px;
+      border:1px solid rgba(60,255,120,.22);
+      background: rgba(0,0,0,.28);
+      overflow:hidden;
+    }
+    .fill{ height:100%; width:0%; background: linear-gradient(90deg, rgba(60,255,120,.55), rgba(60,255,120,.18)); }
+    .fill.danger{ background: linear-gradient(90deg, rgba(255,59,107,.55), rgba(255,59,107,.18)); }
 
-.grid2{ display:grid; gap:10px; margin-top:12px; }
-@media(min-width:420px){ .grid2{ grid-template-columns:1fr 1fr; } }
+    button{
+      font:inherit;
+      border-radius:14px;
+      border:1px solid rgba(60,255,120,.32);
+      background: rgba(60,255,120,.08);
+      color:var(--text);
+      padding:14px 12px;
+      cursor:pointer;
+      user-select:none;
+      -webkit-tap-highlight-color:transparent;
+      transition: .12s;
+      letter-spacing:.10em;
+      text-transform:uppercase;
+    }
+    button:active{ transform: translateY(1px); }
+    button:disabled{ opacity:.55; cursor:not-allowed; box-shadow:none; }
 
-.muted{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.45; }
+    .big{
+      width:100%;
+      font-weight:900;
+      font-size:18px;
+      padding:18px 14px;
+      background: linear-gradient(180deg, rgba(60,255,120,.18), rgba(60,255,120,.06));
+      box-shadow: inset 0 0 0 1px rgba(60,255,120,.10);
+    }
 
-.bar{
-  height:10px; border-radius:999px;
-  border:1px solid rgba(57,255,106,.22);
-  background:rgba(0,0,0,.28);
-  overflow:hidden;
-}
-.fill{
-  height:100%;
-  width:0%;
-  background:linear-gradient(90deg, rgba(57,255,106,.55), rgba(57,255,106,.20));
-  box-shadow:0 0 18px rgba(57,255,106,.20);
-}
-.fill.danger{
-  background:linear-gradient(90deg, rgba(255,59,107,.55), rgba(255,59,107,.18));
-  box-shadow:0 0 18px rgba(255,59,107,.18);
-}
+    /* 2 buttons per row */
+    .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+    .grid2 > * { min-width: 0; }
 
-.upgrades{ display:flex; flex-direction:column; gap:12px; }
-.up{
-  border:1px solid rgba(57,255,106,.2);
-  border-radius:14px;
-  padding:12px;
-  background:rgba(0,0,0,.30);
-  display:flex; flex-wrap:wrap;
-  gap:12px; align-items:center;
-}
-.up.affordable{ box-shadow:0 0 24px rgba(57,255,106,.18); }
-.up.locked{ opacity:.60; border-style:dashed; }
-.up .meta{ flex:1; min-width:220px; }
-.up .name{ font-weight:900; letter-spacing:.04em; }
-.up .desc,.up .cost{ font-size:12px; margin-top:6px; color:var(--muted); }
-.up .cost{ color:rgba(207,255,214,.90); }
+    .muted{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.45; }
 
-.log{
-  max-height:320px;
-  overflow:auto;
-  -webkit-overflow-scrolling:touch;
-}
-.log p{
-  margin:0 0 10px;
-  font-size:12px;
-  line-height:1.55;
-  color:rgba(207,255,214,.88);
-}
-.tag{
-  display:inline-block;
-  padding:2px 8px;
-  border:1px solid rgba(57,255,106,.22);
-  border-radius:999px;
-  font-size:10px;
-  letter-spacing:.10em;
-  color:rgba(207,255,214,.95);
-  margin-right:8px;
-}
+    /* Scope */
+    .scopeWrap{
+      margin-top:10px;
+      border:1px solid rgba(60,255,120,.22);
+      border-radius:12px;
+      background: rgba(0,0,0,.35);
+      overflow:hidden;
+    }
+    .scopeTop{
+      display:flex; justify-content:space-between; gap:10px;
+      padding:8px 10px;
+      border-bottom:1px solid rgba(60,255,120,.14);
+      font-size:10px; letter-spacing:.12em;
+      color: rgba(207,255,214,.92);
+    }
+    .scopeMeta{ color:var(--muted); letter-spacing:.10em; text-transform:uppercase; }
+    canvas#scope{ display:block; width:100%; height:84px; background: rgba(0,0,0,.25); }
 
-.flash{ animation:flash .18s ease-out; }
-@keyframes flash{
-  from{ box-shadow:0 0 30px rgba(57,255,106,.6); }
-  to{ box-shadow:none; }
-}
+    /* Upgrades */
+    .upgrades{ display:flex; flex-direction:column; gap:10px; }
+    .up{
+      border:1px solid rgba(60,255,120,.2);
+      border-radius:14px;
+      padding:12px;
+      background: rgba(0,0,0,.30);
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    .up.afford{ box-shadow: var(--glow); border-color: rgba(60,255,120,.36); }
+    .up.locked{ opacity:.62; border-style:dashed; }
+    .meta{ flex:1; min-width:200px; }
+    .name{ font-weight:900; letter-spacing:.04em; }
+    .desc,.cost{ font-size:12px; margin-top:6px; color:var(--muted); }
+    .cost{ color: rgba(207,255,214,.92); }
 
-/* Scope */
-.scopeWrap{
-  margin-top:10px;
-  border:1px solid rgba(57,255,106,.22);
-  border-radius:12px;
-  background:rgba(0,0,0,.35);
-  overflow:hidden;
-}
-.scopeTop{
-  display:flex;
-  justify-content:space-between;
-  gap:10px;
-  padding:8px 10px;
-  border-bottom:1px solid rgba(57,255,106,.14);
-  font-size:10px;
-  letter-spacing:.12em;
-  color:rgba(207,255,214,.92);
-}
-.scopeMeta{
-  color:var(--muted);
-  letter-spacing:.10em;
-  text-transform:uppercase;
-}
-canvas#scope{
-  display:block;
-  width:100%;
-  height:84px;
-  background:rgba(0,0,0,.25);
-}
+    /* Logs */
+    .log{ max-height:300px; overflow:auto; -webkit-overflow-scrolling:touch; }
+    .log p{ margin:0 0 10px; font-size:12px; line-height:1.55; color: rgba(207,255,214,.90); }
+    .tag{
+      display:inline-block;
+      padding:2px 8px;
+      border:1px solid rgba(60,255,120,.22);
+      border-radius:999px;
+      font-size:10px;
+      letter-spacing:.10em;
+      margin-right:8px;
+      color: rgba(207,255,214,.95);
+    }
 
-/* Popups (tap to close) */
-.popHost{
-  position:fixed; top:12px; left:12px; right:12px;
-  z-index:999; display:flex; flex-direction:column; gap:10px;
-  pointer-events:none;
-}
-.pop{
-  pointer-events:auto;
-  max-width:860px; margin:0 auto;
-  border:1px solid rgba(57,255,106,.25);
-  border-radius:14px;
-  background:rgba(0,0,0,.78);
-  box-shadow:0 10px 26px rgba(0,0,0,.55), 0 0 20px rgba(57,255,106,.15);
-  padding:10px 12px;
-}
-.pop .who{
-  font-size:10px; letter-spacing:.14em;
-  color:rgba(126,219,146,.95);
-  margin-bottom:6px; text-transform:uppercase;
-}
-.pop .msg{
-  font-size:12px; line-height:1.5;
-  color:rgba(207,255,214,.94);
-}
+    /* Popup comms */
+    .popHost{
+      position:fixed; top:12px; left:12px; right:12px;
+      z-index:999;
+      display:flex; flex-direction:column; gap:10px;
+      pointer-events:none;
+    }
+    .pop{
+      pointer-events:auto;
+      max-width:860px;
+      margin:0 auto;
+      border:1px solid rgba(60,255,120,.25);
+      border-radius:14px;
+      background: rgba(0,0,0,.76);
+      box-shadow: 0 10px 26px rgba(0,0,0,.55), 0 0 20px rgba(60,255,120,.12);
+      padding:10px 12px;
+    }
+    .pop .who{ font-size:10px; letter-spacing:.14em; color: var(--muted); text-transform:uppercase; margin-bottom:6px; }
+    .pop .msg{ font-size:12px; line-height:1.5; }
+    .pop .hint{ font-size:10px; color: rgba(207,255,214,.7); margin-top:6px; letter-spacing:.08em; }
 
-/* Modal */
-.modalBack{
-  position:fixed; inset:0;
-  background:rgba(0,0,0,.68);
-  z-index:1000;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  padding:14px 12px calc(14px + env(safe-area-inset-bottom));
-}
-.modal{
-  width:min(860px, 100%);
-  max-height:min(78vh, 680px);
-  border:1px solid rgba(57,255,106,.28);
-  border-radius:16px;
-  background:rgba(0,0,0,.86);
-  box-shadow:0 16px 40px rgba(0,0,0,.6), 0 0 28px rgba(57,255,106,.12);
-  overflow:hidden;
-}
-.modalHd{
-  padding:12px 14px;
-  border-bottom:1px solid rgba(57,255,106,.18);
-  display:flex; align-items:center; justify-content:space-between; gap:10px;
-}
-.modalHd .t{
-  letter-spacing:.14em;
-  font-size:11px;
-  color:rgba(207,255,214,.95);
-}
-.modalBody{
-  padding:14px;
-  overflow:auto;
-  -webkit-overflow-scrolling:touch;
-  max-height:calc(78vh - 56px);
-}
-.modalBody p{
-  margin:0 0 12px;
-  font-size:12px;
-  line-height:1.6;
-  color:rgba(207,255,214,.92);
-}
-.smallBtn{
-  padding:10px 12px;
-  border-radius:12px;
-  font-size:12px;
-}
-input.texty{
-  width:100%;
-  box-sizing:border-box;
-  padding:12px;
-  border-radius:10px;
-  border:1px solid rgba(57,255,106,.3);
-  background:rgba(0,0,0,.3);
-  color:inherit;
-}
-</style>
+    /* Modal */
+    .modalBack{
+      position:fixed; inset:0;
+      display:none;
+      background: rgba(0,0,0,.72);
+      z-index:1000;
+      align-items:center;
+      justify-content:center;
+      padding: 14px;
+    }
+    .modal{
+      width:min(860px, 100%);
+      max-height: min(80vh, 640px);
+      overflow:auto;
+      -webkit-overflow-scrolling:touch;
+      border:1px solid rgba(60,255,120,.25);
+      border-radius: 16px;
+      background: rgba(0,0,0,.82);
+      box-shadow: 0 16px 40px rgba(0,0,0,.65), 0 0 18px rgba(60,255,120,.14);
+    }
+    .modalHd{
+      position:sticky; top:0;
+      padding:10px 12px;
+      border-bottom:1px solid rgba(60,255,120,.18);
+      background: rgba(0,0,0,.90);
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+    }
+    .modalTitle{ font-size:12px; letter-spacing:.14em; text-transform:uppercase; color: rgba(207,255,214,.95); }
+    .modalBody{ padding:12px; color: rgba(207,255,214,.92); font-size:12px; line-height:1.55; }
+    .texty{
+      width:100%;
+      box-sizing:border-box;
+      border-radius:12px;
+      border:1px solid rgba(60,255,120,.25);
+      background: rgba(0,0,0,.35);
+      color: var(--text);
+      padding:12px;
+      font:inherit;
+      outline:none;
+    }
+  </style>
 </head>
 
 <body>
-<div class="fx scanlines"></div>
-<div class="popHost" id="popHost"></div>
+  <div class="scan"></div>
+  <div class="popHost" id="popHost"></div>
 
-<!-- Modal -->
-<div class="modalBack" id="modalBack" aria-hidden="true">
-  <div class="modal">
-    <div class="modalHd">
-      <div class="t" id="modalTitle">TRANSMISSION</div>
-      <button class="smallBtn" id="modalClose">CLOSE</button>
+  <!-- Modal -->
+  <div class="modalBack" id="modalBack" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modalHd">
+        <div class="modalTitle" id="modalTitle">TRANSMISSION</div>
+        <button id="modalClose" style="padding:10px 12px">CLOSE</button>
+      </div>
+      <div class="modalBody" id="modalBody"></div>
     </div>
-    <div class="modalBody" id="modalBody"></div>
   </div>
-</div>
 
-<div class="wrap">
+  <div class="wrap">
 
-  <header class="card">
-    <div class="pad">
-      <h1>SYGN1L</h1>
-      <div class="subtitle">THE ARRAY LISTENS. THE VOID REPLIES IN ARITHMETIC.</div>
+    <header class="card">
+      <div class="pad">
+        <h1>SYGN1L</h1>
+        <div class="sub" id="subtitle">THE ARRAY LISTENS. THE VOID REPLIES IN ARITHMETIC.</div>
 
-      <div class="stats">
-        <div class="stat"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
-        <div class="stat"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
-        <div class="stat"><div class="k">BANDWIDTH</div><div class="v" id="bw">1.00×</div></div>
-      </div>
-
-      <div class="scopeWrap">
-        <div class="scopeTop">
-          <div>ARRAY SCOPE</div>
-          <div class="scopeMeta" id="scopeLabel">LOCK: 0%</div>
+        <div class="stats">
+          <div class="stat"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
+          <div class="stat"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
+          <div class="stat"><div class="k">PHASE TINT</div><div class="v" id="phaseTint">P1</div></div>
         </div>
-        <canvas id="scope"></canvas>
+
+        <div class="scopeWrap">
+          <div class="scopeTop">
+            <div>ARRAY SCOPE</div>
+            <div class="scopeMeta" id="scopeLabel">LOCK: 0%</div>
+          </div>
+          <canvas id="scope"></canvas>
+        </div>
+
+        <div style="height:10px"></div>
+        <div class="stat">
+          <div class="k">CORRUPTION</div>
+          <div class="bar"><div class="fill danger" id="corrFill"></div></div>
+          <div class="muted" id="corrText">0% (DORMANT)</div>
+        </div>
+      </div>
+    </header>
+
+    <section class="card">
+      <div class="hd">
+        <div>
+          <span class="chip"><span class="dot"></span><span id="phase">PHASE 1</span></span>
+          <span class="chip" id="status">ARRAY: STABLE</span>
+          <span class="chip" id="buildChip">BUILD: 1</span>
+          <span class="chip" id="relicChip">RELICS: 0</span>
+        </div>
+        <div>
+          <span class="chip clicky" id="userChip" title="Tap to set username">USER: GUEST</span>
+          <span class="chip" id="syncChip">SYNC: LOCAL</span>
+          <span class="chip" id="aiChip">AI: OFF</span>
+        </div>
       </div>
 
-      <div style="height:10px"></div>
-      <div class="stat">
-        <div class="k">CORRUPTION</div>
-        <div class="bar"><div class="fill danger" id="corrFill"></div></div>
-        <div class="muted" id="corrText">0% (DORMANT)</div>
+      <div class="pad">
+        <button class="big" id="ping">PING VOID</button>
+
+        <div class="grid2">
+          <button id="saveBtn">SAVE</button>
+          <button id="helpBtn">MANUAL</button>
+        </div>
+
+        <div class="grid2">
+          <button id="riteBtn" disabled>RITE</button>
+          <button id="wipeBtn">WIPE</button>
+        </div>
+
+        <div class="grid2">
+          <button id="aiBtn">AI COMMS</button>
+          <button id="fbBtn">FEEDBACK</button>
+        </div>
+
+        <div class="muted" id="objective">OBJECTIVE: Tap PING VOID, then buy DISH.</div>
       </div>
-    </div>
-  </header>
+    </section>
 
-  <!-- ACCOUNT -->
-  <section class="card" id="accountCard">
-    <div class="hd">
-      <div>ACCOUNT</div>
-      <div class="muted" id="authStatus">NOT SIGNED IN</div>
-    </div>
-    <div class="pad">
-      <input id="authEmail" class="texty" type="email" inputmode="email" autocomplete="email" placeholder="email">
-      <div style="height:8px"></div>
-      <input id="authPassword" class="texty" type="password" autocomplete="current-password" placeholder="password">
-
-      <div class="grid2">
-        <button id="signInBtn">SIGN IN</button>
-        <button id="signUpBtn">SIGN UP</button>
+    <section class="card">
+      <div class="hd">
+        <div>ACCOUNT</div>
+        <div class="muted">EMAIL/PASS TO SYNC SAVES</div>
       </div>
-
-      <div style="margin-top:10px">
-        <button id="signOutBtn" disabled>SIGN OUT</button>
+      <div class="pad">
+        <input class="texty" id="email" placeholder="email" autocomplete="email" inputmode="email" />
+        <div style="height:10px"></div>
+        <input class="texty" id="pass" placeholder="password" autocomplete="current-password" type="password" />
+        <div class="grid2">
+          <button id="signUpBtn">SIGNUP</button>
+          <button id="signInBtn">SIGNIN</button>
+        </div>
+        <div class="grid2">
+          <button id="signOutBtn" disabled>SIGNOUT</button>
+          <button id="whoBtn">WHOAMI</button>
+        </div>
+        <div class="muted" id="authStatus">STATUS: NOT SIGNED IN</div>
       </div>
+    </section>
 
-      <div class="muted" style="margin-top:10px;font-size:11px;line-height:1.45">
-        Sign in to keep your save safe across devices. Local save still works offline.
+    <section class="card">
+      <div class="hd">
+        <div>BUFFS</div>
+        <div class="muted">AVAILABLE BUFFS GLOW</div>
       </div>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="hd">
-      <div>
-        <span class="chip"><span class="dot"></span><span id="phase">PHASE I</span></span>
-        <span class="chip" id="status">ARRAY: STABLE</span>
-        <span class="chip" id="buildChip">BUILD: 1</span>
-        <span class="chip" id="relicChip">RELICS: 0</span>
+      <div class="pad">
+        <div class="upgrades" id="upgrades"></div>
       </div>
-      <div>
-        <span class="chip" id="syncChip">SYNC: LOCAL</span>
-        <span class="chip clickable" id="userChip" title="Tap to edit username">USER: GUEST</span>
+    </section>
+
+    <section class="card">
+      <div class="hd">
+        <div>COMMS</div>
+        <div class="muted">TAP POPUPS TO CLOSE</div>
       </div>
-    </div>
-
-    <div class="pad">
-      <button class="big" id="ping">PING THE VOID</button>
-
-      <div class="grid2">
-        <button id="save">SAVE</button>
-        <button id="wipe">WIPE</button>
+      <div class="pad">
+        <div class="log" id="comms"></div>
       </div>
+    </section>
 
-      <div class="grid2">
-        <button id="prestige" disabled>RITE RESET (LOCKED)</button>
-        <button id="feedbackBtn">FEEDBACK: ON</button>
+    <section class="card">
+      <div class="hd">
+        <div>LOG</div>
+        <div class="muted">MILESTONES REVEAL CONTEXT</div>
       </div>
-
-      <div class="grid2">
-        <button id="aiBtn">DYNAMIC COMMS: ON</button>
-        <span class="chip" id="aiChip">AI: READY</span>
+      <div class="pad">
+        <div class="log" id="log"></div>
       </div>
+    </section>
 
-      <div class="grid2">
-        <button id="manualBtn">GETTING STARTED</button>
-      </div>
+  </div>
 
-      <div class="muted" id="objective">
-        OBJECTIVE: PING THE VOID TO BEGIN. THEN BUY DISH CALIBRATION.
-      </div>
-    </div>
-  </section>
+  <!-- Supabase JS (required for auth + db + functions.invoke) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <section class="card">
-    <div class="hd">
-      <div>BUFFS</div>
-      <div class="muted">AVAILABLE BUFFS GLOW.</div>
-    </div>
-    <div class="pad">
-      <div class="upgrades" id="upgrades"></div>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="hd">
-      <div>COMMUNICATIONS</div>
-      <div class="muted">ANCILLARY CHANNELS REPORT STATUS</div>
-    </div>
-    <div class="pad">
-      <div class="log" id="comms"></div>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="hd">
-      <div>TRANSMISSION LOG</div>
-      <div class="muted">MILESTONES REVEAL CONTEXT</div>
-    </div>
-    <div class="pad">
-      <div class="log" id="log"></div>
-    </div>
-  </section>
-
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-
-(() => {
-  const $ = (id) => document.getElementById(id);
-
-  // Prevent double-tap zoom on buttons (iOS Safari etc.)
-  document.addEventListener("dblclick", (e) => {
-    if (e.target && e.target.closest("button")) e.preventDefault();
-  }, { passive: false });
-
-  // -------------------------
-  // Supabase config (your project)
-  // -------------------------
-  const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
-  const supabase = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  // -------------------------
-  // Feedback (haptics + tiny click)
-  // -------------------------
-  let feedbackOn = true;
-  let audioCtx = null;
-
-  function tinyClickSound(){
-    if (!feedbackOn) return;
-    try{
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const ctx = audioCtx;
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = "square";
-      o.frequency.value = 820;
-      g.gain.value = 0.00001;
-      o.connect(g); g.connect(ctx.destination);
-      o.start();
-      const t = ctx.currentTime;
-      g.gain.setValueAtTime(0.00001, t);
-      g.gain.exponentialRampToValueAtTime(0.025, t + 0.006);
-      g.gain.exponentialRampToValueAtTime(0.00001, t + 0.050);
-      o.stop(t + 0.055);
-    } catch(_){}
-  }
-
-  function hapticPulse(ms=10){
-    if (!feedbackOn) return false;
-    if (navigator.vibrate){
-      navigator.vibrate([ms]);
-      return true;
-    }
-    return false;
-  }
-
-  function feedback(el, strength="light"){
-    if (el){
-      el.classList.remove("flash");
-      void el.offsetWidth;
-      el.classList.add("flash");
-    }
-    const didHaptic = (strength === "strong") ? hapticPulse(18) : hapticPulse(10);
-    if (!didHaptic) tinyClickSound();
-  }
-
-  // -------------------------
-  // Helpers
-  // -------------------------
-  const clamp = (x,a,b) => Math.max(a, Math.min(b, x));
-  const nowMs = () => Date.now();
-
-  function fmt(n){
-    n = Number(n) || 0;
-    if (n < 1000) return n.toFixed(0);
-    const units = ["K","M","B","T","Qa","Qi"];
-    let u = -1;
-    while (n >= 1000 && u < units.length-1){ n /= 1000; u++; }
-    return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + units[u];
-  }
-
-  function escapeHtml(s){
-    return String(s)
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
-
-  function pushLog(elId, tag, msg){
-    const host = $(elId);
-    if (!host) return;
-    const p = document.createElement("p");
-    p.innerHTML = `<span class="tag">${escapeHtml(tag)}</span>${msg}`;
-    host.prepend(p);
-  }
-
-  // -------------------------
-  // Tap-to-close popups
-  // -------------------------
-  function popupComms(who, msg){
-    const host = $("popHost");
-    if (!host) return;
-    const box = document.createElement("div");
-    box.className = "pop";
-    box.innerHTML = `<div class="who">${escapeHtml(who)}</div><div class="msg">${escapeHtml(msg)}</div>`;
-    box.addEventListener("click", () => box.remove());
-    host.prepend(box);
-  }
-
-  // -------------------------
-  // Modal
-  // -------------------------
-  function openModal(title, html){
-    $("modalTitle").textContent = title;
-    $("modalBody").innerHTML = html;
-    $("modalBack").style.display = "flex";
-    $("modalBack").setAttribute("aria-hidden", "false");
-  }
-
-  function closeModal(){
-    $("modalBack").style.display = "none";
-    $("modalBack").setAttribute("aria-hidden", "true");
-    $("modalBody").innerHTML = "";
-  }
-
-  $("modalClose").onclick = closeModal;
-  $("modalBack").addEventListener("click", (e) => {
-    if (e.target === $("modalBack")) closeModal();
-  });
-
-  // -------------------------
-  // Activity tracking (AI gating + “active use”)
-  // -------------------------
-  let lastUserActionAt = 0;
-  const markActive = () => { lastUserActionAt = nowMs(); };
-
-  window.addEventListener("pointerdown", markActive, { passive:true });
-  window.addEventListener("keydown", markActive, { passive:true });
-
-  function isActivelyUsed(){
-    return (nowMs() - lastUserActionAt) <= 15000;
-  }
-
-  // -------------------------
-  // State
-  // -------------------------
-  const state = {
-    profile: { name: "GUEST" },
-
-    build: 1,
-    relics: 0,
-    signal: 0,
-    total: 0,
-
-    baseSPS: 0,
-    clickPower: 1,
-    bandwidth: 1.0,
-    autoPingsPerSec: 0,
-
-    corruption: 0,
-    phase: 1,
-
-    flags: { p2:false, p3:false, p4:false, prestigeHint:false },
-
-    upgrades: {
-      dish: 0, scan: 0, probes: 0, tuning: 0,
-      autopinger: 0, echo: 0, lattice: 0, dark: 0,
-      stabilizer: 0, purge: 0,
-      relicAmp: 0
-    },
-
-    aiEnabled: true,
-    lastAiAtMs: 0,
-
-    updatedAtMs: 0
-  };
-
-  function touchUpdated(){ state.updatedAtMs = nowMs(); }
-
-  // -------------------------
-  // Upgrades
-  // -------------------------
-  const UPG = [
-    { id:"dish", name:"DISH CALIBRATION", unlockAt:0, baseCost:10, costMult:1.18,
-      desc:"+1 SIGNAL/SEC PER LEVEL.", buy(){ state.upgrades.dish++; } },
-
-    { id:"scan", name:"DEEP SCAN", unlockAt:100, baseCost:50, costMult:1.25,
-      desc:"+10% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.scan++; } },
-
-    { id:"probes", name:"PROBE SWARM", unlockAt:120, baseCost:80, costMult:1.22,
-      desc:"+1 CLICK POWER PER LEVEL.", buy(){ state.upgrades.probes++; } },
-
-    { id:"tuning", name:"HARMONIC TUNING", unlockAt:240, baseCost:140, costMult:1.27,
-      desc:"+0.3 SIGNAL/SEC AND +1% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.tuning++; } },
-
-    { id:"autopinger", name:"AUTO-PINGER ROUTINE", unlockAt:600, baseCost:520, costMult:1.30,
-      desc:"ADDS AUTO-PINGS/SEC. SCALES WITH PROBES.", buy(){ state.upgrades.autopinger++; } },
-
-    { id:"echo", name:"ECHO INTEGRATOR", unlockAt:1800, baseCost:1400, costMult:1.35,
-      desc:"BANDWIDTH BONUS: + (3%*LV) * LOG10(SIGNAL+1).", buy(){ state.upgrades.echo++; } },
-
-    { id:"lattice", name:"HARMONIC LATTICE", unlockAt:3500, baseCost:3200, costMult:1.38,
-      desc:"SPS MULT: (1 + 0.06*LV*SQRT(CORRUPTION*10)).", buy(){ state.upgrades.lattice++; } },
-
-    { id:"dark", name:"DARK LISTENING", unlockAt:7000, baseCost:9000, costMult:1.45,
-      desc:"IF CORRUPTION>30%: GAINS × (1 + 0.12*LV).", buy(){ state.upgrades.dark++; } },
-
-    // Phase 4 style lead-in: containment tech
-    { id:"stabilizer", name:"SIGNAL STABILIZER", unlockAt:9500, baseCost:7200, costMult:1.33,
-      desc:"SLOWS CORRUPTION CREEP BY 6% PER LEVEL.", buy(){ state.upgrades.stabilizer++; } },
-
-    { id:"purge", name:"CORRUPTION PURGE", unlockAt:11000, baseCost:12000, costMult:1.44,
-      desc:"ON BUY: -10% CORRUPTION.", buy(){ state.upgrades.purge++; state.corruption = clamp(state.corruption - 0.10, 0, 1); } },
-
-    // Prestige currency
-    { id:"relicAmp", name:"RELIC AMPLIFIER", unlockAt:0, baseCost:3, costMult:1.65, currency:"relics",
-      desc:"SPEND RELICS. PER LV: GLOBAL MULT +8% (PERMANENT).", buy(){ state.upgrades.relicAmp++; } }
-  ];
-
-  function lvl(id){ return state.upgrades[id] || 0; }
-  function cost(u){ return Math.floor(u.baseCost * Math.pow(u.costMult, lvl(u.id))); }
-
-  // -------------------------
-  // Derived math
-  // -------------------------
-  function baseSPS(){
-    return (lvl("dish") * 1.0) + (lvl("tuning") * 0.3);
-  }
-
-  function clickPower(){
-    return 1 + (lvl("probes") * 1.0);
-  }
-
-  function baseBandwidth(){
-    let bw = 1.0;
-    bw *= Math.pow(1.10, lvl("scan"));
-    bw *= Math.pow(1.01, lvl("tuning"));
-    return bw;
-  }
-
-  function echoMult(){
-    const e = lvl("echo");
-    if (e <= 0) return 1.0;
-    return 1 + (0.03 * e * Math.log10(state.signal + 1));
-  }
-
-  function relicMult(){
-    return 1 + 0.08 * lvl("relicAmp");
-  }
-
-  function latticeMult(){
-    const l = lvl("lattice");
-    if (l <= 0) return 1.0;
-    return 1 + 0.06 * l * Math.sqrt(clamp(state.corruption,0,1) * 10);
-  }
-
-  function darkMult(){
-    const d = lvl("dark");
-    if (d <= 0) return 1.0;
-    return state.corruption > 0.30 ? (1 + 0.12 * d) : 1.0;
-  }
-
-  function stabilizerFactor(){
-    return clamp(1 - 0.06*lvl("stabilizer"), 0.25, 1.0);
-  }
-
-  function autoPingsPerSec(){
-    const a = lvl("autopinger");
-    if (a <= 0) return 0;
-    const probeFactor = 1 + lvl("probes") * 0.15;
-    return a * 0.65 * probeFactor;
-  }
-
-  function recompute(){
-    state.baseSPS = baseSPS();
-    state.clickPower = clickPower();
-    state.bandwidth = baseBandwidth() * echoMult() * relicMult();
-    state.autoPingsPerSec = autoPingsPerSec();
-  }
-
-  function sps(){
-    return state.baseSPS * state.bandwidth * latticeMult() * darkMult();
-  }
-
-  function globalMult(){
-    return state.bandwidth * latticeMult() * darkMult();
-  }
-
-  // -------------------------
-  // Corruption
-  // -------------------------
-  function corruptionLabel(c){
-    if (c < 0.10) return "DORMANT";
-    if (c < 0.30) return "WHISPERING";
-    if (c < 0.60) return "INCIDENT";
-    if (c < 0.85) return "BREACH";
-    return "OVERRUN";
-  }
-
-  function updateCorruption(dt){
-    const creep = 0.0000025 * Math.log10(state.total + 10);
-    const tech  = (lvl("echo") * 0.0000015) + (lvl("lattice") * 0.0000018) + (lvl("dark") * 0.0000022);
-    const invite = 0.0000010;
-    state.corruption = clamp(
-      state.corruption + (creep + tech + invite) * stabilizerFactor() * dt,
-      0, 1
-    );
-  }
-
-  // -------------------------
-  // Prestige
-  // -------------------------
-  function prestigeGain(){
-    const over = Math.max(0, state.total - 12000);
-    return 1 + Math.floor(Math.sqrt(over / 6000));
-  }
-
-  function doPrestige(){
-    const gain = prestigeGain();
-    state.relics += gain;
-    state.build += 1;
-
-    pushLog("log","SYS",`RITE RESET EXECUTED. +${gain} RELICS RECOVERED.`);
-    pushLog("comms","MOTHERLINE","THE ARRAY FORGETS. YOU DO NOT.");
-
-    const keepRelicAmp = lvl("relicAmp");
-
-    state.signal = 0;
-    state.total = 0;
-    state.corruption = Math.max(0, state.corruption * 0.25);
-
-    state.phase = 1;
-    state.flags = { p2:false, p3:false, p4:false, prestigeHint:false };
-
-    for (const k in state.upgrades) state.upgrades[k] = 0;
-    state.upgrades.relicAmp = keepRelicAmp;
-
-    touchUpdated();
-    recompute();
-  }
-
-  // -------------------------
-  // Objectives / phases (Phase 4 lead-in)
-  // -------------------------
-  function setObjective(t){
-    $("objective").innerHTML = "OBJECTIVE: " + t;
-  }
-
-  function phaseText(n){
-    return ["PHASE I","PHASE II","PHASE III","PHASE IV","PHASE V"][n-1] || "PHASE I";
-  }
-
-  function milestones(){
-    if (!state.flags.p2 && state.total >= 500){
-      state.flags.p2 = true;
-      state.phase = Math.max(state.phase, 2);
-      $("phase").textContent = phaseText(state.phase);
-      $("status").textContent = "ARRAY: DRIFT";
-      pushLog("log","SYS","PHASE II ENGAGED. RETURN TRANSMISSIONS BEGIN.");
-      popupComms("OPS", `${state.profile.name}, ping the void so we can establish baseline signal integrity.`);
-      setObjective("Buy DISH CALIBRATION, then reach 600 total signal for AUTO-PINGER.");
-    }
-    if (!state.flags.p3 && state.total >= 1800){
-      state.flags.p3 = true;
-      state.phase = Math.max(state.phase, 3);
-      $("phase").textContent = phaseText(state.phase);
-      $("status").textContent = "ARRAY: ACTIVE";
-      pushLog("log","SYS","PHASE III: RESPONSE PATTERNS DETECTED. NOT RANDOM.");
-      pushLog("comms","DR KESS","Keep scanning. The ‘noise’ is behaving like language.");
-      setObjective("Reach 3500 total signal for HARMONIC LATTICE. Watch corruption.");
-    }
-    if (!state.flags.p4 && state.total >= 9000){
-      state.flags.p4 = true;
-      state.phase = Math.max(state.phase, 4);
-      $("phase").textContent = phaseText(state.phase);
-      $("status").textContent = "ARRAY: GLITCH";
-      pushLog("log","SYS","PHASE IV: INSTABILITY EVENTS INCREASING. CONTAINMENT TECH ONLINE.");
-      pushLog("comms","OPS", `${state.profile.name}, if the bar goes red, don’t panic. Stabilize it. Then keep listening.`);
-      setObjective("Unlock SIGNAL STABILIZER at 9500. Consider PURGE at 11000 if corruption spikes.");
-    }
-    if (!state.flags.prestigeHint && state.total >= 12000){
-      state.flags.prestigeHint = true;
-      pushLog("log","SYS","RITE RESET PROTOCOL DISCOVERED. RELICS MAY PERSIST.");
-      setObjective("RITE RESET is available. You gain relics and keep permanent power.");
-    }
-  }
-
-  // -------------------------
-  // Local + cloud save (email/password auth)
-  // -------------------------
-  const LOCAL_KEY = "sygn1l_save_v9";
-  let userId = null;
-  let cloudReady = false;
-  let lastCloudSaveAt = 0;
-
-  function mergeIntoState(data){
-    for (const k in data){
-      if (data[k] && typeof data[k] === "object" && state[k] && typeof state[k] === "object"){
-        Object.assign(state[k], data[k]);
-      } else {
-        state[k] = data[k];
-      }
-    }
-    // Safe defaults for older saves
-    state.profile ||= { name:"GUEST" };
-    state.profile.name ||= "GUEST";
-    state.upgrades ||= {};
-    state.flags ||= { p2:false,p3:false,p4:false,prestigeHint:false };
-    state.aiEnabled = (state.aiEnabled !== false);
-    state.updatedAtMs ||= 0;
-  }
-
-  function saveLocal(){
-    touchUpdated();
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
-    $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
-  }
-
-  function loadLocal(){
-    const raw = localStorage.getItem(LOCAL_KEY);
-    if (!raw) return false;
-    try{
-      mergeIntoState(JSON.parse(raw));
-      return true;
-    }catch{
-      return false;
-    }
-  }
-
-  function applyOfflineProgress(){
-    const last = state.updatedAtMs || 0;
-    if (!last) return;
-    let dt = (nowMs() - last) / 1000;
-    if (!isFinite(dt) || dt <= 2) return;
-
-    const CAP = 6 * 60 * 60; // 6 hours
-    dt = Math.min(dt, CAP);
-
-    recompute();
-    const g = sps() * dt;
-    if (g > 0){
-      state.signal += g;
-      state.total += g;
-      pushLog("log","SYS",`OFFLINE INTEGRATION: +${fmt(g)} SIGNAL (${Math.floor(dt/60)}m).`);
-    }
-  }
-
-  async function loadCloud(){
-    if (!supabase || !cloudReady || !userId) return null;
-    const { data, error } = await supabase
-      .from("saves")
-      .select("state, updated_at")
-      .eq("player_id", userId)
-      .maybeSingle();
-
-    if (error) throw error;
-    if (!data?.state) return null;
-
-    const cloudState = data.state;
-    const cloudUpdatedMs = cloudState.updatedAtMs || (data.updated_at ? Date.parse(data.updated_at) : 0);
-    return { cloudState, cloudUpdatedMs };
-  }
-
-  async function saveCloud(force=false){
-    if (!supabase || !cloudReady || !userId) return false;
-    const n = nowMs();
-    if (!force && (n - lastCloudSaveAt) < 60000) return false;
-    lastCloudSaveAt = n;
-
-    touchUpdated();
-    const payload = {
-      player_id: userId,
-      updated_at: new Date().toISOString(),
-      state: JSON.parse(JSON.stringify(state))
-    };
-
-    const { error } = await supabase.from("saves").upsert(payload);
-    if (error) throw error;
-    $("syncChip").textContent = "SYNC: CLOUD+LOCAL";
-    return true;
-  }
-
-  // -------------------------
-  // Auth UI
-  // -------------------------
-  function setAuthUI(signedIn){
-    $("authStatus").textContent = signedIn ? "SIGNED IN" : "NOT SIGNED IN";
-    $("signOutBtn").disabled = !signedIn;
-    $("syncChip").textContent = signedIn ? "SYNC: CLOUD" : "SYNC: LOCAL";
-    setAiChip(signedIn ? (state.aiEnabled ? "AI: READY" : "AI: DISABLED") : "AI: OFFLINE");
-  }
-
-  async function signUp(){
-    if (!supabase) return alert("Supabase not loaded (CDN script missing).");
-    const email = $("authEmail").value.trim();
-    const password = $("authPassword").value;
-    if (!email || !password) return alert("Enter email + password");
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) return alert(error.message);
-    alert("Account created. Now press SIGN IN.");
-  }
-
-  async function signIn(){
-    if (!supabase) return alert("Supabase not loaded (CDN script missing).");
-    const email = $("authEmail").value.trim();
-    const password = $("authPassword").value;
-    if (!email || !password) return alert("Enter email + password");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return alert(error.message);
-  }
-
-  async function signOut(){
-    if (!supabase) return;
-    if (!confirm("Sign out? Your cloud save stays safe.")) return;
-    const { error } = await supabase.auth.signOut();
-    if (error) alert(error.message);
-  }
-
-  $("signUpBtn").onclick = () => { markActive(); signUp(); };
-  $("signInBtn").onclick = () => { markActive(); signIn(); };
-  $("signOutBtn").onclick = () => { markActive(); signOut(); };
-
-  async function initAuth(){
-    if (!supabase) {
-      setAuthUI(false);
-      return;
-    }
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user?.id){
-      userId = session.user.id;
-      cloudReady = true;
-      setAuthUI(true);
-    } else {
-      userId = null;
-      cloudReady = false;
-      setAuthUI(false);
-    }
-
-    supabase.auth.onAuthStateChange(async (_event, session2) => {
-      if (session2?.user?.id){
-        userId = session2.user.id;
-        cloudReady = true;
-        setAuthUI(true);
-
-        // Choose newer save: cloud vs local
-        try{
-          const cloud = await loadCloud();
-          const localUpdated = state.updatedAtMs || 0;
-          const cloudUpdated = cloud?.cloudUpdatedMs || 0;
-
-          if (cloud?.cloudState && cloudUpdated > localUpdated){
-            mergeIntoState(cloud.cloudState);
-            pushLog("log","SYS","CLOUD SAVE LOADED (NEWER).");
-          } else {
-            await saveCloud(true);
-            pushLog("log","SYS","LOCAL SAVE PUSHED TO CLOUD.");
-          }
-        } catch(_){
-          pushLog("log","SYS","CLOUD LOAD FAILED. CONTINUING LOCAL.");
-          cloudReady = false;
-          setAuthUI(false);
-        }
-
-        saveLocal();
-        renderAll();
-      } else {
-        userId = null;
-        cloudReady = false;
-        setAuthUI(false);
-        saveLocal();
-      }
-    });
-  }
-
-  // -------------------------
-  // Username editing (tap chip)
-  // -------------------------
-  function updateUserChip(){
-    const n = (state.profile?.name || "GUEST").toUpperCase();
-    state.profile.name = n;
-    $("userChip").textContent = `USER: ${n}`;
-  }
-
-  $("userChip").addEventListener("click", () => {
-    markActive();
-    openModal("IDENTITY OVERRIDE", `
-      <p><span class="tag">OPS</span>Callsign helps. Makes the logs readable.</p>
-      <input class="texty" id="nameInput" maxlength="18" placeholder="enter username" value="${escapeHtml(state.profile.name || "")}">
-      <div style="height:10px"></div>
-      <button class="smallBtn" id="nameSave">SAVE NAME</button>
-    `);
-
-    const input = document.getElementById("nameInput");
-    const saveBtn = document.getElementById("nameSave");
-
-    saveBtn.onclick = async () => {
-      const name = (input.value || "").trim().slice(0,18);
-      state.profile.name = (name ? name.toUpperCase() : "GUEST");
-      updateUserChip();
-      popupComms("OPS", `Copy that, ${state.profile.name}.`);
-      pushLog("comms","OPS", `Alright ${escapeHtml(state.profile.name)}. Back to work.`);
-      saveLocal();
-      try{ await saveCloud(true); }catch(_){}
-      closeModal();
-    };
-  });
-
-  // -------------------------
-  // AI toggle (does not break gameplay if offline)
-  // -------------------------
-  const AI_COOLDOWN_MS = 180000;
-  function setAiChip(t){ $("aiChip").textContent = t; }
-
-  $("aiBtn").onclick = (e) => {
-    state.aiEnabled = !state.aiEnabled;
-    e.currentTarget.textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
-    setAiChip(!cloudReady ? "AI: OFFLINE" : (state.aiEnabled ? "AI: READY" : "AI: DISABLED"));
-    saveLocal();
-    feedback(e.currentTarget, "light");
-    markActive();
-  };
-
-  function aiReady(){
-    if (!state.aiEnabled) return false;
-    if (!cloudReady) return false;
-    if (!isActivelyUsed()) return false;
-    if ((nowMs() - (state.lastAiAtMs||0)) < AI_COOLDOWN_MS) return false;
-    return true;
-  }
-
-  async function maybeAi(eventName, speakerHint){
-    if (!aiReady()) return;
-    state.lastAiAtMs = nowMs();
-    saveLocal();
-    setAiChip("AI: THINKING");
-
-    try{
-      const payload = {
-        event: eventName,
-        speaker_hint: speakerHint || "OPS",
-        player_name: state.profile.name,
-        phase: state.phase,
-        build: state.build,
-        signal: Math.floor(state.signal),
-        total: Math.floor(state.total),
-        sps: Math.floor(sps()),
-        bandwidth: Number(state.bandwidth.toFixed(2)),
-        corruption: Number(state.corruption.toFixed(3))
-      };
-
-      const { data, error } = await supabase.functions.invoke("sygn1l-comms", { body: payload });
-      if (error) throw error;
-
-      const who = data?.who || speakerHint || "COMMS";
-      const msg = data?.text || "…";
-      popupComms(who, msg);
-      pushLog("comms", who, escapeHtml(msg));
-      setAiChip("AI: READY");
-    } catch(_){
-      setAiChip("AI: OFFLINE");
-      pushLog("log","SYS","AI COMMS FAILED. (EDGE FUNCTION OR KEY NOT CONFIGURED)");
-    }
-  }
-
-  // -------------------------
-  // Render HUD + upgrades
-  // -------------------------
-  function renderHUD(){
-    $("signal").textContent = fmt(state.signal);
-    $("sps").textContent = fmt(sps());
-    $("bw").textContent = state.bandwidth.toFixed(2) + "×";
-
-    $("buildChip").textContent = "BUILD: " + state.build;
-    $("relicChip").textContent = "RELICS: " + state.relics;
-
-    $("phase").textContent = phaseText(state.phase);
-
-    const c = state.corruption;
-    $("corrFill").style.width = (c*100).toFixed(1) + "%";
-    $("corrText").textContent = (c*100).toFixed(1) + "% (" + corruptionLabel(c) + ")";
-
-    const canPrestige = state.total >= 12000;
-    $("prestige").disabled = !canPrestige;
-    $("prestige").textContent = canPrestige
-      ? `RITE RESET (+${prestigeGain()} RELICS)`
-      : "RITE RESET (LOCKED)";
-
-    updateUserChip();
-    updateScopeLabel();
-  }
-
-  function renderUpgrades(){
-    const root = $("upgrades");
-    root.innerHTML = "";
-
-    for (const u of UPG){
-      if (u.id === "relicAmp" && (state.relics <= 0 && lvl("relicAmp") === 0)) continue;
-
-      const unlocked = state.total >= u.unlockAt;
-      const price = cost(u);
-      const currency = u.currency || "signal";
-      const have = currency === "relics" ? state.relics : state.signal;
-      const affordable = unlocked && have >= price;
-
-      const row = document.createElement("div");
-      row.className = "up" + (affordable ? " affordable" : "") + (!unlocked ? " locked" : "");
-
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      meta.innerHTML = `
-        <div class="name">${escapeHtml(u.name)} (LV ${lvl(u.id)})</div>
-        <div class="desc">${escapeHtml(unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlockAt)} TOTAL SIGNAL.`)}</div>
-        <div class="cost">${unlocked ? `COST: ${fmt(price)} ${currency.toUpperCase()}` : "STATUS: LOCKED"}</div>
-      `;
-
-      const btn = document.createElement("button");
-      btn.textContent = unlocked ? (affordable ? "ACQUIRE" : "LOCKED") : "CLASSIFIED";
-      btn.disabled = !affordable;
-
-      btn.onclick = async () => {
-        if (!affordable) return;
-        markActive();
-        feedback(btn, "light");
-
-        if (currency === "relics") state.relics -= price;
-        else state.signal -= price;
-
-        u.buy();
-
-        touchUpdated();
-        recompute();
-        renderAll();
-        saveLocal();
-        try{ await saveCloud(false); }catch(_){}
-
-        if (Math.random() < 0.25) await maybeAi("buy_upgrade:" + u.id, "OPS");
-      };
-
-      row.appendChild(meta);
-      row.appendChild(btn);
-      root.appendChild(row);
-    }
-  }
-
-  function renderAll(){
-    renderHUD();
-    renderUpgrades();
-  }
-
-  // -------------------------
-  // Buttons (PING / SAVE / WIPE / PRESTIGE / MANUAL)
-  // -------------------------
-  $("ping").addEventListener("click", async (e) => {
-    markActive();
-    feedback(e.currentTarget, "light");
-
-    const g = state.clickPower * globalMult();
-    state.signal += g;
-    state.total += g;
-
-    state.corruption = clamp(state.corruption + 0.0006, 0, 1);
-
-    touchUpdated();
-    recompute();
-    renderAll();
-    saveLocal();
-    try{ await saveCloud(false); } catch(_){}
-
-    if (Math.random() < 0.12) await maybeAi("ping_void", "OPS");
-  }, { passive:true });
-
-  $("save").onclick = async (e) => {
-    markActive();
-    feedback(e.currentTarget, "light");
-    saveLocal();
-    try{
-      await saveCloud(true);
-      pushLog("log","SYS","STATE SAVED (CLOUD).");
-    } catch(_){
-      pushLog("log","SYS","STATE SAVED (LOCAL).");
-    }
-  };
-
-  $("wipe").onclick = async (e) => {
-    markActive();
-    feedback(e.currentTarget, "strong");
-
-    const ok = confirm("WIPE will delete your local save.\nIf signed in, it will also delete your cloud save.\n\nAre you sure?");
-    if (!ok) return;
-
-    localStorage.removeItem(LOCAL_KEY);
-
-    if (cloudReady && userId && supabase){
-      try{ await supabase.from("saves").delete().eq("player_id", userId); } catch(_){}
-    }
-    location.reload();
-  };
-
-  $("prestige").onclick = async (e) => {
-    if (e.currentTarget.disabled) return;
-
-    const gain = prestigeGain();
-    const ok = confirm(`RITE RESET will restart this build.\nYou gain +${gain} relics.\n\nProceed?`);
-    if (!ok) return;
-
-    markActive();
-    feedback(e.currentTarget, "strong");
-
-    doPrestige();
-    renderAll();
-    saveLocal();
-    try{ await saveCloud(true); } catch(_){}
-
-    await maybeAi("rite_reset", "MOTHERLINE");
-  };
-
-  $("manualBtn").onclick = () => {
-    markActive();
-    openModal("HOME BASE COMMUNIQUE", `
-      <p><span class="tag">HB</span><strong>Operator,</strong> the Array is picking up structured noise. Not static. Not natural. Your job is simple: build signal strength and keep the system stable long enough to understand what’s answering back.</p>
-      <p><span class="tag">HOW</span>
-        1) Tap <strong>PING THE VOID</strong> to gain Signal.<br>
-        2) Buy <strong>DISH CALIBRATION</strong> for passive Signal/Second.<br>
-        3) Unlock more buffs by reaching Total Signal milestones.<br>
-        4) Watch <strong>CORRUPTION</strong>. It grows. Some buffs profit from it. Others fight it.
-      </p>
-      <p><span class="tag">TIP</span>Sign in to protect your save across reloads/devices.</p>
-    `);
-  };
-
-  // -------------------------
-  // Feedback toggle UI
-  // -------------------------
-  $("feedbackBtn").onclick = (e) => {
-    feedbackOn = !feedbackOn;
-    e.currentTarget.textContent = feedbackOn ? "FEEDBACK: ON" : "FEEDBACK: OFF";
-    feedback(e.currentTarget, "light");
-    markActive();
-  };
-
-  // -------------------------
-  // Scope visualizer
-  // -------------------------
-  const scope = $("scope");
-  const ctx = scope.getContext("2d", { alpha:false });
-  let sw = 0, sh = 0, dpr = 1;
-
-  const sig = { cols: [], vel: [], phase: 0 };
-
-  function resizeScope(){
-    dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-    const cssW = scope.clientWidth || 300;
-    const cssH = 84;
-    scope.style.height = cssH + "px";
-    scope.width  = Math.floor(cssW * dpr);
-    scope.height = Math.floor(cssH * dpr);
-    sw = scope.width;
-    sh = scope.height;
-
-    const cols = Math.max(120, Math.floor(sw / (2*dpr)));
-    sig.cols = new Array(cols).fill(0);
-    sig.vel  = new Array(cols).fill(0);
-    sig.phase = 0;
-  }
-  window.addEventListener("resize", resizeScope);
-
-  function lockValue(){
-    const bw = state.bandwidth;
-    const t = state.total;
-    const sp = sps();
-    const a = clamp(Math.log10(t + 1)/5, 0, 1);
-    const b = clamp((bw - 1)/4, 0, 1);
-    const c = clamp(Math.log10(sp + 1)/4, 0, 1);
-    const raw = (0.45*a + 0.35*b + 0.20*c);
-    return clamp(raw * (1 - 0.55*state.corruption), 0, 1);
-  }
-
-  function updateScopeLabel(){
-    $("scopeLabel").textContent = "LOCK: " + Math.round(lockValue()*100) + "%";
-  }
-
-  function rand01(seed){
-    seed = (seed ^ 0x6D2B79F5) >>> 0;
-    seed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    seed ^= seed + Math.imul(seed ^ (seed >>> 7), 61 | seed);
-    return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
-  }
-
-  function drawScope(dt, timeMs){
-    if (!sw || !sh) return;
-
-    const lk = lockValue();
-    const corr = state.corruption;
-
-    ctx.fillStyle = "rgb(0,0,0)";
-    ctx.fillRect(0,0,sw,sh);
-
-    const noiseAmt = clamp(0.85 - 0.70*lk + 0.35*corr, 0.15, 0.95);
-    const spikeProb = clamp(0.04 + 0.36*lk, 0.04, 0.70);
-
-    const cols = sig.cols.length;
-    sig.phase += dt * (0.6 + 1.8*lk) * (1 + 0.8*corr);
-
-    for (let i=0;i<cols;i++){
-      const base = Math.sin(sig.phase + i*0.07) * 0.25;
-      const chaos = (rand01((timeMs|0) + i*9973) - 0.5) * (0.45 + 0.9*corr);
-      const target = base + chaos;
-
-      const stiffness = 0.08 + 0.22*lk;
-      const damping = 0.82 - 0.35*corr;
-
-      sig.vel[i] = sig.vel[i]*damping + (target - sig.cols[i]) * stiffness;
-      sig.cols[i] += sig.vel[i];
-    }
-
-    const midY = Math.floor(sh * 0.60);
-    const px = Math.max(1, Math.floor(dpr));
-    const baseG = 190;
-
-    for (let y=0;y<sh;y+=px){
-      const lineFade = 0.72 + 0.28*Math.sin((y/sh)*Math.PI);
-      for (let x=0;x<sw;x+=px){
-        const n = rand01((x*131 + y*977 + (timeMs|0))|0);
-        if (n < noiseAmt){
-          const v = Math.floor((baseG + 55*n) * lineFade);
-          ctx.fillStyle = `rgb(0,${v},0)`;
-          ctx.fillRect(x,y,px,px);
-        }
-      }
-    }
-
-    ctx.lineWidth = Math.max(1, 1*dpr);
-    ctx.strokeStyle = "rgba(57,255,106,0.85)";
-    ctx.beginPath();
-
-    for (let i=0;i<cols;i++){
-      const x = Math.floor((i/(cols-1)) * (sw-1));
-      const s = sig.cols[i];
-      const spike = (rand01((timeMs|0) + i*71) < spikeProb) ? 1 : 0;
-
-      const spikeH = spike * (0.15 + 0.85*lk) * (0.75 + 0.25*Math.abs(s));
-      const noiseH = (s * (0.35 + 0.65*(1-lk))) * 0.35;
-      const echo = corr > 0.28 ? (0.10 + 0.35*corr) * Math.sin(sig.phase*2 + i*0.12) : 0;
-
-      const y = midY - (spikeH + noiseH + echo) * (sh * 0.70);
-      if (i===0) ctx.moveTo(x,y);
-      else ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-  }
-
-  // -------------------------
-  // Boot narrative
-  // -------------------------
-  function bootNarrative(){
-    if ($("log").children.length === 0){
-      pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
-      pushLog("comms","OPS","Ping the void so we can start getting the signal integrity.");
-      pushLog("comms","DR KESS","We need you to calibrate the dishes once you can afford it.");
-      popupComms("OPS", "Tap PING THE VOID a few times, then buy DISH CALIBRATION.");
-      setObjective("PING THE VOID. THEN BUY DISH CALIBRATION.");
-    }
-  }
-
-  // -------------------------
-  // Main loop
-  // -------------------------
-  let upgradesRefreshAcc = 0;
-  const UPGRADES_REFRESH_EVERY = 0.25;
-  let last = performance.now();
-
-  function loop(t){
-    const dt = Math.min(0.05, (t - last)/1000);
-    last = t;
-
-    recompute();
-
-    const passive = sps() * dt;
-    if (passive > 0){
-      state.signal += passive;
-      state.total += passive;
-    }
-
-    if (state.autoPingsPerSec > 0){
-      const p = state.autoPingsPerSec * dt;
-      const g = p * (state.clickPower * globalMult());
-      state.signal += g;
-      state.total += g;
-    }
-
-    updateCorruption(dt);
-    milestones();
-
-    renderHUD();
-
-    upgradesRefreshAcc += dt;
-    if (upgradesRefreshAcc >= UPGRADES_REFRESH_EVERY){
-      upgradesRefreshAcc = 0;
-      renderUpgrades();
-    }
-
-    drawScope(dt, t|0);
-
-    // Keep updatedAt fresh even if player idles on-page
-    if ((t|0) % 2000 < 16){
-      touchUpdated();
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
-    }
-
-    requestAnimationFrame(loop);
-  }
-
-  // -------------------------
-  // Start
-  // -------------------------
-  resizeScope();
-  loadLocal();
-  applyOfflineProgress();
-  recompute();
-  updateUserChip();
-  bootNarrative();
-  renderAll();
-
-  initAuth().finally(() => {
-    requestAnimationFrame(loop);
-  });
-
-})();
-</script>
+  <!-- Your game logic -->
+  <script src="./sygn1l.js"></script>
 </body>
 </html>
