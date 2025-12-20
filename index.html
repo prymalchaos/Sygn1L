@@ -376,6 +376,15 @@ canvas{display:block;width:100%;height:84px;}
 
   // ===== State (includes persistent ARCHIVE so phase5 evidence survives Rite Reset)
   const LOCAL_KEY = "sygn1l_save_v6";
+const LEGACY_KEYS = [
+  "sygn1l_cloudsave_v3",
+  "sygn1l_save_v5",
+  "sygn1l_save_v4",
+  "sygn1l_save_v3",
+  "sygn1l_save_v2",
+  "sygn1l_save_v1",
+];
+ 
 
   const DEFAULT_ARCHIVE = () => ({
     phase5Unlocked: false,
@@ -478,13 +487,27 @@ canvas{display:block;width:100%;height:84px;}
   }
 
   function loadLocal(){
-    const raw = localStorage.getItem(LOCAL_KEY);
-    if (!raw) return false;
-    try{
-      mergeIntoState(JSON.parse(raw));
-      return true;
-    } catch { return false; }
+  // Try current key first
+  const raw = localStorage.getItem(LOCAL_KEY);
+  if (raw){
+    try{ mergeIntoState(JSON.parse(raw)); return true; } catch {}
   }
+
+  // Migrate from legacy keys
+  for (const k of LEGACY_KEYS){
+    const r = localStorage.getItem(k);
+    if (!r) continue;
+    try{
+      const data = JSON.parse(r);
+      mergeIntoState(data);
+
+      // Save into new key immediately (migration)
+      saveLocal();
+      return true;
+    } catch {}
+  }
+  return false;
+}
 
   async function ensureSession(){
     try{
