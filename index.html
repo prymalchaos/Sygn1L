@@ -286,7 +286,7 @@ canvas{display:block;width:100%;height:84px;}
 (() => {
   const $ = (id) => document.getElementById(id);
 
-  // Prevent double-tap zoom on buttons (mobile safari)
+  // Prevent double-tap zoom on buttons (mobile)
   document.addEventListener("dblclick", (e) => {
     if (e.target && e.target.closest("button")) e.preventDefault();
   }, { passive:false });
@@ -294,7 +294,7 @@ canvas{display:block;width:100%;height:84px;}
   document.documentElement.style.touchAction = "manipulation";
   document.body.style.touchAction = "manipulation";
 
-  // ===== Supabase config (your project)
+  // ===== Supabase config (yours)
   const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -319,7 +319,7 @@ canvas{display:block;width:100%;height:84px;}
       .replaceAll("'","&#039;");
   }
 
-  // ===== Modal system (scrollable, from Part A)
+  // ===== Modal system (scrollable)
   const modalHost = $("modalHost");
   const modalTitle = $("modalTitle");
   const modalBody  = $("modalBody");
@@ -360,7 +360,7 @@ canvas{display:block;width:100%;height:84px;}
     return await openModal(title, html, { okText: okText || "CONFIRM", cancelText:"CANCEL" });
   }
 
-  // ===== Comms log (tap-to-close lines)
+  // ===== Comms log (tap-to-dismiss)
   function pushComms(who, msg){
     const p = document.createElement("p");
     p.innerHTML = `<span class="tag">${escapeHtml(who)}</span>${escapeHtml(msg)}`;
@@ -370,7 +370,7 @@ canvas{display:block;width:100%;height:84px;}
     $("comms").prepend(p);
   }
 
-  // ===== State + persistent archive
+  // ===== State
   const DEFAULT_ARCHIVE = () => ({
     phase5Unlocked: false,
     engramsSolved: 0,
@@ -382,7 +382,7 @@ canvas{display:block;width:100%;height:84px;}
   });
 
   const state = {
-    username: "----",
+    username: "Operator",
     build: 1,
     relics: 0,
 
@@ -401,26 +401,12 @@ canvas{display:block;width:100%;height:84px;}
     lastTickMs: Date.now(),
     lastUserActionAt: 0,
 
-    aiEnabled: true,
-    lastAiAtMs: 0,
-
     archive: DEFAULT_ARCHIVE(),
 
     upgrades: {
-      dish: 0,
-      scan: 0,
-      probes: 0,
-      tuning: 0,
-      autopinger: 0,
-      echo: 0,
-      lattice: 0,
-      dark: 0,
-
-      purifier: 0,
-      firewall: 0,
-      deadband: 0,
-      decoderRig: 0,
-
+      dish: 0, scan: 0, probes: 0, tuning: 0,
+      autopinger: 0, echo: 0, lattice: 0, dark: 0,
+      purifier: 0, firewall: 0, deadband: 0, decoderRig: 0,
       relicAmp: 0
     }
   };
@@ -432,10 +418,12 @@ canvas{display:block;width:100%;height:84px;}
   window.addEventListener("keydown", markActive, { passive:true });
   const isActivelyUsed = () => (Date.now() - state.lastUserActionAt) <= 20000;
 
-  // ===== Supabase session + saves
-  let userId = null;
-  let cloudReady = false;
-  let lastCloudSaveAt = 0;
+  // ===== Local save migration
+  const LOCAL_KEY = "sygn1l_save_v6";
+  const LEGACY_KEYS = [
+    "sygn1l_cloudsave_v3","sygn1l_cloudsave_v2","sygn1l_cloudsave_v1",
+    "sygn1l_save_v5","sygn1l_save_v4","sygn1l_save_v3","sygn1l_save_v2","sygn1l_save_v1"
+  ];
 
   function mergeIntoState(data){
     if (!data || typeof data !== "object") return;
@@ -453,31 +441,12 @@ canvas{display:block;width:100%;height:84px;}
     }
   }
 
-  // ===== Local save keys (new + legacy) + robust migration
-  const LOCAL_KEY = "sygn1l_save_v6";
-  const LEGACY_KEYS = [
-    "sygn1l_cloudsave_v3",
-    "sygn1l_cloudsave_v2",
-    "sygn1l_cloudsave_v1",
-    "sygn1l_save_v5",
-    "sygn1l_save_v4",
-    "sygn1l_save_v3",
-    "sygn1l_save_v2",
-    "sygn1l_save_v1",
-    "sygn1l_cloudsave_v6", // just in case you used variants
-    "sygn1l_save_v7"
-  ];
-
   function tryParseState(raw){
     try{
       const data = JSON.parse(raw);
-      if (!data || typeof data !== "object") return null;
-      // "updatedAtMs" is our best freshness signal
       const t = Number(data.updatedAtMs || data.lastTickMs || 0);
       return { data, t: Number.isFinite(t) ? t : 0 };
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   }
 
   function saveLocal(){
@@ -486,27 +455,19 @@ canvas{display:block;width:100%;height:84px;}
   }
 
   function loadLocal(){
-    // Gather candidates from current + legacy keys
     const keys = [LOCAL_KEY, ...LEGACY_KEYS];
-    let best = null; // {key, data, t}
+    let best = null;
 
     for (const k of keys){
       const raw = localStorage.getItem(k);
       if (!raw) continue;
       const parsed = tryParseState(raw);
       if (!parsed) continue;
-
-      if (!best || parsed.t > best.t){
-        best = { key: k, data: parsed.data, t: parsed.t };
-      }
+      if (!best || parsed.t > best.t) best = { key:k, data:parsed.data, t:parsed.t };
     }
-
     if (!best) return false;
 
-    // Load best
     mergeIntoState(best.data);
-
-    // Migrate forward if needed
     if (best.key !== LOCAL_KEY){
       saveLocal();
       pushComms("SYS", `LOCAL SAVE MIGRATED (${best.key} → ${LOCAL_KEY})`);
@@ -515,6 +476,11 @@ canvas{display:block;width:100%;height:84px;}
     }
     return true;
   }
+
+  // ===== Supabase saves (cloud)
+  let userId = null;
+  let cloudReady = false;
+  let lastCloudSaveAt = 0;
 
   async function ensureSession(){
     try{
@@ -620,7 +586,7 @@ canvas{display:block;width:100%;height:84px;}
   const sps = ()=> state.baseSPS * state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
   const globalMult = ()=> state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
 
-  // ===== Corruption model
+  // ===== Corruption
   function updateCorruption(dt){
     const creep = 0.0000025 * Math.log10(state.total + 10);
     const tech  = (lv("echo")*0.0000015) + (lv("lattice")*0.0000018) + (lv("dark")*0.0000022);
@@ -634,8 +600,7 @@ canvas{display:block;width:100%;height:84px;}
 
     const pur = lv("purifier");
     if (pur > 0){
-      const clean = (0.000010 * pur) * dt;
-      state.corruption = clamp(state.corruption - clean, 0, 1);
+      state.corruption = clamp(state.corruption - (0.000010 * pur) * dt, 0, 1);
     }
   }
 
@@ -660,7 +625,7 @@ canvas{display:block;width:100%;height:84px;}
       desc:"BANDWIDTH BONUS SCALES WITH LOG(SIGNAL).", buy(){ state.upgrades.echo++; } },
 
     { id:"lattice", name:"HARMONIC LATTICE", unlockAt:3500, baseCost:3200, costMult:1.38,
-      desc:"SPS MULT SCALES WITH CORRUPTION. (RISKY POWER).", buy(){ state.upgrades.lattice++; } },
+      desc:"SPS MULT SCALES WITH CORRUPTION.", buy(){ state.upgrades.lattice++; } },
 
     { id:"dark", name:"DARK LISTENING", unlockAt:7000, baseCost:9000, costMult:1.45,
       desc:"IF CORRUPTION>30%: GAINS × (1 + 0.12*LV).", buy(){ state.upgrades.dark++; } },
@@ -672,47 +637,34 @@ canvas{display:block;width:100%;height:84px;}
       desc:"PASSIVELY REDUCES CORRUPTION OVER TIME.", buy(){ state.upgrades.purifier++; } },
 
     { id:"deadband", name:"DEADBAND AMPLIFIER", unlockAt:13000, baseCost:16000, costMult:1.52,
-      desc:"+BANDWIDTH, BUT INCREASES CORRUPTION GROWTH.", buy(){ state.upgrades.deadband++; } },
+      desc:"+BANDWIDTH BUT ADDS CORRUPTION PRESSURE.", buy(){ state.upgrades.deadband++; } },
 
     { id:"decoderRig", name:"DECODER RIG", unlockAt:15000, baseCost:24000, costMult:1.60,
       desc:"REDUCES ENGRAM COSTS BY 6% PER LEVEL.", buy(){ state.upgrades.decoderRig++; } },
   ];
 
-  // ===== Phase thresholds
-  const PHASE2 = 500;
-  const PHASE3 = 1800;
-  const PHASE4 = 9000;
-  const PHASE5 = 15000;
-
+  // ===== Phases
+  const PHASE2 = 500, PHASE3 = 1800, PHASE4 = 9000, PHASE5 = 15000;
   function setPhase(p){
     state.phase = Math.max(state.phase, p);
     $("phase").textContent = p===1?"PHASE I":p===2?"PHASE II":p===3?"PHASE III":p===4?"PHASE IV":"PHASE V";
   }
-
   function phaseCheck(){
     if (state.total >= PHASE2) setPhase(2);
     if (state.total >= PHASE3) setPhase(3);
     if (state.total >= PHASE4) setPhase(4);
     if (state.total >= PHASE5) setPhase(5);
-
-    if (state.phase >= 5 && !state.archive.phase5Unlocked){
-      state.archive.phase5Unlocked = true;
-      initDecoderIfNeeded();
-      pushComms("OPS", `${state.username}, structured carrier detected. Decoder interface is live.`);
-      saveLocal(); saveCloud(true);
-    }
   }
 
   // ===== Decoder
   const FINAL_MESSAGE = "Greetings! This is a warning. Prepare for invasion. They are coming";
-
   function initDecoderIfNeeded(){
+    if (!state.archive || typeof state.archive !== "object") state.archive = DEFAULT_ARCHIVE();
     if (!state.archive.engramsTotal || state.archive.engramsTotal <= 0){
       state.archive.engramsTotal = FINAL_MESSAGE.length;
       state.archive.engramsSolved = clamp(state.archive.engramsSolved, 0, state.archive.engramsTotal);
     }
   }
-
   function engramCost(){
     const n = state.archive.engramsSolved;
     const rigDiscount = Math.pow(0.94, lv("decoderRig"));
@@ -720,12 +672,10 @@ canvas{display:block;width:100%;height:84px;}
     const ramp = Math.pow(1.14, n);
     return Math.floor(base * ramp * rigDiscount);
   }
-
   function scrambleDisplay(seed, revealedCount){
     const text = FINAL_MESSAGE;
     const len = text.length;
     let s = (seed >>> 0) || 1;
-
     const rnd = () => {
       s ^= s << 13; s >>>= 0;
       s ^= s >>> 17; s >>>= 0;
@@ -752,7 +702,7 @@ canvas{display:block;width:100%;height:84px;}
     const root = $("decoder");
     initDecoderIfNeeded();
 
-    if (!state.archive.phase5Unlocked){
+    if (state.phase < 5){
       root.innerHTML = `<div class="subtitle">STATUS: LOCKED</div>
       <div style="margin-top:10px;color:var(--muted);font-size:12px;line-height:1.5">
         Reach PHASE V (15,000 total signal) to unlock the decoder.
@@ -764,11 +714,9 @@ canvas{display:block;width:100%;height:84px;}
     const total = state.archive.engramsTotal;
     const done = solved >= total;
 
-    const needsRite = state.archive.awaitingRiteReset && state.archive.hasCipherKey && !state.archive.finalMessageRevealed;
     const scrambled = scrambleDisplay(state.archive.scrambleSeed, solved);
-
-    const c = engramCost();
-    const canBuy = state.signal >= c && !done;
+    const price = engramCost();
+    const canBuy = state.signal >= price && !done;
 
     root.innerHTML = `
       <div class="subtitle">STATUS: ${done ? "CIPHER KEY ACQUIRED" : "DECRYPTING"}</div>
@@ -782,12 +730,11 @@ canvas{display:block;width:100%;height:84px;}
 
       <div style="margin-top:10px;font-size:12px;color:var(--muted)">
         ENGRAMS: <b style="color:var(--text)">${solved}</b> / ${total}
-        ${needsRite ? `<div style="margin-top:8px;color:var(--text)">RITE RESET REQUIRED TO APPLY CIPHER KEY.</div>` : ``}
       </div>
 
       <div style="margin-top:12px;display:grid;gap:10px;grid-template-columns:1fr">
         <button id="decryptBtn" ${canBuy ? "" : "disabled"}>
-          ${done ? "DECRYPT COMPLETE" : (canBuy ? `DECRYPT ENGRAM (COST ${fmt(c)})` : `INSUFFICIENT SIGNAL (COST ${fmt(c)})`)}
+          ${done ? "DECRYPT COMPLETE" : (canBuy ? `DECRYPT ENGRAM (COST ${fmt(price)})` : `INSUFFICIENT SIGNAL (COST ${fmt(price)})`)}
         </button>
       </div>
     `;
@@ -796,11 +743,13 @@ canvas{display:block;width:100%;height:84px;}
     if (btn){
       btn.addEventListener("click", async () => {
         markActive();
-        if (done) return;
-        const price = engramCost();
-        if (state.signal < price) return;
+        initDecoderIfNeeded();
 
-        state.signal -= price;
+        // recompute at click-time (no stale affordability)
+        const priceNow = engramCost();
+        if (state.signal < priceNow) return;
+
+        state.signal -= priceNow;
         state.archive.engramsSolved++;
 
         if (state.archive.engramsSolved >= state.archive.engramsTotal){
@@ -808,10 +757,6 @@ canvas{display:block;width:100%;height:84px;}
           state.archive.hasCipherKey = true;
           state.archive.awaitingRiteReset = true;
           pushComms("DR KESS", `${state.username}, final engram is a key. We need a Rite Reset to apply it.`);
-        } else {
-          if (Math.random() < 0.35){
-            pushComms("TECH RIV", `Okay… that wasn’t random. Keep going, ${state.username}.`);
-          }
         }
 
         saveLocal(); await saveCloud(false);
@@ -820,7 +765,7 @@ canvas{display:block;width:100%;height:84px;}
     }
   }
 
-  // ===== Rite Reset / Wipe (with confirmation)
+  // ===== Rite Reset / Wipe
   function prestigeGain(){
     const over = Math.max(0, state.total - 12000);
     return 1 + Math.floor(Math.sqrt(over / 6000));
@@ -864,11 +809,11 @@ Spend Signal on Buffs to increase Signal/second and Bandwidth.
 As Signal accumulates, phases unlock and the Array begins to answer.
 
 Early steps:
-1) Buy DISH CALIBRATION (it starts your Signal/second).
-2) Reach 100 total Signal to unlock DEEP SCAN (bandwidth).
-3) Keep pushing until PHASE V unlocks the decoder.
+1) Buy DISH CALIBRATION (starts Signal/second).
+2) Reach 100 total Signal to unlock DEEP SCAN.
+3) Push toward PHASE V to unlock the decoder.
 
-Corruption is a pressure system: it can empower upgrades, but it also destabilizes the Array.
+Corruption is pressure: it can empower upgrades, but it also destabilizes the Array.
 
 Proceed.`)}
 </div>`;
@@ -881,7 +826,7 @@ Proceed.`)}
 <div style="font-size:12px;line-height:1.55;color:rgba(207,255,214,.92)">
   <div style="margin-bottom:10px;color:var(--muted)">Set a callsign. Used in comms.</div>
   <input id="nameInput" maxlength="18"
-    value="${escapeHtml(state.username === "----" ? "" : state.username)}"
+    value="${escapeHtml(state.username === "Operator" ? "" : state.username)}"
     placeholder="e.g. Corey"
     style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(57,255,106,.35);background:rgba(0,0,0,.35);color:var(--text);font:inherit"/>
 </div>`;
@@ -889,26 +834,26 @@ Proceed.`)}
     if (!ok) return;
     const el = $("nameInput");
     let v = (el?.value || "").trim().replace(/\s+/g," ");
-    if (!v) v = "----";
+    if (!v) v = "Operator";
     state.username = v;
     renderHUD();
     saveLocal(); await saveCloud(true);
     pushComms("OPS", `Alright, ${state.username}. Callsign confirmed.`);
   }
 
-  // ===== Human chatter every ~5 minutes (casual)
+  // ===== Casual human chatter every 4–6 mins (active only)
   let nextChatterAt = Date.now() + 120000;
   const CHATTER = [
-    (n)=>`Hey ${n}. Quick check-in. You still doing okay?`,
-    (n)=>`If you need a break, take it. The Array will still be here… waiting.`,
-    (n)=>`Not gonna lie, ${n}, that scope is messing with my eyes.`,
-    (n)=>`You seeing those spikes too, ${n}? Tell me you’re seeing them.`,
-    (n)=>`I made coffee. It tastes like regret. How’s your signal looking, ${n}?`,
-    (n)=>`${n}, tiny reminder: calibrate dishes early. It snowballs fast.`,
-    (n)=>`We’ve got other listeners on the channel. Pretend you don’t notice.`,
-    (n)=>`You’re doing good, ${n}. Just… don’t chase the noise too hard.`,
+    (n)=>`Hey ${n}. Quick check in. You alright?`,
+    (n)=>`If you need a breather, take it. The Array isn’t going anywhere.`,
+    (n)=>`Okay, that spike was not normal. You saw it too, right ${n}?`,
+    (n)=>`Not gonna lie, ${n}, I hate how it “feels” when the scope locks in.`,
+    (n)=>`Coffee update: it’s awful. Signal update: how’s yours, ${n}?`,
+    (n)=>`${n}, reminder: dishes first. Everything else starts behaving after that.`,
+    (n)=>`We’re all pretending this is science. It’s… not. Keep going, ${n}.`,
+    (n)=>`I’m here if you want to pause. But also… don’t stop now, ${n}.`,
   ];
-  const SPEAKERS = ["OPS", "TECH RIV", "DR KESS", "LT VANCE"];
+  const SPEAKERS = ["OPS","TECH RIV","DR KESS","LT VANCE"];
 
   function maybeChatter(){
     const now = Date.now();
@@ -920,7 +865,7 @@ Proceed.`)}
     const line = CHATTER[Math.floor(Math.random()*CHATTER.length)](state.username || "Operator");
     pushComms(who, line);
 
-    nextChatterAt = now + (240000 + Math.floor(Math.random()*120000)); // 4–6 mins
+    nextChatterAt = now + (240000 + Math.floor(Math.random()*120000));
   }
 
   // ===== Offline progress
@@ -957,6 +902,7 @@ Proceed.`)}
     live.style.opacity = isActivelyUsed() ? "1" : "0.65";
   }
 
+  // ===== IMPORTANT FIX: renderUpgrades recomputes affordability fresh each time
   function renderUpgrades(){
     const root = $("upgrades");
     root.innerHTML = "";
@@ -991,13 +937,25 @@ Proceed.`)}
       btn.disabled = !affordable;
       btn.style.padding = "12px 14px";
 
+      // Click handler RECOMPUTES affordability at click time (no stale closure)
       btn.addEventListener("click", async () => {
         markActive();
-        if (!affordable) return;
-        state.signal -= price;
+
+        const unlockedNow = state.total >= u.unlockAt;
+        const priceNow = cost(u);
+        const affordableNow = unlockedNow && state.signal >= priceNow;
+
+        if (!affordableNow) return;
+
+        state.signal -= priceNow;
         u.buy();
-        saveLocal(); await saveCloud(false);
-        renderHUD(); renderUpgrades(); renderDecoder();
+
+        saveLocal();
+        await saveCloud(false);
+
+        renderHUD();
+        renderUpgrades();
+        renderDecoder();
       });
 
       row.appendChild(left);
@@ -1078,8 +1036,8 @@ Proceed.`)}
   function tick(dt){
     recompute();
 
-    const r = sps();
-    if (r > 0) gain(r*dt);
+    const rate = sps();
+    if (rate > 0) gain(rate*dt);
 
     if (state.autoPingsPerSec > 0){
       const p = state.autoPingsPerSec * dt;
@@ -1088,6 +1046,7 @@ Proceed.`)}
 
     updateCorruption(dt);
     phaseCheck();
+    initDecoderIfNeeded();
     maybeChatter();
   }
 
@@ -1130,47 +1089,19 @@ Proceed.`)}
 
   $("userChip").addEventListener("click", () => { markActive(); editUsername(); });
 
-  // ===== Briefing helper uses modal
-  async function showBriefing(){
-    const html = `
-<div style="white-space:pre-wrap">
-<b>HOME BASE COMMUNIQUE</b>
-
-${escapeHtml(`Operator ${state.username}:
-
-Ping the Void to generate Signal.
-Spend Signal on Buffs to increase Signal/second and Bandwidth.
-As Signal accumulates, phases unlock and the Array begins to answer.
-
-Early steps:
-1) Buy DISH CALIBRATION (starts Signal/second).
-2) Reach 100 total Signal to unlock DEEP SCAN.
-3) Keep pushing until PHASE V unlocks the decoder.
-
-Corruption is pressure: it can empower upgrades, but it also destabilizes the Array.
-
-Proceed.`)}
-</div>`;
-    await openModal("BRIEFING", html, { okText:"ACKNOWLEDGED", cancelText:"CLOSE" });
-  }
-
   // ===== Boot comms
   function bootComms(){
     if ($("comms").children.length === 0){
       pushComms("OPS", "Ping the Void so we can establish signal integrity.");
-      pushComms("DR KESS", "We need you to calibrate the dishes as soon as possible. That’s how the snowball starts.");
+      pushComms("DR KESS", "We need you to calibrate the dishes. That’s how the snowball starts.");
       pushComms("TECH RIV", "If anything starts sounding like language… tell us. Immediately.");
     }
   }
 
-  // ===== Init
+  // ===== Init + loop
   async function init(){
     const hadLocal = loadLocal();
     await ensureSession();
-
-    if (!state.username || state.username === "----"){
-      state.username = "Operator";
-    }
 
     const cloud = await loadCloud();
     if (cloud?.cloudState){
@@ -1184,12 +1115,10 @@ Proceed.`)}
     }
 
     applyOfflineProgress();
-    initDecoderIfNeeded();
-
-    state.lastTickMs = Date.now();
 
     resizeScope();
     bootComms();
+
     renderHUD();
     renderUpgrades();
     renderDecoder();
@@ -1201,7 +1130,10 @@ Proceed.`)}
     saveLocal(); await saveCloud(true);
   }
 
-  // ===== Main loop
+  // ===== THE IMPORTANT FIX: periodic upgrades refresh while AFK
+  let upgradesRefreshAcc = 0;
+  const UPGRADES_REFRESH_EVERY = 0.25; // seconds
+
   let last = performance.now();
   function loop(now){
     const dt = Math.min(0.05, (now-last)/1000);
@@ -1210,6 +1142,14 @@ Proceed.`)}
     tick(dt);
     drawScope(dt);
     renderHUD();
+
+    // periodic refresh so buttons unlock/relight while idling
+    upgradesRefreshAcc += dt;
+    if (upgradesRefreshAcc >= UPGRADES_REFRESH_EVERY){
+      upgradesRefreshAcc = 0;
+      renderUpgrades();
+      renderDecoder();
+    }
 
     if (Math.random() < 0.02){
       saveLocal();
