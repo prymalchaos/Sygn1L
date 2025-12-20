@@ -492,11 +492,31 @@ const LEGACY_KEYS = [
   }
 
   function loadLocal(){
-  // Try current key first
+  // 1) Try current key first
   const raw = localStorage.getItem(LOCAL_KEY);
   if (raw){
-    try{ mergeIntoState(JSON.parse(raw)); return true; } catch {}
+    try{
+      mergeIntoState(JSON.parse(raw));
+      return true;
+    } catch {}
   }
+
+  // 2) Try legacy keys and migrate forward
+  for (const k of LEGACY_KEYS){
+    const r = localStorage.getItem(k);
+    if (!r) continue;
+    try{
+      const data = JSON.parse(r);
+      mergeIntoState(data);
+
+      // Save into the new key immediately (migration)
+      saveLocal();
+      pushComms("SYS", `LOCAL SAVE MIGRATED (${k} → ${LOCAL_KEY})`, "COMMS");
+      return true;
+    } catch {}
+  }
+  return false;
+}
 
   // Migrate from legacy keys
   for (const k of LEGACY_KEYS){
