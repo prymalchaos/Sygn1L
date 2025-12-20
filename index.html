@@ -292,7 +292,7 @@ canvas#scope{
   to{ transform:translateY(-4px); opacity:0; }
 }
 
-/* Modal confirm / prompt */
+/* Modal confirm/prompt/manual */
 .modalHost{
   position:fixed; inset:0;
   z-index:2000;
@@ -370,7 +370,6 @@ canvas#scope{
 
 <body>
 <div class="fx scanlines"></div>
-
 <div class="popHost" id="popHost"></div>
 
 <div class="modalHost" id="modalHost" aria-hidden="true">
@@ -434,6 +433,11 @@ canvas#scope{
 
     <div class="pad">
       <button class="big" id="ping">PING THE VOID</button>
+
+      <div class="grid2">
+        <button id="briefing">BRIEFING</button>
+        <span class="chip"><span class="dot warn"></span>READ BEFORE YOU LISTEN</span>
+      </div>
 
       <div class="grid2">
         <button id="save">SAVE</button>
@@ -511,11 +515,9 @@ canvas#scope{
   }
   function escapeAttr(s){ return escapeHtml(s).replaceAll("`","&#096;"); }
 
-  // ====== Logging with safety (never crash if log panel missing)
+  // ====== Logging with safety
   function safePrepend(el, node){
-    try{
-      if (el && el.prepend) el.prepend(node);
-    }catch(_){}
+    try{ if (el && el.prepend) el.prepend(node); }catch(_){}
   }
   function pushLog(elId, tag, msg){
     const el = $(elId);
@@ -563,6 +565,7 @@ canvas#scope{
   // ===== Feedback (vibrate if possible, else tiny click)
   let feedbackOn = true;
   let audioCtx = null;
+
   function tinyClickSound(){
     if (!feedbackOn) return;
     try{
@@ -615,6 +618,9 @@ canvas#scope{
       const dot = $("modalDot");
       dot.className = "dot " + (danger ? "danger" : "warn");
 
+      const okBtn = $("modalOk");
+      okBtn.classList.toggle("dangerBtn", !!danger);
+
       host.style.display = "flex";
       host.setAttribute("aria-hidden","false");
 
@@ -661,6 +667,9 @@ canvas#scope{
 
       const dot = $("modalDot");
       dot.className = "dot " + (danger ? "danger" : "warn");
+
+      const okBtn = $("modalOk");
+      okBtn.classList.toggle("dangerBtn", !!danger);
 
       host.style.display = "flex";
       host.setAttribute("aria-hidden","false");
@@ -788,6 +797,7 @@ canvas#scope{
 
     updatedAtMs: 0,
 
+    // AI comm settings
     aiEnabled: true,
     lastAiAtMs: 0
   };
@@ -801,6 +811,38 @@ canvas#scope{
     const text = String(msg).replaceAll("{user}", playerName());
     if (popup) popupComms(who, text);
     if (log) pushLog("comms", who, escapeHtml(text));
+  }
+
+  // ===== Banter (cooldown)
+  const banter = {
+    ping: [
+      "Pulse logged. The noise looks… opinionated today.",
+      "That one stung. Did you feel it, or am I projecting again?",
+      "Signal integrity nudged upward. Keep going, {user}.",
+      "I hate how quickly it learns your rhythm."
+    ],
+    upgrade: [
+      "Nice. Hardware likes certainty. Whatever is out there prefers ambiguity.",
+      "Budget approval denied by reality. Approved by curiosity.",
+      "That upgrade will increase throughput… and attention. Careful.",
+      "Every improvement makes the Array easier to hear… and harder to ignore."
+    ],
+    corruption: [
+      "Corruption is climbing. It’s not an error. It’s an invitation.",
+      "We should not be this proud of a system that’s quietly rotting.",
+      "If you hear your name in the static, do not answer."
+    ]
+  };
+  let lastBanterAt = 0;
+  function maybeBanter(type){
+    const now = Date.now();
+    if (now - lastBanterAt < 45000) return;
+    lastBanterAt = now;
+    const list = banter[type] || [];
+    if (!list.length) return;
+    const msg = list[Math.floor(Math.random()*list.length)];
+    const who = (type === "corruption") ? "DR KESS" : (type === "upgrade" ? "OPS" : "TECH RIV");
+    say(who, msg);
   }
 
   // ===== Upgrades data
@@ -949,7 +991,7 @@ canvas#scope{
     if (!state.tutorial.welcomed){
       state.tutorial.welcomed = true;
       say("OPS","Alright {user}, you’re on Array duty. Tap PING to wake the receiver.");
-      say("TECH RIV","Then grab DISH CALIBRATION in BUFFS so Signal keeps rising while you breathe.", {popup:true, log:true});
+      say("TECH RIV","Then grab DISH CALIBRATION in BUFFS so Signal keeps rising while you blink.");
     }
     if (!state.tutorial.dishHint && state.total >= 10 && (state.upgrades.dish||0) === 0){
       state.tutorial.dishHint = true;
@@ -957,7 +999,7 @@ canvas#scope{
     }
     if (!state.tutorial.scanHint && state.total >= 100 && (state.upgrades.scan||0) === 0){
       state.tutorial.scanHint = true;
-      say("DR KESS","Deep Scan is online. It increases bandwidth. Bandwidth multiplies your progress.");
+      say("DR KESS","Deep Scan is online. It increases bandwidth. Bandwidth multiplies everything.");
     }
     if (!state.tutorial.probesHint && state.total >= 120 && (state.upgrades.probes||0) === 0){
       state.tutorial.probesHint = true;
@@ -967,38 +1009,6 @@ canvas#scope{
       state.tutorial.autopingerHint = true;
       say("OPS","Auto-Pinger unlocked. Now the Array works even when you’re not babysitting it.");
     }
-  }
-
-  // ===== Banter (cooldown)
-  const banter = {
-    ping: [
-      "Pulse logged. The noise looks… opinionated today.",
-      "That one stung. Did you feel it, or am I projecting again?",
-      "Signal integrity nudged upward. Keep going, {user}.",
-      "I hate how quickly it learns your rhythm."
-    ],
-    upgrade: [
-      "Nice. Hardware likes certainty. Whatever is out there prefers ambiguity.",
-      "Budget approval denied by reality. Approved by curiosity.",
-      "That upgrade will increase throughput… and attention. Careful.",
-      "Every improvement makes the Array easier to hear… and harder to ignore."
-    ],
-    corruption: [
-      "Corruption is climbing. It’s not an error. It’s an invitation.",
-      "We should not be this proud of a system that’s quietly rotting.",
-      "If you hear your name in the static, do not answer."
-    ]
-  };
-  let lastBanterAt = 0;
-  function maybeBanter(type){
-    const now = Date.now();
-    if (now - lastBanterAt < 45000) return;
-    lastBanterAt = now;
-    const list = banter[type] || [];
-    if (!list.length) return;
-    const msg = list[Math.floor(Math.random()*list.length)];
-    const who = (type === "corruption") ? "DR KESS" : (type === "upgrade" ? "OPS" : "TECH RIV");
-    say(who, msg);
   }
 
   // ===== Prestige
@@ -1033,6 +1043,13 @@ canvas#scope{
     state.upgrades.relicAmp = keepRelicAmp;
     state.profile.username = keepUsername;
 
+    state.tutorial.welcomed = false;
+    state.tutorial.firstPing = false;
+    state.tutorial.dishHint = false;
+    state.tutorial.scanHint = false;
+    state.tutorial.probesHint = false;
+    state.tutorial.autopingerHint = false;
+
     touchLocalUpdated();
     recomputeDerived();
     updateObjectiveFallback();
@@ -1045,12 +1062,14 @@ canvas#scope{
   }
 
   // ===== Save Manager (Local + Cloud)
-  const LOCAL_KEY = "sygn1l_full_v8_hardened";
+  const LOCAL_KEY = "sygn1l_full_v9";
   function touchLocalUpdated(){ state.updatedAtMs = Date.now(); }
+
   function saveLocal(){
     touchLocalUpdated();
     try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); }catch(_){}
   }
+
   function mergeIntoState(data){
     for (const k in data){
       if (data[k] && typeof data[k] === "object" && state[k] && typeof state[k] === "object"){
@@ -1059,11 +1078,13 @@ canvas#scope{
         state[k] = data[k];
       }
     }
+    // normalize missing fields from older saves
     state.profile = state.profile || { username:"" };
     state.tutorial = state.tutorial || {};
     state.flags = state.flags || {};
     state.upgrades = state.upgrades || {};
   }
+
   function loadLocal(){
     try{
       const raw = localStorage.getItem(LOCAL_KEY);
@@ -1074,6 +1095,8 @@ canvas#scope{
   }
 
   // ===== Supabase (optional): game still runs without it
+  // NOTE: This uses your Supabase URL + anon key (public).
+  // Do NOT put any private keys in this front-end file.
   const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
 
@@ -1167,23 +1190,27 @@ canvas#scope{
   // Offline progress capped 8 hours
   function applyOfflineProgress(){
     offlineRecoveryFlag = true;
+
     const lastMs = Number(state.updatedAtMs) || 0;
     if (!lastMs){
       offlineRecoveryFlag = false;
       return;
     }
+
     const now = Date.now();
     let elapsed = (now - lastMs) / 1000;
     if (!isFinite(elapsed) || elapsed <= 2){
       offlineRecoveryFlag = false;
       return;
     }
+
     const CAP = 8 * 60 * 60;
     const capped = Math.min(elapsed, CAP);
 
     recomputeDerived();
     const sps = computeSPS();
     const autoP = state.autoPingsPerSec || 0;
+
     const gainedFromSPS = Math.max(0, sps) * capped;
     const gainedFromAuto = Math.max(0, autoP) * capped * (state.clickPower * globalMultiplier());
     const totalGain = gainedFromSPS + gainedFromAuto;
@@ -1193,7 +1220,6 @@ canvas#scope{
       state.total += totalGain;
       pushLog("log","SYS",`OFFLINE RECOVERY: +${fmt(totalGain)} SIGNAL.`);
       popupComms("OPS", `While you were away: +${fmt(totalGain)} signal.`);
-      touchLocalUpdated();
       saveLocal();
     }
 
@@ -1201,7 +1227,7 @@ canvas#scope{
     setLive("ACTIVE");
   }
 
-  // Heartbeat autosave to keep updatedAtMs fresh
+  // Heartbeat autosave to keep updatedAtMs fresh during AFK
   let heartbeatTimer = null;
   function startHeartbeat(){
     if (heartbeatTimer) clearInterval(heartbeatTimer);
@@ -1266,14 +1292,18 @@ canvas#scope{
     say("OPS", `Acknowledged, ${cleaned}.`);
   };
 
-  // ===== AI integration (optional)
+  // ===== AI integration (optional) via Supabase Edge Function
+  // Gated:
+  // - only on user actions
+  // - max once per 3 minutes
+  // - never when idle (no recent interaction)
   const AI_COOLDOWN_MS = 180000;
   function setAiChip(text){ const el = $("aiChip"); if (el) el.textContent = text; }
 
   $("aiBtn").onclick = (e) => {
     state.aiEnabled = !state.aiEnabled;
     e.currentTarget.textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
-    setAiChip(state.aiEnabled ? "AI: READY" : "AI: DISABLED");
+    setAiChip(state.aiEnabled ? (cloudReady ? "AI: READY" : "AI: OFFLINE") : "AI: DISABLED");
     saveLocal();
     feedback(e.currentTarget, "light");
     markActive();
@@ -1290,6 +1320,7 @@ canvas#scope{
 
   async function maybeAiComms(eventName, speakerHint){
     if (!aiReadyNow()) return;
+
     state.lastAiAtMs = Date.now();
     saveLocal();
     setAiChip("AI: THINKING");
@@ -1324,7 +1355,73 @@ canvas#scope{
     }
   }
 
-  // ===== HUD
+  // ===== BRIEFING (manual)
+  function showBriefing(){
+    const body = `
+      <div style="margin-bottom:10px">
+        <span class="tag">HOME BASE</span>
+        <span class="tag">PRIORITY: UMBRA</span>
+        <span class="tag">CHANNEL: SYGN1L</span>
+      </div>
+
+      <div style="margin-bottom:12px">
+        <b>TRANSMISSION:</b> Operator <span class="tag">${escapeHtml(playerName())}</span>,
+        you’re not “playing a game”. You’re staffing an Array built to catch a whisper that shouldn’t exist.
+        Every ping you send improves lock. Every upgrade sharpens the ear. And as the signal clarifies,
+        the silence starts to… <i>organise itself</i>. If you feel watched, log it. If it feels familiar, do <i>not</i> reply.
+      </div>
+
+      <div class="inputWrap" style="margin-top:0">
+        <label>GETTING STARTED</label>
+        <div class="hint" style="margin-top:0">
+          <b>1) Ping the Void:</b> Tap <span class="tag">PING THE VOID</span> to gain Signal immediately.<br>
+          <b>2) Stabilise growth:</b> Buy <span class="tag">DISH CALIBRATION</span> so Signal increases passively.<br>
+          <b>3) Multiply progress:</b> Unlock <span class="tag">DEEP SCAN</span> for Bandwidth (Bandwidth multiplies everything).<br>
+          <b>4) Speed up input:</b> <span class="tag">PROBE SWARM</span> boosts click power (great early).<br>
+          <b>5) Automation:</b> At 600 total Signal, <span class="tag">AUTO-PINGER</span> starts earning while you breathe.<br>
+        </div>
+      </div>
+
+      <div class="inputWrap">
+        <label>WHAT TO WATCH</label>
+        <div class="hint" style="margin-top:0">
+          <b>• Corruption:</b> It rises as you expand capability. Some upgrades benefit from it… some things benefit <i>too much</i>.<br>
+          <b>• Scope Lock:</b> That noise band becomes structured as Signal and Bandwidth grow.<br>
+          <b>• Buff glow:</b> If a buff row glows, you can afford it right now.<br>
+        </div>
+      </div>
+
+      <div class="inputWrap">
+        <label>SAVES</label>
+        <div class="hint" style="margin-top:0">
+          <b>• SAVE:</b> writes your current state.<br>
+          <b>• WIPE:</b> deletes everything (local + cloud if configured).<br>
+          <b>• Offline recovery:</b> when you return, the Array estimates what it earned while you were away.<br>
+        </div>
+      </div>
+
+      <div style="margin-top:12px; color: rgba(126,219,146,.9); font-size:11px; letter-spacing:.08em;">
+        END TRANSMISSION. REMEMBER: THE ARRAY DOES NOT SEEK YOU. IT SEEKS THE SHAPE YOU LEAVE IN THE STATIC.
+      </div>
+    `;
+
+    confirmAction({
+      title: "BRIEFING / OPERATOR MANUAL",
+      body,
+      okText: "ACKNOWLEDGED",
+      cancelText: "CLOSE",
+      danger: false,
+      tag: "HOME BASE"
+    });
+  }
+
+  $("briefing").onclick = (e) => {
+    markActive();
+    feedback(e.currentTarget, "light");
+    showBriefing();
+  };
+
+  // ===== UI render
   function renderHUD(){
     $("signal").textContent = fmt(state.signal);
     $("sps").textContent = fmt(computeSPS());
@@ -1420,6 +1517,7 @@ canvas#scope{
     e.currentTarget.textContent = feedbackOn ? "FEEDBACK: ON" : "FEEDBACK: OFF";
     feedback(e.currentTarget, "light");
     markActive();
+    saveLocal();
   };
 
   $("ping").addEventListener("click", async (e) => {
@@ -1466,6 +1564,7 @@ canvas#scope{
     renderHUD();
     renderUpgrades();
     await saveCloud(true);
+
     await maybeAiComms("rite_reset", "MOTHERLINE");
   };
 
@@ -1597,11 +1696,13 @@ canvas#scope{
     for (let i=0;i<cols;i++){
       const x = Math.floor((i/(cols-1)) * (sw-1));
       const s = signature.cols[i];
+
       const focus = lk;
       const spike = (rand01((timeMs|0) + i*71) < spikeProb) ? 1 : 0;
 
       const spikeH = spike * (0.15 + 0.85*focus) * (0.75 + 0.25*Math.abs(s));
       const noiseH = (s * (0.35 + 0.65*(1-focus))) * 0.35;
+
       const echo = corr > 0.28 ? (0.10 + 0.35*corr) * Math.sin(signature.phase*2 + i*0.12) : 0;
 
       const y = midY - (spikeH + noiseH + echo) * (sh * 0.70);
@@ -1631,16 +1732,25 @@ canvas#scope{
     ctx.strokeRect(Math.floor(0.5*dpr), Math.floor(0.5*dpr), sw - Math.floor(1*dpr), sh - Math.floor(1*dpr));
   }
 
-  // ===== Loop timing (fixed, separate lastNow)
-  let lastNow = performance.now();
-
   // ===== Locked buttons fix: periodic refresh
   let upgradesRefreshAcc = 0;
   const UPGRADES_REFRESH_EVERY = 0.25;
 
-  function mainLoop(now){
-    const dt = Math.min(0.05, (now - lastNow) / 1000);
-    const gap = (now - lastNow) / 1000;
+  // ===== Init narrative
+  function bootNarrativeIfEmpty(){
+    if ($("log").children.length === 0){
+      pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
+      pushLog("comms","OPS","Ping the void so we can establish signal integrity. Then calibrate the dishes.");
+      pushLog("comms","DR KESS","We’re scanning because something is already scanning us. We need to know the shape of it.");
+    }
+  }
+
+  // ===== Main loop (NO AI calls here)
+  let lastNow = performance.now();
+
+  function loop(now){
+    const dt = Math.min(0.05, (now - lastNow)/1000);
+    const gap = (now - lastNow)/1000;
     lastNow = now;
 
     if (document.visibilityState !== "visible") setLive("HIDDEN");
@@ -1676,45 +1786,44 @@ canvas#scope{
     }
 
     drawScope(dt, now|0);
-    requestAnimationFrame(mainLoop);
+
+    requestAnimationFrame(loop);
   }
 
   // ===== Startup render
-  function bootNarrativeIfEmpty(){
-    if ($("log").children.length === 0){
-      pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
-      pushLog("comms","OPS","Ping the void so we can establish signal integrity. Then calibrate the dishes.");
-      pushLog("comms","DR KESS","We’re scanning because something is already scanning us. We need to know the shape of it.");
-    }
-  }
+  function renderUpfront(){
+    $("aiBtn").textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
+    setAiChip(state.aiEnabled ? (cloudReady ? "AI: READY" : "AI: OFFLINE") : "AI: DISABLED");
 
-  // ===== Init sequence (BUFFS ALWAYS RENDER, even if Supabase dies)
-  (async function init(){
-    loadLocal();
     recomputeDerived();
     updateObjectiveFallback();
     renderHUD();
     renderUpgrades();
     bootNarrativeIfEmpty();
+  }
 
-    // Make sure scope has a real width on mobile: resize after layout
-    resizeScope();
-    setTimeout(resizeScope, 80);
-    setTimeout(resizeScope, 250);
+  // ===== Start
+  resizeScope();
+  renderUpfront();
 
-    // Supabase init is optional; do not block the game
+  (async () => {
+    const hasLocal = loadLocal();
+    renderUpfront();
+
     await initSupabase();
     await loadCloudIfNewer();
-    setSyncChip();
-    syncUserChip();
 
-    applyOfflineProgress();
+    renderUpfront();
 
-    // AI chip state
-    setAiChip((cloudReady && state.aiEnabled) ? "AI: READY" : (state.aiEnabled ? "AI: OFFLINE" : "AI: DISABLED"));
+    // force scope resize after layout on mobile Safari
+    setTimeout(resizeScope, 80);
+    setTimeout(resizeScope, 240);
+
+    // offline progress on boot
+    if (hasLocal) applyOfflineProgress();
 
     pushLog("log","SYS","BOOT COMPLETE. ARRAY STANDING BY.");
-    requestAnimationFrame(mainLoop);
+    requestAnimationFrame(loop);
   })();
 
 })();
