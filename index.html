@@ -893,14 +893,24 @@ Proceed.`)}
 
   // ===== UI render
   function renderHUD(){
-    $("signal").textContent = fmt(state.signal);
-    $("sps").textContent = fmt(sps());
-    $("bw").textContent = state.bandwidth.toFixed(2) + "×";
-    $("userChip").textContent = `USER: ${state.username}`;
-    const live = $("liveChip");
+  $("signal").textContent = fmt(state.signal);
+  $("sps").textContent = fmt(sps());
+  $("bw").textContent = state.bandwidth.toFixed(2) + "×";
+  $("userChip").textContent = `USER: ${state.username}`;
+
+  const live = $("liveChip");
+  if (live){
     live.textContent = isActivelyUsed() ? "LIVE: ACTIVE" : "LIVE: IDLE";
     live.style.opacity = isActivelyUsed() ? "1" : "0.65";
   }
+
+  // ✅ Corruption bar + label (only if elements exist)
+  const cf = $("corrFill");
+  const ct = $("corrText");
+  if (cf) cf.style.width = (state.corruption * 100).toFixed(1) + "%";
+  if (ct) ct.textContent =
+    (state.corruption * 100).toFixed(1) + "% (" + corruptionLabel(state.corruption) + ")";
+}
 
   // ===== IMPORTANT FIX: renderUpgrades recomputes affordability fresh each time
   function renderUpgrades(){
@@ -1026,7 +1036,13 @@ Proceed.`)}
       }
     }
   }
-
+function corruptionLabel(c){
+  if (c < 0.10) return "DORMANT";
+  if (c < 0.30) return "WHISPERING";
+  if (c < 0.60) return "INCIDENT";
+  if (c < 0.85) return "BREACH";
+  return "OVERRUN";
+}
   // ===== Core loop
   function gain(x){
     state.signal += x;
