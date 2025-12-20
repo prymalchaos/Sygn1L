@@ -13,6 +13,7 @@
   --border:rgba(57,255,106,.25);
   --radius:16px; --shadow:0 10px 22px rgba(0,0,0,.55);
   --glow:0 0 18px rgba(57,255,106,.25);
+  --glow2:0 0 24px rgba(57,255,106,.18);
 }
 
 html{ background:var(--bg0); -webkit-text-size-adjust:100%; }
@@ -29,6 +30,7 @@ body{
   padding:14px 12px calc(24px + env(safe-area-inset-bottom));
 }
 
+/* CRT vignette */
 body::before{
   content:"";
   position:fixed; inset:0;
@@ -37,6 +39,7 @@ body::before{
   z-index:0;
 }
 
+/* scanlines */
 .fx{ position:fixed; inset:0; pointer-events:none; z-index:0; }
 .fx.scanlines{
   background:repeating-linear-gradient(
@@ -169,7 +172,7 @@ button:disabled{ opacity:.5; cursor:not-allowed; box-shadow:none; }
   gap:12px; align-items:center;
   position:relative;
 }
-.up.affordable{ box-shadow:var(--glow); }
+.up.affordable{ box-shadow:var(--glow2); }
 .up.locked{ opacity:.60; border-style:dashed; }
 
 .up .meta{ flex:1; min-width:220px; }
@@ -199,6 +202,13 @@ button:disabled{ opacity:.5; cursor:not-allowed; box-shadow:none; }
   margin-right:8px;
 }
 
+.flash{ animation:flash .18s ease-out; }
+@keyframes flash{
+  from{ box-shadow:0 0 30px rgba(57,255,106,.6); }
+  to{ box-shadow:none; }
+}
+
+/* Array Scope canvas panel */
 .scopeWrap{
   margin-top:10px;
   border:1px solid rgba(57,255,106,.22);
@@ -228,7 +238,7 @@ canvas#scope{
   background:rgba(0,0,0,.25);
 }
 
-/* Popup comm bubbles (tap-to-close enabled by JS) */
+/* Popup comm bubbles (tap to close) */
 .popHost{
   position:fixed;
   top:12px;
@@ -246,9 +256,15 @@ canvas#scope{
   margin:0 auto;
   border:1px solid rgba(57,255,106,.25);
   border-radius:14px;
-  background:rgba(0,0,0,.72);
+  background:rgba(0,0,0,.78);
   box-shadow:0 10px 26px rgba(0,0,0,.55), 0 0 20px rgba(57,255,106,.15);
   padding:10px 12px;
+  animation: popin .14s ease-out;
+}
+.pop:active{ transform:translateY(1px); }
+@keyframes popin{
+  from{ transform:translateY(-6px); opacity:0; }
+  to{ transform:translateY(0); opacity:1; }
 }
 .pop .who{
   font-size:10px;
@@ -262,54 +278,72 @@ canvas#scope{
   line-height:1.5;
   color:rgba(207,255,214,.94);
 }
+.pop.fade{
+  animation: popout .18s ease-in forwards;
+}
+@keyframes popout{
+  to{ transform:translateY(-4px); opacity:0; }
+}
 
-/* Modal */
-.modalHost{
+/* Modal (manual / decoder) */
+.modalBack{
   position:fixed; inset:0;
-  background:rgba(0,0,0,.72);
-  z-index:2000;
+  background:rgba(0,0,0,.68);
+  z-index:1000;
   display:none;
-  padding:14px 12px calc(18px + env(safe-area-inset-bottom));
+  align-items:center;
+  justify-content:center;
+  padding:14px 12px calc(14px + env(safe-area-inset-bottom));
 }
 .modal{
-  max-width:860px;
-  margin:0 auto;
+  width:min(860px, 100%);
+  max-height:min(76vh, 640px);
   border:1px solid rgba(57,255,106,.28);
   border-radius:16px;
-  background:rgba(0,0,0,.78);
-  box-shadow:0 12px 30px rgba(0,0,0,.60), 0 0 24px rgba(57,255,106,.12);
+  background:rgba(0,0,0,.86);
+  box-shadow:0 16px 40px rgba(0,0,0,.6), 0 0 28px rgba(57,255,106,.12);
   overflow:hidden;
 }
 .modalHd{
   padding:12px 14px;
   border-bottom:1px solid rgba(57,255,106,.18);
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:10px;
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
 }
-.modalTitle{
-  font-size:11px;
+.modalHd .t{
   letter-spacing:.14em;
-  color:rgba(207,255,214,.96);
-  text-transform:uppercase;
+  font-size:11px;
+  color:rgba(207,255,214,.95);
 }
 .modalBody{
-  padding:12px 14px;
-  max-height:62vh;
+  padding:14px;
   overflow:auto;
   -webkit-overflow-scrolling:touch;
+  max-height:calc(76vh - 56px);
+}
+.modalBody p{
+  margin:0 0 12px;
   font-size:12px;
-  line-height:1.55;
+  line-height:1.6;
   color:rgba(207,255,214,.92);
 }
-.modalBtns{
-  padding:12px 14px;
-  border-top:1px solid rgba(57,255,106,.18);
-  display:grid;
-  gap:10px;
+.smallBtn{
+  padding:10px 12px;
+  border-radius:12px;
+  font-size:12px;
 }
-@media(min-width:420px){ .modalBtns{ grid-template-columns:1fr 1fr; } }
+.inputRow{
+  display:flex; gap:10px; flex-wrap:wrap;
+  margin-top:10px;
+}
+input.texty{
+  width:100%;
+  box-sizing:border-box;
+  padding:12px;
+  border-radius:10px;
+  border:1px solid rgba(57,255,106,.3);
+  background:rgba(0,0,0,.3);
+  color:inherit;
+}
 </style>
 </head>
 
@@ -318,17 +352,13 @@ canvas#scope{
 <div class="popHost" id="popHost"></div>
 
 <!-- Modal -->
-<div class="modalHost" id="modalHost">
+<div class="modalBack" id="modalBack" aria-hidden="true">
   <div class="modal">
     <div class="modalHd">
-      <div class="modalTitle" id="modalTitle">TRANSMISSION</div>
-      <div class="chip">TAP OUTSIDE TO CLOSE</div>
+      <div class="t" id="modalTitle">TRANSMISSION</div>
+      <button class="smallBtn" id="modalClose">CLOSE</button>
     </div>
     <div class="modalBody" id="modalBody"></div>
-    <div class="modalBtns">
-      <button id="modalOk">OK</button>
-      <button id="modalCancel">CLOSE</button>
-    </div>
   </div>
 </div>
 
@@ -354,8 +384,6 @@ canvas#scope{
       </div>
 
       <div style="height:10px"></div>
-
-      <!-- ✅ Corruption bar exists here -->
       <div class="stat">
         <div class="k">CORRUPTION</div>
         <div class="bar"><div class="fill danger" id="corrFill"></div></div>
@@ -363,35 +391,33 @@ canvas#scope{
       </div>
     </div>
   </header>
-<section class="card" id="accountCard">
-  <div class="hd">
-    <div>ACCOUNT</div>
-    <div class="muted" id="authStatus">NOT SIGNED IN</div>
-  </div>
 
-  <div class="pad">
-    <input id="authEmail" type="email" placeholder="email"
-      style="width:100%;margin-bottom:8px;padding:12px;border-radius:10px;
-      border:1px solid rgba(57,255,106,.3);background:rgba(0,0,0,.3);color:inherit">
-
-    <input id="authPassword" type="password" placeholder="password"
-      style="width:100%;margin-bottom:12px;padding:12px;border-radius:10px;
-      border:1px solid rgba(57,255,106,.3);background:rgba(0,0,0,.3);color:inherit">
-
-    <div class="grid2">
-      <button id="signInBtn">SIGN IN</button>
-      <button id="signUpBtn">SIGN UP</button>
+  <!-- ACCOUNT -->
+  <section class="card" id="accountCard">
+    <div class="hd">
+      <div>ACCOUNT</div>
+      <div class="muted" id="authStatus">NOT SIGNED IN</div>
     </div>
+    <div class="pad">
+      <input id="authEmail" class="texty" type="email" inputmode="email" autocomplete="email" placeholder="email">
+      <div style="height:8px"></div>
+      <input id="authPassword" class="texty" type="password" autocomplete="current-password" placeholder="password">
 
-    <div style="margin-top:10px">
-      <button id="signOutBtn" disabled>SIGN OUT</button>
-    </div>
+      <div class="grid2">
+        <button id="signInBtn">SIGN IN</button>
+        <button id="signUpBtn">SIGN UP</button>
+      </div>
 
-    <div class="muted" style="margin-top:10px;font-size:11px">
-      Signing in protects your save across devices.
+      <div style="margin-top:10px">
+        <button id="signOutBtn" disabled>SIGN OUT</button>
+      </div>
+
+      <div class="muted" style="margin-top:10px;font-size:11px;line-height:1.45">
+        Signing in protects your save across devices. Local save still works offline.
+      </div>
     </div>
-  </div>
-</section>
+  </section>
+
   <section class="card">
     <div class="hd">
       <div>
@@ -402,10 +428,7 @@ canvas#scope{
       </div>
       <div>
         <span class="chip" id="syncChip">SYNC: LOCAL</span>
-        <!-- ✅ Clickable username chip -->
-        <span class="chip" id="userChip" title="Tap to edit username">USER: Operator</span>
-        <!-- ✅ Optional but supported -->
-        <span class="chip" id="liveChip">LIVE: IDLE</span>
+        <span class="chip" id="userChip">USER: ----</span>
       </div>
     </div>
 
@@ -413,17 +436,27 @@ canvas#scope{
       <button class="big" id="ping">PING THE VOID</button>
 
       <div class="grid2">
-        <button id="briefing">BRIEFING</button>
         <button id="save">SAVE</button>
+        <button id="wipe">WIPE</button>
       </div>
 
       <div class="grid2">
-        <button id="wipe">WIPE</button>
         <button id="prestige" disabled>RITE RESET (LOCKED)</button>
+        <button id="feedbackBtn">FEEDBACK: ON</button>
+      </div>
+
+      <div class="grid2">
+        <button id="aiBtn">DYNAMIC COMMS: ON</button>
+        <span class="chip" id="aiChip">AI: READY</span>
+      </div>
+
+      <div class="grid2">
+        <button id="manualBtn">GETTING STARTED</button>
+        <button id="decoderBtn" disabled>DECODER (LOCKED)</button>
       </div>
 
       <div class="muted" id="objective">
-        OBJECTIVE: START WITH DISH CALIBRATION. REACH 100 TOTAL SIGNAL TO UNLOCK DEEP SCAN.
+        OBJECTIVE: PING THE VOID TO BEGIN ACQUIRING SIGNAL. THEN CALIBRATE THE DISHES.
       </div>
     </div>
   </section>
@@ -434,26 +467,14 @@ canvas#scope{
       <div class="muted">UNLOCKED BY MILESTONES. AVAILABLE BUFFS GLOW.</div>
     </div>
     <div class="pad">
-      <!-- ✅ Required -->
       <div class="upgrades" id="upgrades"></div>
     </div>
   </section>
 
   <section class="card">
     <div class="hd">
-      <div>DECODER</div>
-      <div class="muted">PHASE V UNLOCKS ENGRAM DECRYPTION</div>
-    </div>
-    <div class="pad">
-      <!-- ✅ Required -->
-      <div id="decoder"></div>
-    </div>
-  </section>
-
-  <section class="card">
-    <div class="hd">
       <div>COMMUNICATIONS</div>
-      <div class="muted">TAP A LINE TO DISMISS</div>
+      <div class="muted">ANCILLARY CHANNELS REPORT STATUS</div>
     </div>
     <div class="pad">
       <div class="log" id="comms"></div>
@@ -472,143 +493,87 @@ canvas#scope{
 
 </div>
 
-<!-- Supabase lib -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-// ===== AUTH (Email + Password)
-async function signUpEmailPassword(email, password) {
-  const { data, error } = await supabase.auth.signUp({ email, password });
-  if (error) throw error;
-  return data;
-}
-// ===== SIMPLE EMAIL + PASSWORD AUTH
-const authStatus = document.getElementById("authStatus");
-const signInBtn = document.getElementById("signInBtn");
-const signUpBtn = document.getElementById("signUpBtn");
-const signOutBtn = document.getElementById("signOutBtn");
-const emailEl = document.getElementById("authEmail");
-const passEl = document.getElementById("authPassword");
 
-async function signIn() {
-  const email = emailEl.value.trim();
-  const password = passEl.value.trim();
-  if (!email || !password) return alert("Enter email and password");
-
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) alert(error.message);
-}
-
-async function signUp() {
-  const email = emailEl.value.trim();
-  const password = passEl.value.trim();
-  if (!email || !password) return alert("Enter email and password");
-
-  const { error } = await supabase.auth.signUp({ email, password });
-  if (error) alert(error.message);
-  else alert("Account created. You can sign in now.");
-}
-
-async function signOut() {
-  await supabase.auth.signOut();
-}
-
-// Button wiring
-signInBtn.onclick = signIn;
-signUpBtn.onclick = signUp;
-signOutBtn.onclick = signOut;
-
-// ===== AUTH STATE LISTENER (THIS IS THE IMPORTANT BIT)
-supabase.auth.onAuthStateChange(async (event, session) => {
-  if (session?.user) {
-    userId = session.user.id;
-    cloudReady = true;
-
-    authStatus.textContent = "SIGNED IN";
-    signOutBtn.disabled = false;
-
-    // Load cloud save safely
-    const cloud = await loadCloud();
-    if (cloud?.cloudState) {
-      mergeIntoState(cloud.cloudState);
-      saveLocal();
-      renderUpfront();
-    }
-  } else {
-    userId = null;
-    cloudReady = false;
-
-    authStatus.textContent = "NOT SIGNED IN";
-    signOutBtn.disabled = true;
-  }
-});
-async function signInEmailPassword(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) throw error;
-  return data;
-}
-
-async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  if (error) throw error;
-}
-
-// Call once during init:
-function wireAuthListener() {
-  supabase.auth.onAuthStateChange(async (event, session) => {
-    // event examples: "SIGNED_IN", "SIGNED_OUT", "TOKEN_REFRESHED"
-    if (session?.user?.id) {
-      userId = session.user.id;
-      cloudReady = true;
-      $("userChip").textContent = "USER: " + userId.slice(0, 4) + "…" + userId.slice(-4);
-      $("syncChip").textContent = "SYNC: CLOUD";
-
-      // Pull cloud save immediately after sign-in
-      const cloud = await loadCloud();
-      if (cloud?.cloudState) {
-        const localUpdated = state.updatedAtMs || 0;
-        if (cloud.cloudUpdatedMs > localUpdated) mergeIntoState(cloud.cloudState);
-      }
-      saveLocal();
-      renderUpfront();
-    } else {
-      userId = null;
-      cloudReady = false;
-      $("syncChip").textContent = "SYNC: LOCAL";
-      $("userChip").textContent = "USER: ----";
-    }
-  });
-}
-<!-- Part B JS goes below -->
+<script>
 (() => {
   const $ = (id) => document.getElementById(id);
 
-  // Prevent double-tap zoom on buttons
+  // Prevent double-click zoom on buttons
   document.addEventListener("dblclick", (e) => {
     if (e.target && e.target.closest("button")) e.preventDefault();
-  }, { passive:false });
+  }, { passive: false });
 
-  // ===== Supabase config (your project)
+  // Supabase Config (yours)
   const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
-  const supabase = window.supabase?.createClient
-    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  // ===== Constants
-  const FINAL_MESSAGE = "Greetings! This is a warning. Prepare for invasion. They are coming";
-  const PHASE2 = 500, PHASE3 = 1800, PHASE4 = 9000, PHASE5 = 15000;
-  const RITE_RESET_THRESHOLD = 12000;
+  // ===== Feedback (vibrate if possible, else tiny click)
+  let feedbackOn = true;
+  let audioCtx = null;
+
+  function tinyClickSound(){
+    if (!feedbackOn) return;
+    try{
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = audioCtx;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "square";
+      o.frequency.value = 820;
+      g.gain.value = 0.00001;
+      o.connect(g); g.connect(ctx.destination);
+      o.start();
+      const t = ctx.currentTime;
+      g.gain.setValueAtTime(0.00001, t);
+      g.gain.exponentialRampToValueAtTime(0.028, t + 0.006);
+      g.gain.exponentialRampToValueAtTime(0.00001, t + 0.050);
+      o.stop(t + 0.055);
+    } catch(_){}
+  }
+  function hapticPulse(ms=10){
+    if (!feedbackOn) return false;
+    if (navigator.vibrate){
+      navigator.vibrate([ms]);
+      return true;
+    }
+    return false;
+  }
+  function feedback(el, strength="light"){
+    if (el){
+      el.classList.remove("flash");
+      void el.offsetWidth;
+      el.classList.add("flash");
+    }
+    const h = (strength === "strong") ? hapticPulse(18) : hapticPulse(10);
+    if (!h) tinyClickSound();
+  }
+
+  $("feedbackBtn").onclick = (e) => {
+    feedbackOn = !feedbackOn;
+    e.currentTarget.textContent = feedbackOn ? "FEEDBACK: ON" : "FEEDBACK: OFF";
+    feedback(e.currentTarget, "light");
+    markActive("toggle_feedback");
+  };
 
   // ===== Utils
-  const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
   function fmt(n){
-    n = Number(n);
-    if (!Number.isFinite(n)) return "0";
+    n = Number(n) || 0;
     if (n < 1000) return n.toFixed(0);
     const units = ["K","M","B","T","Qa","Qi"];
     let u = -1;
-    while (n >= 1000 && u < units.length-1){ n/=1000; u++; }
-    return n.toFixed(n<10?2:n<100?1:0)+units[u];
+    while (n >= 1000 && u < units.length-1){ n /= 1000; u++; }
+    return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + units[u];
   }
+  function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+
+  function pushLog(elId, tag, msg){
+    const p = document.createElement("p");
+    p.innerHTML = `<span class="tag">${tag}</span>${msg}`;
+    $(elId).prepend(p);
+  }
+
   function escapeHtml(s){
     return String(s)
       .replaceAll("&","&amp;")
@@ -617,95 +582,48 @@ function wireAuthListener() {
       .replaceAll('"',"&quot;")
       .replaceAll("'","&#039;");
   }
-  function corruptionLabel(c){
-    if (c < 0.10) return "DORMANT";
-    if (c < 0.30) return "WHISPERING";
-    if (c < 0.60) return "INCIDENT";
-    if (c < 0.85) return "BREACH";
-    return "OVERRUN";
-  }
 
-  // ===== Activity gating (for “LIVE” chip + future AI)
-  let lastUserActionAt = 0;
-  function markActive(){ lastUserActionAt = Date.now(); }
-  window.addEventListener("pointerdown", markActive, { passive:true });
-  window.addEventListener("keydown", markActive, { passive:true });
-  function isActivelyUsed(){ return (Date.now() - lastUserActionAt) <= 20000; }
-
-  // ===== Popup comms (tap to close)
+  // Tap-to-close popup comms
   function popupComms(who, msg){
     const host = $("popHost");
-    if (!host) return;
     const box = document.createElement("div");
     box.className = "pop";
     box.innerHTML = `<div class="who">${escapeHtml(who)}</div><div class="msg">${escapeHtml(msg)}</div>`;
-    box.addEventListener("click", () => box.remove());
+    box.addEventListener("click", () => {
+      box.classList.add("fade");
+      setTimeout(() => box.remove(), 160);
+    });
     host.prepend(box);
   }
 
-  function pushLog(elId, who, msg){
-    const root = $(elId);
-    if (!root) return;
-    const p = document.createElement("p");
-    p.innerHTML = `<span class="tag">${escapeHtml(who)}</span>${escapeHtml(msg)}`;
-    p.style.cursor = "pointer";
-    p.title = "Tap to dismiss";
-    p.addEventListener("click", ()=>p.remove());
-    root.prepend(p);
+  // ===== Modal helpers (manual / decoder)
+  function openModal(title, html){
+    $("modalTitle").textContent = title;
+    $("modalBody").innerHTML = html;
+    $("modalBack").style.display = "flex";
+    $("modalBack").setAttribute("aria-hidden", "false");
   }
-
-  // ===== Modal
-  const modalHost = $("modalHost");
-  const modalTitle = $("modalTitle");
-  const modalBody = $("modalBody");
-  const modalOk = $("modalOk");
-  const modalCancel = $("modalCancel");
-
-  function openModal(title, html, opts={}){
-    if (!modalHost) return Promise.resolve(false);
-
-    modalTitle.textContent = title || "TRANSMISSION";
-    modalBody.innerHTML = html || "";
-    modalOk.textContent = opts.okText || "OK";
-    modalCancel.textContent = opts.cancelText || "CLOSE";
-    modalCancel.style.display = opts.hideCancel ? "none" : "";
-    modalHost.style.display = "block";
-
-    requestAnimationFrame(()=>{ modalBody.scrollTop = 0; });
-
-    return new Promise((resolve)=>{
-      const onOk = ()=>cleanup(true);
-      const onCancel = ()=>cleanup(false);
-      const onBackdrop = (e)=>{ if (e.target === modalHost) cleanup(false); };
-
-      function cleanup(v){
-        modalOk.removeEventListener("click", onOk);
-        modalCancel.removeEventListener("click", onCancel);
-        modalHost.removeEventListener("click", onBackdrop);
-        modalHost.style.display = "none";
-        resolve(v);
-      }
-
-      modalOk.addEventListener("click", onOk);
-      modalCancel.addEventListener("click", onCancel);
-      modalHost.addEventListener("click", onBackdrop);
-    });
+  function closeModal(){
+    $("modalBack").style.display = "none";
+    $("modalBack").setAttribute("aria-hidden", "true");
+    $("modalBody").innerHTML = "";
   }
+  $("modalClose").onclick = closeModal;
+  $("modalBack").addEventListener("click", (e) => {
+    if (e.target === $("modalBack")) closeModal();
+  });
 
-  async function confirmAction(title, message, okText){
-    return await openModal(
-      title,
-      `<div style="white-space:pre-wrap">${escapeHtml(message)}</div>`,
-      { okText: okText || "CONFIRM", cancelText:"CANCEL" }
-    );
-  }
+  // ===== Activity gating (AI never triggers while idling)
+  let lastUserActionAt = 0;
+  function markActive(_reason){ lastUserActionAt = Date.now(); }
+  window.addEventListener("pointerdown", () => markActive("pointer"), { passive:true });
+  window.addEventListener("keydown", () => markActive("key"), { passive:true });
+  function isActivelyUsed(){ return (Date.now() - lastUserActionAt) <= 15000; }
 
   // ===== State
   const state = {
-    username: "Operator",
     build: 1,
     relics: 0,
-
     signal: 0,
     total: 0,
 
@@ -717,506 +635,401 @@ function wireAuthListener() {
     corruption: 0,
     phase: 1,
 
-    // IMPORTANT: start at 0 so blank boot can never “beat” cloud
-    updatedAtMs: 0,
-    lastTickMs: Date.now(),
+    flags: { sawPhase2:false, sawPhase3:false, sawPhase4:false, sawPrestigeHint:false },
 
     upgrades: {
-      dish: 0, scan: 0, probes: 0, tuning: 0,
-      autopinger: 0, echo: 0, lattice: 0, dark: 0,
-      firewall: 0, purifier: 0, deadband: 0, decoderRig: 0,
-      relicAmp: 0
+      dish: 0, probes: 0, scan: 0, tuning: 0,
+      autopinger: 0, echo: 0, dark: 0, lattice: 0,
+      relicAmp: 0,
+      // phase 4 additions
+      purge: 0,
+      stabilizer: 0
     },
 
-    archive: {
-      engramsSolved: 0,
-      engramsTotal: FINAL_MESSAGE.length,
-      hasCipherKey: false,
-      awaitingRiteReset: false,
-      finalMessageRevealed: false,
-      scrambleSeed: (Math.floor(Math.random()*1e9)>>>0)
-    }
+    // Decoder system (phase 5)
+    decoder: {
+      unlocked:false,
+      lettersRevealed: 0,
+      scrambled: true,
+      message: "GREETINGS! THIS IS A WARNING. PREPARE FOR INVASION. THEY ARE COMING",
+      cipherSolved:false
+    },
+
+    updatedAtMs: 0,
+
+    // AI comm settings
+    aiEnabled: true,
+    lastAiAtMs: 0,
+    lastChatterAtMs: 0
   };
   window.SYGN1L_STATE = state;
 
-  function touchUpdated(){ state.updatedAtMs = Date.now(); }
-
-  // ===== Prestige gain (shows on button)
-  function prestigeGain(){
-    const over = Math.max(0, state.total - RITE_RESET_THRESHOLD);
-    const base = 1;
-    const extra = Math.floor(Math.sqrt(over / 6000));
-    return base + extra;
-  }
-
   // ===== Upgrades
-  const lv = (id)=>state.upgrades[id]||0;
-
   const UPG = [
     { id:"dish", name:"DISH CALIBRATION", unlockAt:0, baseCost:10, costMult:1.18,
       desc:"+1 SIGNAL/SEC PER LEVEL.", buy(){ state.upgrades.dish++; } },
-
-    { id:"scan", name:"DEEP SCAN", unlockAt:100, baseCost:50, costMult:1.25,
-      desc:"+10% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.scan++; } },
-
     { id:"probes", name:"PROBE SWARM", unlockAt:120, baseCost:80, costMult:1.22,
       desc:"+1 CLICK POWER PER LEVEL.", buy(){ state.upgrades.probes++; } },
-
+    { id:"scan", name:"DEEP SCAN", unlockAt:100, baseCost:50, costMult:1.25,
+      desc:"+10% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.scan++; } },
     { id:"tuning", name:"HARMONIC TUNING", unlockAt:240, baseCost:140, costMult:1.27,
-      desc:"+0.35 SPS +1% BANDWIDTH PER LEVEL.", buy(){ state.upgrades.tuning++; } },
-
+      desc:"+0.3 SIGNAL/SEC AND +1% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.tuning++; } },
     { id:"autopinger", name:"AUTO-PINGER ROUTINE", unlockAt:600, baseCost:520, costMult:1.30,
-      desc:"ADDS AUTO-PINGS/SEC. SCALES WITH PROBES.", buy(){ state.upgrades.autopinger++; } },
-
+      desc:"ADDS AUTO-PINGS/SEC. SCALES WITH PROBES (SYNERGY).", buy(){ state.upgrades.autopinger++; } },
     { id:"echo", name:"ECHO INTEGRATOR", unlockAt:1800, baseCost:1400, costMult:1.35,
-      desc:"BANDWIDTH BONUS SCALES WITH LOG(SIGNAL).", buy(){ state.upgrades.echo++; } },
-
+      desc:"BANDWIDTH BONUS: + (3%*LV) * LOG10(SIGNAL+1).", buy(){ state.upgrades.echo++; } },
     { id:"lattice", name:"HARMONIC LATTICE", unlockAt:3500, baseCost:3200, costMult:1.38,
-      desc:"SPS MULT SCALES WITH CORRUPTION.", buy(){ state.upgrades.lattice++; } },
-
+      desc:"SPS MULT: (1 + 0.06*LV*SQRT(CORRUPTION*10)).", buy(){ state.upgrades.lattice++; } },
     { id:"dark", name:"DARK LISTENING", unlockAt:7000, baseCost:9000, costMult:1.45,
       desc:"IF CORRUPTION>30%: GAINS × (1 + 0.12*LV).", buy(){ state.upgrades.dark++; } },
 
-    { id:"firewall", name:"FIREWALL SIGIL", unlockAt:9000, baseCost:8500, costMult:1.42,
-      desc:"SLOWS CORRUPTION GROWTH PER LEVEL.", buy(){ state.upgrades.firewall++; } },
+    // Phase 4: corruption countermeasures
+    { id:"stabilizer", name:"SIGNAL STABILIZER", unlockAt:9500, baseCost:7200, costMult:1.33,
+      desc:"SLOWS CORRUPTION CREEP BY 6% PER LEVEL.", buy(){ state.upgrades.stabilizer++; } },
+    { id:"purge", name:"CORRUPTION PURGE", unlockAt:11000, baseCost:12000, costMult:1.44,
+      desc:"ON BUY: REDUCES CORRUPTION BY 10% (STACKS).", buy(){ state.upgrades.purge++; state.corruption = clamp(state.corruption - 0.10, 0, 1); } },
 
-    { id:"purifier", name:"SIGNAL PURIFIER", unlockAt:11000, baseCost:12000, costMult:1.48,
-      desc:"PASSIVELY REDUCES CORRUPTION OVER TIME.", buy(){ state.upgrades.purifier++; } },
-
-    { id:"deadband", name:"DEADBAND AMPLIFIER", unlockAt:13000, baseCost:16000, costMult:1.52,
-      desc:"+BANDWIDTH BUT ADDS CORRUPTION PRESSURE.", buy(){ state.upgrades.deadband++; } },
-
-    { id:"decoderRig", name:"DECODER RIG", unlockAt:15000, baseCost:24000, costMult:1.60,
-      desc:"REDUCES ENGRAM COSTS BY 6% PER LEVEL.", buy(){ state.upgrades.decoderRig++; } }
+    { id:"relicAmp", name:"RELIC AMPLIFIER", unlockAt:0, baseCost:3, costMult:1.65, currency:"relics",
+      desc:"SPEND RELICS. PER LV: GLOBAL MULT +8% (PERMANENT).", buy(){ state.upgrades.relicAmp++; } }
   ];
 
+  function upgradeLevel(id){ return state.upgrades[id] || 0; }
   function upgradeCost(u){
-    return Math.floor(u.baseCost * Math.pow(u.costMult, lv(u.id)));
+    const lvl = upgradeLevel(u.id);
+    return Math.floor(u.baseCost * Math.pow(u.costMult, lvl));
   }
 
   // ===== Derived math
-  function computeBaseSPS(){ return lv("dish")*1.0 + lv("tuning")*0.35; }
-  function computeClickPower(){ return 1 + lv("probes")*1.0; }
+  function computeBaseSPS(){
+    return upgradeLevel("dish") * 1.0 + upgradeLevel("tuning") * 0.3;
+  }
+  function computeClickPower(){
+    return 1 + upgradeLevel("probes") * 1.0;
+  }
   function computeBaseBandwidth(){
     let bw = 1.0;
-    bw *= Math.pow(1.10, lv("scan"));
-    bw *= Math.pow(1.01, lv("tuning"));
-    bw *= (1 + 0.05 * lv("deadband"));
+    bw *= Math.pow(1.10, upgradeLevel("scan"));
+    bw *= Math.pow(1.01, upgradeLevel("tuning"));
     return bw;
   }
   function computeEchoMultiplier(){
-    const e = lv("echo");
-    return e<=0 ? 1 : (1 + 0.03*e*Math.log10(state.signal+1));
+    const lv = upgradeLevel("echo");
+    if (lv <= 0) return 1.0;
+    const logBonus = Math.log10(state.signal + 1);
+    return 1 + (0.03 * lv * logBonus);
   }
-  function computeRelicMultiplier(){ return 1 + 0.08*lv("relicAmp"); }
+  function computeRelicMultiplier(){
+    const lv = upgradeLevel("relicAmp");
+    return 1 + 0.08 * lv;
+  }
   function computeLatticeMultiplier(){
-    const l = lv("lattice");
-    if (l<=0) return 1;
-    const term = Math.sqrt(clamp(state.corruption,0,1)*10);
-    return 1 + 0.06*l*term;
+    const lv = upgradeLevel("lattice");
+    if (lv <= 0) return 1.0;
+    const term = Math.sqrt(clamp(state.corruption,0,1) * 10);
+    return 1 + 0.06 * lv * term;
   }
   function computeDarkMultiplier(){
-    const d = lv("dark");
-    return d<=0 ? 1 : (state.corruption > 0.30 ? (1 + 0.12*d) : 1);
+    const lv = upgradeLevel("dark");
+    if (lv <= 0) return 1.0;
+    return state.corruption > 0.30 ? (1 + 0.12 * lv) : 1.0;
   }
   function computeAutoPingsPerSec(){
-    const a = lv("autopinger");
-    if (a<=0) return 0;
-    const probeFactor = 1 + lv("probes")*0.15;
-    return a * 0.65 * probeFactor;
+    const lv = upgradeLevel("autopinger");
+    if (lv <= 0) return 0;
+    const probeFactor = 1 + upgradeLevel("probes") * 0.15;
+    return lv * 0.65 * probeFactor;
   }
-  function recompute(){
+
+  function recomputeDerived(){
     state.baseSPS = computeBaseSPS();
     state.clickPower = computeClickPower();
     state.bandwidth = computeBaseBandwidth() * computeEchoMultiplier() * computeRelicMultiplier();
     state.autoPingsPerSec = computeAutoPingsPerSec();
   }
-  const sps = ()=> state.baseSPS * state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
-  const globalMult = ()=> state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
+  function computeSPS(){
+    return state.baseSPS * state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
+  }
+  function globalMultiplier(){
+    return state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
+  }
 
   // ===== Corruption
+  function stabilizerFactor(){
+    const lv = upgradeLevel("stabilizer");
+    return clamp(1 - 0.06*lv, 0.25, 1);
+  }
   function updateCorruption(dt){
     const creep = 0.0000025 * Math.log10(state.total + 10);
-    const tech  = (lv("echo")*0.0000015) + (lv("lattice")*0.0000018) + (lv("dark")*0.0000022);
-    const invite= 0.0000010;
+    const tech = (upgradeLevel("echo") * 0.0000015) + (upgradeLevel("lattice") * 0.0000018) + (upgradeLevel("dark") * 0.0000022);
+    const invite = 0.0000010;
+    const slow = stabilizerFactor();
+    state.corruption = clamp(state.corruption + (creep + tech + invite) * slow * dt, 0, 1);
+  }
+  function corruptionLabel(c){
+    if (c < 0.10) return "DORMANT";
+    if (c < 0.30) return "WHISPERING";
+    if (c < 0.60) return "INCIDENT";
+    if (c < 0.85) return "BREACH";
+    return "OVERRUN";
+  }
 
-    const firewall = 1 - clamp(0.06*lv("firewall"), 0, 0.55);
-    const deadband = 1 + clamp(0.05*lv("deadband"), 0, 0.60);
-    const phaseAmp = (state.phase >= 4) ? 1.35 : 1.0;
+  // ===== Objectives & milestones
+  function setObjective(text){ $("objective").innerHTML = "OBJECTIVE: " + text; }
 
-    state.corruption = clamp(state.corruption + (creep+tech+invite) * firewall * deadband * phaseAmp * dt, 0, 1);
-
-    const pur = lv("purifier");
-    if (pur > 0){
-      state.corruption = clamp(state.corruption - (0.000010 * pur) * dt, 0, 1);
+  function updateObjectiveFallback(){
+    if (!state.flags.sawPhase2){
+      setObjective("PING THE VOID TO BEGIN. THEN BUY DISH CALIBRATION. REACH 100 TOTAL SIGNAL TO UNLOCK DEEP SCAN.");
+    } else if (!state.flags.sawPhase3){
+      setObjective("UNLOCK AUTO-PINGER ROUTINE AT 600 TOTAL SIGNAL. BUILD SIGNAL/SEC.");
+    } else if (!state.flags.sawPhase4){
+      setObjective("PHASE IV LOOMS. REACH 9,500 TOTAL SIGNAL TO ACCESS STABILIZATION TECH.");
+    } else if (!state.decoder.unlocked){
+      setObjective("PHASE V: DECODER COMING ONLINE. REACH 14,000 TOTAL SIGNAL TO UNLOCK DECODER INTERFACE.");
+    } else {
+      setObjective("DECRYPT ENGRAMS. THE SENTENCE REMAINS SCRAMBLED UNTIL THE CIPHER KEY IS SOLVED.");
     }
   }
 
-  // ===== Phase logic
-  function phaseCheck(){
-    const p = state.total >= PHASE5 ? 5 :
-              state.total >= PHASE4 ? 4 :
-              state.total >= PHASE3 ? 3 :
-              state.total >= PHASE2 ? 2 : 1;
-    state.phase = Math.max(state.phase, p);
-  }
-
-  // ===== Decoder
-  function engramCost(){
-    const n = state.archive.engramsSolved;
-    const rigDiscount = Math.pow(0.94, lv("decoderRig"));
-    const base = 1200;
-    const ramp = Math.pow(1.14, n);
-    return Math.floor(base * ramp * rigDiscount);
-  }
-
-  function scrambleDisplay(seed, revealedCount){
-    const text = FINAL_MESSAGE;
-    const len = text.length;
-    let s = (seed >>> 0) || 1;
-    const rnd = () => {
-      s ^= s << 13; s >>>= 0;
-      s ^= s >>> 17; s >>>= 0;
-      s ^= s << 5;  s >>>= 0;
-      return (s >>> 0) / 4294967296;
-    };
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!?.,:;-' ";
-    const out = [];
-    for (let i=0;i<len;i++){
-      if (i < revealedCount) out.push(text[i]);
-      else out.push(alphabet[Math.floor(rnd()*alphabet.length)]);
-    }
-    return out.join("");
-  }
-
-  function renderDecoder(){
-    const root = $("decoder");
-    if (!root) return;
-
-    if (state.phase < 5){
-      root.innerHTML = `<div class="muted">STATUS: LOCKED. REACH PHASE V (15,000 TOTAL SIGNAL).</div>`;
-      return;
+  function milestoneCheck(){
+    if (!state.flags.sawPhase2 && state.total >= 500){
+      state.flags.sawPhase2 = true;
+      state.phase = Math.max(state.phase, 2);
+      $("phase").textContent = "PHASE II";
+      $("status").textContent = "ARRAY: DRIFT";
+      pushLog("log","SYS","PHASE II ENGAGED. THE ARRAY BEGINS RETURN TRANSMISSIONS.");
+      pushLog("comms","LT VANCE","Ping it again. We need repeatable readings, not vibes.");
+      pushLog("comms","DR KESS","Calibrate the dishes. The noise isn’t random, it’s layered.");
+      updateObjectiveFallback();
+      popupComms("OPS","Ping the void so we can establish baseline signal integrity.");
     }
 
-    const solved = state.archive.engramsSolved;
-    const total = state.archive.engramsTotal;
-    const done = solved >= total;
-
-    const scrambled = scrambleDisplay(state.archive.scrambleSeed, solved);
-    const price = engramCost();
-    const canBuy = state.signal >= price && !done;
-
-    root.innerHTML = `
-      <div class="muted">STATUS: ${done ? "CIPHER KEY ACQUIRED" : "DECRYPTING"}</div>
-      <div style="margin-top:10px;border:1px solid rgba(57,255,106,.25);border-radius:12px;padding:10px;background:rgba(0,0,0,.30)">
-        <div style="font-size:10px;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">INTERCEPTED STRING</div>
-        <div style="white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.55">${escapeHtml(scrambled)}</div>
-      </div>
-      <div class="muted" style="margin-top:10px">ENGRAMS: <b style="color:var(--text)">${solved}</b> / ${total}</div>
-      <div style="margin-top:12px">
-        <button id="decryptBtn" ${canBuy ? "" : "disabled"}>
-          ${done ? "DECRYPT COMPLETE" : (canBuy ? `DECRYPT ENGRAM (COST ${fmt(price)})` : `INSUFFICIENT SIGNAL (COST ${fmt(price)})`)}
-        </button>
-      </div>
-      ${state.archive.awaitingRiteReset && state.archive.hasCipherKey && !state.archive.finalMessageRevealed
-        ? `<div class="muted" style="margin-top:10px">CIPHER KEY READY. RITE RESET REQUIRED TO APPLY.</div>`
-        : ``}
-    `;
-
-    const btn = $("decryptBtn");
-    if (btn){
-      btn.onclick = () => {
-        markActive();
-        const priceNow = engramCost();
-        if (state.signal < priceNow) return;
-
-        state.signal -= priceNow;
-        state.archive.engramsSolved++;
-
-        if (state.archive.engramsSolved >= state.archive.engramsTotal){
-          state.archive.engramsSolved = state.archive.engramsTotal;
-          state.archive.hasCipherKey = true;
-          state.archive.awaitingRiteReset = true;
-          popupComms("DR KESS", `${state.username}, final engram is a key. We need a Rite Reset to apply it.`);
-          pushLog("comms","DR KESS", `${state.username}, final engram is a key. We need a Rite Reset to apply it.`);
-        }
-
-        touchUpdated();
-        renderHUD();
-        renderUpgrades();
-        renderDecoder();
-        saveLocal();
-        saveCloud(false);
-      };
+    if (!state.flags.sawPhase3 && state.total >= 1800){
+      state.flags.sawPhase3 = true;
+      state.phase = Math.max(state.phase, 3);
+      $("phase").textContent = "PHASE III";
+      $("status").textContent = "ARRAY: ACTIVE";
+      pushLog("log","SYS","PHASE III: RESPONSE PATTERNS DETECTED. NOT RANDOM. NOT FRIENDLY.");
+      pushLog("comms","DR KESS","It’s not a signal. It’s an instruction set pretending to be noise.");
+      pushLog("comms","OPS","Keep scanning. If it learns our cadence, we learn its intent.");
+      updateObjectiveFallback();
     }
+
+    if (!state.flags.sawPhase4 && state.total >= 9000){
+      state.flags.sawPhase4 = true;
+      state.phase = Math.max(state.phase, 4);
+      $("phase").textContent = "PHASE IV";
+      $("status").textContent = "ARRAY: GLITCH";
+      pushLog("log","SYS","PHASE IV: SYSTEM INSTABILITY. INTERFERENCE SHOWS INTENTIONAL ARTIFACTS.");
+      pushLog("comms","LT VANCE","Hey. Slow down if you need to. Nobody wins a panic sprint.");
+      pushLog("comms","OPS","We’re adding stabilizers. Corruption is rising faster than expected.");
+      updateObjectiveFallback();
+      popupComms("OPS","New directive: stabilize the array. Corruption is chewing through our signal.");
+    }
+
+    // Prestige hint
+    if (!state.flags.sawPrestigeHint && state.total >= 12000){
+      state.flags.sawPrestigeHint = true;
+      pushLog("comms","OPS","We can reset the Array and keep the residue. Call it a Rite.");
+      pushLog("log","SYS","RITE RESET PROTOCOL DISCOVERED. RELICS MAY PERSIST BETWEEN BUILDS.");
+      updateObjectiveFallback();
+    }
+
+    // Phase 5 Decoder unlock
+    if (!state.decoder.unlocked && state.total >= 14000){
+      state.phase = Math.max(state.phase, 5);
+      $("phase").textContent = "PHASE V";
+      $("status").textContent = "ARRAY: DECODING";
+      state.decoder.unlocked = true;
+      $("decoderBtn").disabled = false;
+      pushLog("log","SYS","PHASE V: DECODER INTERFACE EXPOSED. ENGRAMS DETECTED.");
+      pushLog("comms","DR KESS","This is… language. Not ours. Each engram is a piece of a key.");
+      popupComms("DR KESS","Decoder is live. Decrypt engrams one-by-one. It will get expensive.");
+      updateObjectiveFallback();
+    }
+
+    // Decoder button state
+    $("decoderBtn").disabled = !state.decoder.unlocked;
   }
 
-  // ===== Rite Reset
-  function doRiteReset(){
-    const gainR = prestigeGain();
-    state.relics += gainR;
+  // ===== Prestige
+  function prestigeGain(){
+    const over = Math.max(0, state.total - 12000);
+    const base = 1;
+    const extra = Math.floor(Math.sqrt(over / 6000));
+    return base + extra;
+  }
+
+  function doPrestige(){
+    const gainRelics = prestigeGain();
+    state.relics += gainRelics;
     state.build += 1;
 
-    // Keep archive + username always
-    const keepArchive = JSON.parse(JSON.stringify(state.archive));
-    const keepName = state.username;
+    pushLog("log","SYS",`RITE RESET EXECUTED. +${gainRelics} RELICS RECOVERED.`);
+    pushLog("comms","MOTHERLINE","THE ARRAY FORGETS. YOU DO NOT.");
+
+    // Keep relic amplifier levels (permanent)
+    const keepRelicAmp = state.upgrades.relicAmp || 0;
+
+    // IMPORTANT: keep decoder progress across resets (so “evidence” doesn’t vanish)
+    const keepDecoder = JSON.parse(JSON.stringify(state.decoder));
 
     state.signal = 0;
     state.total = 0;
     state.corruption = Math.max(0, state.corruption * 0.25);
+
     state.phase = 1;
+    state.flags.sawPhase2 = false;
+    state.flags.sawPhase3 = false;
+    state.flags.sawPhase4 = false;
+    state.flags.sawPrestigeHint = false;
 
     for (const k in state.upgrades) state.upgrades[k] = 0;
+    state.upgrades.relicAmp = keepRelicAmp;
 
-    state.archive = keepArchive;
-    state.username = keepName;
+    state.decoder = keepDecoder;
 
-    // Apply cipher key on Rite Reset (this is the “unscramble” moment)
-    if (state.archive.awaitingRiteReset && state.archive.hasCipherKey && !state.archive.finalMessageRevealed){
-      state.archive.awaitingRiteReset = false;
-      state.archive.finalMessageRevealed = true;
-      popupComms("DECRYPT", FINAL_MESSAGE);
-      pushLog("comms","DECRYPT", FINAL_MESSAGE);
-      pushLog("log","SYS","CIPHER KEY APPLIED. STRING UNSCRAMBLED.");
-    }
+    touchLocalUpdated();
+    recomputeDerived();
+    updateObjectiveFallback();
   }
 
-  // ===== Objective
-  function updateObjective(){
-    const o = $("objective");
-    if (!o) return;
-
-    if (state.total < 100) o.textContent = "OBJECTIVE: BUY DISH CALIBRATION. REACH 100 TOTAL SIGNAL FOR DEEP SCAN.";
-    else if (state.total < 600) o.textContent = "OBJECTIVE: UNLOCK AUTO-PINGER AT 600 TOTAL SIGNAL. PUSH SIGNAL/SEC.";
-    else if (state.total < 3500) o.textContent = "OBJECTIVE: PREPARE HARMONIC LATTICE AT 3500 TOTAL SIGNAL. WATCH CORRUPTION.";
-    else if (state.total < RITE_RESET_THRESHOLD) o.textContent = "OBJECTIVE: RITE RESET UNLOCKS AT 12,000 TOTAL SIGNAL. RELICS PERSIST.";
-    else if (state.total < PHASE5) o.textContent = "OBJECTIVE: PHASE V AT 15,000 TOTAL SIGNAL UNLOCKS THE DECODER.";
-    else o.textContent = "OBJECTIVE: DECRYPT ENGRAMS. APPLY CIPHER KEY VIA RITE RESET.";
+  // ===== Decoder mechanic
+  function decoderCost(){
+    // Gets more expensive each letter
+    const n = state.decoder.lettersRevealed;
+    return Math.floor(900 * Math.pow(1.28, n));
   }
+  function scrambledView(text){
+    // Show revealed letters in correct positions, unrevealed as ▒ and keep the whole line scrambled until cipher solved
+    const clean = text.toUpperCase();
+    const totalChars = clean.length;
+    const reveal = clamp(state.decoder.lettersRevealed, 0, totalChars);
 
-  // ===== HUD render (includes corruption + Rite Reset (+X relics))
-  function renderHUD(){
-    if ($("signal")) $("signal").textContent = fmt(state.signal);
-    if ($("sps")) $("sps").textContent = fmt(sps());
-    if ($("bw")) $("bw").textContent = state.bandwidth.toFixed(2) + "×";
-
-    if ($("buildChip")) $("buildChip").textContent = "BUILD: " + state.build;
-    if ($("relicChip")) $("relicChip").textContent = "RELICS: " + state.relics;
-
-    if ($("phase")){
-      $("phase").textContent =
-        state.phase===1 ? "PHASE I" :
-        state.phase===2 ? "PHASE II" :
-        state.phase===3 ? "PHASE III" :
-        state.phase===4 ? "PHASE IV" : "PHASE V";
-    }
-
-    if ($("userChip")) $("userChip").textContent = "USER: " + state.username;
-
-    const live = $("liveChip");
-    if (live){
-      live.textContent = isActivelyUsed() ? "LIVE: ACTIVE" : "LIVE: IDLE";
-      live.style.opacity = isActivelyUsed() ? "1" : "0.65";
-    }
-
-    // Corruption bar
-    const cf = $("corrFill");
-    const ct = $("corrText");
-    if (cf) cf.style.width = (clamp(state.corruption,0,1)*100).toFixed(1) + "%";
-    if (ct){
-      const c = clamp(state.corruption,0,1);
-      ct.textContent = (c*100).toFixed(1) + "% (" + corruptionLabel(c) + ")";
-    }
-
-    // Status chip (optional)
-    if ($("status")){
-      $("status").textContent =
-        state.phase<=1 ? "ARRAY: STABLE" :
-        state.phase===2 ? "ARRAY: DRIFT" :
-        state.phase===3 ? "ARRAY: ACTIVE" :
-        state.phase===4 ? "ARRAY: FRACTURE" : "ARRAY: OPEN";
-    }
-
-    // Rite Reset button label
-    const btn = $("prestige");
-    if (btn){
-      const canReset = state.total >= RITE_RESET_THRESHOLD;
-      const gainR = prestigeGain();
-      btn.disabled = !canReset;
-      btn.textContent = canReset ? `RITE RESET (+${gainR} RELICS)` : "RITE RESET (LOCKED)";
-    }
-
-    updateObjective();
-    updateScopeLabel();
-  }
-
-  // ===== Locked button fix: render upgrades often + recompute affordability on click
-  function renderUpgrades(){
-    const root = $("upgrades");
-    if (!root) return;
-    root.innerHTML = "";
-
-    for (const u of UPG){
-      const unlocked = state.total >= u.unlockAt;
-      const lvlNow = lv(u.id);
-      const price = upgradeCost(u);
-      const affordable = unlocked && state.signal >= price;
-
-      const row = document.createElement("div");
-      row.className = "up" + (affordable ? " affordable" : "") + (!unlocked ? " locked" : "");
-
-      const meta = document.createElement("div");
-      meta.className = "meta";
-      meta.innerHTML = `
-        <div class="name">${escapeHtml(u.name)} (LV ${lvlNow})</div>
-        <div class="desc">${escapeHtml(unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlockAt)} TOTAL SIGNAL.`)}</div>
-        <div class="cost">${unlocked ? `COST: ${fmt(price)} SIGNAL` : "STATUS: LOCKED"}</div>
-      `;
-
-      const btn = document.createElement("button");
-      btn.textContent = unlocked ? (affordable ? "ACQUIRE" : "LOCKED") : "CLASSIFIED";
-      btn.disabled = !affordable;
-
-      btn.onclick = () => {
-        markActive();
-
-        // IMPORTANT: re-evaluate now (prevents “stuck locked until refresh”)
-        const unlockedNow = state.total >= u.unlockAt;
-        const priceNow = upgradeCost(u);
-        const canBuyNow = unlockedNow && state.signal >= priceNow;
-        if (!canBuyNow) return;
-
-        state.signal -= priceNow;
-        u.buy();
-
-        touchUpdated();
-        recompute();
-        renderHUD();
-        renderUpgrades();
-        renderDecoder();
-
-        saveLocal();
-        saveCloud(false);
-      };
-
-      row.appendChild(meta);
-      row.appendChild(btn);
-      root.appendChild(row);
-    }
-  }
-
-  // ===== Scope visualiser
-  const scope = $("scope");
-  const scopeLabel = $("scopeLabel");
-  let ctx = null, sw=0, sh=0, dpr=1;
-  let sigPhase = 0;
-
-  function resizeScope(){
-    if (!scope) return;
-    ctx = scope.getContext("2d", { alpha:false });
-    dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-    const cssW = scope.clientWidth || 320;
-    const cssH = 84;
-    scope.width = Math.floor(cssW * dpr);
-    scope.height = Math.floor(cssH * dpr);
-    sw = scope.width;
-    sh = scope.height;
-  }
-  window.addEventListener("resize", resizeScope);
-
-  function lockValue(){
-    const a = clamp(Math.log10(state.total + 1) / 5, 0, 1);
-    const b = clamp((state.bandwidth - 1) / 4, 0, 1);
-    const c = clamp(Math.log10(sps() + 1) / 4, 0, 1);
-    const raw = (0.45*a + 0.35*b + 0.20*c);
-    const corrupted = raw * (1 - 0.55*state.corruption);
-    return clamp(corrupted, 0, 1);
-  }
-  function updateScopeLabel(){
-    if (!scopeLabel) return;
-    scopeLabel.textContent = "LOCK: " + Math.round(lockValue()*100) + "%";
-  }
-
-  function drawScope(dt){
-    if (!ctx || !sw || !sh) return;
-
-    const lk = lockValue();
-    const corr = state.corruption;
-
-    ctx.fillStyle = "rgb(0,0,0)";
-    ctx.fillRect(0,0,sw,sh);
-
-    const noiseAmt = clamp(0.85 - 0.70*lk + 0.35*corr, 0.15, 0.95);
-    const spikeProb = clamp(0.04 + 0.36*lk, 0.04, 0.70);
-    const px = Math.max(1, Math.floor(dpr));
-
-    for (let y=0;y<sh;y+=px){
-      for (let x=0;x<sw;x+=px){
-        if (Math.random() < noiseAmt){
-          const g = Math.floor(150 + 90*Math.random());
-          ctx.fillStyle = `rgb(0,${g},0)`;
-          ctx.fillRect(x,y,px,px);
+    let mask = "";
+    let revealedCount = 0;
+    for (let i=0;i<totalChars;i++){
+      const ch = clean[i];
+      if (ch === " " || ch === "!" || ch === "." ) {
+        mask += ch;
+      } else {
+        if (revealedCount < reveal){
+          mask += ch;
+          revealedCount++;
+        } else {
+          mask += "▒";
         }
       }
     }
 
-    sigPhase += dt * (0.6 + 1.8*lk) * (1 + 0.8*corr);
-    const midY = Math.floor(sh*0.60);
-
-    ctx.strokeStyle = "rgba(57,255,106,0.85)";
-    ctx.lineWidth = Math.max(1, 1*dpr);
-    ctx.beginPath();
-    for (let i=0;i<120;i++){
-      const x = (i/119)*(sw-1);
-      const spike = (Math.random() < spikeProb) ? (0.2 + 0.8*Math.random()) : 0;
-      const wave = Math.sin(sigPhase + i*0.12) * (0.10 + 0.15*(1-lk));
-      const tear = corr > 0.45 ? Math.sin(sigPhase*4 + i*0.22) * (0.06 + 0.10*corr) : 0;
-      const y = midY - (spike + wave + tear) * (sh * 0.70);
-      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    if (state.decoder.cipherSolved){
+      return clean;
     }
-    ctx.stroke();
+
+    // scramble characters but keep spaces/punctuation in place
+    const letters = mask.split("").filter(c => (c !== " " && c !== "!" && c !== "." ));
+    for (let i=letters.length-1;i>0;i--){
+      const j = (Math.random()*(i+1))|0;
+      [letters[i], letters[j]] = [letters[j], letters[i]];
+    }
+    let idx=0;
+    let out="";
+    for (const c of mask){
+      if (c === " " || c==="!" || c===".") out += c;
+      else out += letters[idx++] || c;
+    }
+    return out;
   }
 
-  // ===== Offline progress
-  function applyOfflineProgress(){
-    const now = Date.now();
-    const then = state.lastTickMs || state.updatedAtMs || now;
-    const dtMs = clamp(now - then, 0, 1000*60*60*12);
-    const dt = dtMs/1000;
-    if (dt < 10) return;
+  function openDecoderModal(){
+    const cost = decoderCost();
+    const canBuy = state.signal >= cost && !state.decoder.cipherSolved;
 
-    recompute();
-    const rate = sps();
+    const preview = scrambledView(state.decoder.message);
+    const solved = state.decoder.cipherSolved;
 
-    // cap: 20min base + extra by phase and purifier
-    const cap = 60*20 + (state.phase*60*10) + (lv("purifier")*60*10);
-    const effective = Math.min(dt, cap);
+    openModal("DECODER INTERFACE", `
+      <p><span class="tag">SYS</span>Engrams detected in carrier noise. Decrypting is computationally expensive.</p>
+      <p><span class="tag">DEC</span><strong>OUTPUT:</strong><br><span style="letter-spacing:.12em">${escapeHtml(preview)}</span></p>
+      <p><span class="tag">STAT</span>Revealed: <strong>${state.decoder.lettersRevealed}</strong> / ${state.decoder.message.length}</p>
+      <p><span class="tag">COST</span>Next Engram: <strong>${fmt(cost)}</strong> SIGNAL</p>
 
-    const gained = rate * effective;
-    state.signal += gained;
-    state.total += gained;
+      <div class="inputRow">
+        <button class="smallBtn" id="decryptBtn" ${canBuy ? "" : "disabled"}>${solved ? "CIPHER SOLVED" : (canBuy ? "DECRYPT ENGRAM" : "INSUFFICIENT SIGNAL")}</button>
+        <button class="smallBtn" id="cipherBtn" ${state.decoder.lettersRevealed >= state.decoder.message.replace(/[^A-Z]/g,'').length ? "" : "disabled"}>
+          SOLVE CIPHER KEY
+        </button>
+      </div>
 
-    updateCorruption(effective * 0.6);
+      <p style="opacity:.9"><span class="tag">NOTE</span>The sentence remains scrambled until the cipher key is solved.</p>
+    `);
 
-    pushLog("log","SYS",`OFFLINE RECOVERY: +${fmt(gained)} SIGNAL (${Math.floor(effective)}s simulated)`);
+    const decryptBtn = document.getElementById("decryptBtn");
+    const cipherBtn = document.getElementById("cipherBtn");
+
+    if (decryptBtn){
+      decryptBtn.onclick = () => {
+        const c = decoderCost();
+        if (state.signal < c) return;
+        state.signal -= c;
+
+        // advance reveals (letters only)
+        const lettersTotal = state.decoder.message.replace(/[^A-Z]/gi,'').length;
+        state.decoder.lettersRevealed = Math.min(lettersTotal, state.decoder.lettersRevealed + 1);
+
+        pushLog("log","DEC","Engram decrypted. Pattern density increased.");
+        touchLocalUpdated();
+        saveLocal();
+        saveCloud(false);
+        openDecoderModal();
+      };
+    }
+
+    if (cipherBtn){
+      cipherBtn.onclick = () => {
+        state.decoder.cipherSolved = true;
+        state.decoder.scrambled = false;
+        pushLog("comms","DR KESS","Cipher key resolved. The message is coherent.");
+        pushLog("log","SYS",`ALIEN MESSAGE: "${escapeHtml(state.decoder.message)}"`);
+        popupComms("ALIEN CHANNEL", state.decoder.message);
+        touchLocalUpdated();
+        saveLocal();
+        saveCloud(true);
+        openDecoderModal();
+      };
+    }
   }
 
-  // ===== Gains
-  function gain(x){ state.signal += x; state.total += x; }
+  // ===== Gain
+  function gain(amount){
+    state.signal += amount;
+    state.total += amount;
+  }
 
-  // ===== Saves (Local + Cloud) with wipe-proof merge
-  const LOCAL_KEYS = [
-    "sygn1l_save_vA",
-    "sygn1l_save_v3",
-    "sygn1l_cloudsave_v3",
-    "sygn1l_save",
-  ];
-
+  // ===== Save Manager (Local + Cloud)
+  const LOCAL_KEY = "sygn1l_cloudsave_v7";
   let userId = null;
   let cloudReady = false;
   let lastCloudSaveAt = 0;
 
-  function normalizeLoadedState(data){
+  function touchLocalUpdated(){ state.updatedAtMs = Date.now(); }
+
+  function saveLocal(){
+    touchLocalUpdated();
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
+    $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
+  }
+
+  function loadLocal(){
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if (!raw) return false;
+    try{
+      const data = JSON.parse(raw);
+      mergeIntoState(data);
+      return true;
+    }catch(_){ return false; }
+  }
+
+  function mergeIntoState(data){
     for (const k in data){
       if (data[k] && typeof data[k] === "object" && state[k] && typeof state[k] === "object"){
         Object.assign(state[k], data[k]);
@@ -1224,112 +1037,40 @@ function wireAuthListener() {
         state[k] = data[k];
       }
     }
-
-    state.upgrades = Object.assign({
-      dish:0, scan:0, probes:0, tuning:0,
-      autopinger:0, echo:0, lattice:0, dark:0,
-      firewall:0, purifier:0, deadband:0, decoderRig:0,
-      relicAmp:0
-    }, state.upgrades || {});
-
-    state.archive = Object.assign({
-      engramsSolved:0,
-      engramsTotal: FINAL_MESSAGE.length,
-      hasCipherKey:false,
-      awaitingRiteReset:false,
-      finalMessageRevealed:false,
-      scrambleSeed:(Math.floor(Math.random()*1e9)>>>0)
-    }, state.archive || {});
-
-    // Make sure timestamps exist
-    state.updatedAtMs = Number(state.updatedAtMs || 0);
-    state.lastTickMs = Number(state.lastTickMs || Date.now());
-  }
-
-  function loadFromKey(key){
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    try { return JSON.parse(raw); } catch { return null; }
-  }
-
-  function saveLocal(){
-    touchUpdated();
-    localStorage.setItem(LOCAL_KEYS[0], JSON.stringify(state));
-    if ($("syncChip")) $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
-  }
-
-  function loadLocal(){
-    let best = null;
-    let bestUpdated = -1;
-
-    for (const key of LOCAL_KEYS){
-      const data = loadFromKey(key);
-      if (!data) continue;
-      const t = Number(data.updatedAtMs || 0);
-      if (t > bestUpdated){
-        bestUpdated = t;
-        best = data;
-      }
-    }
-
-    if (!best) return false;
-
-    normalizeLoadedState(best);
-    // migrate forward
-    localStorage.setItem(LOCAL_KEYS[0], JSON.stringify(state));
-    return true;
-  }
-
-  async function ensureSession(){
-    if (!supabase) return null;
-    try{
-      let { data: { session } } = await supabase.auth.getSession();
-      if (!session){
-        const { data, error } = await supabase.auth.signInAnonymously();
-        if (error) throw error;
-        session = data.session;
-      }
-      userId = session.user.id;
-      cloudReady = true;
-      if ($("syncChip")) $("syncChip").textContent = "SYNC: CLOUD";
-      return userId;
-    } catch {
-      cloudReady = false;
-      if ($("syncChip")) $("syncChip").textContent = "SYNC: OFFLINE";
-      return null;
-    }
   }
 
   async function loadCloud(){
-    if (!supabase || !cloudReady || !userId) return null;
+    if (!cloudReady || !userId) return null;
     try{
       const { data, error } = await supabase
         .from("saves")
         .select("state, updated_at")
         .eq("player_id", userId)
         .maybeSingle();
+
       if (error) throw error;
-      if (!data?.state) return null;
+      if (!data || !data.state) return null;
 
       const cloudState = data.state;
       const cloudUpdatedMs = cloudState.updatedAtMs || (data.updated_at ? Date.parse(data.updated_at) : 0);
       return { cloudState, cloudUpdatedMs };
-    } catch {
+    } catch(err){
+      $("syncChip").textContent = "SYNC: OFFLINE";
       cloudReady = false;
-      if ($("syncChip")) $("syncChip").textContent = "SYNC: OFFLINE";
+      pushLog("log","SYS","CLOUD LOAD FAILED. CONTINUING LOCAL.");
       return null;
     }
   }
 
   async function saveCloud(force=false){
-    if (!supabase || !cloudReady || !userId) return false;
+    if (!cloudReady || !userId) return false;
 
     const now = Date.now();
-    if (!force && (now - lastCloudSaveAt) < 45000) return false;
+    if (!force && (now - lastCloudSaveAt) < 60000) return false;
     lastCloudSaveAt = now;
 
     try{
-      touchUpdated();
+      touchLocalUpdated();
       const payload = {
         player_id: userId,
         updated_at: new Date().toISOString(),
@@ -1337,48 +1078,128 @@ function wireAuthListener() {
       };
       const { error } = await supabase.from("saves").upsert(payload);
       if (error) throw error;
-      if ($("syncChip")) $("syncChip").textContent = "SYNC: CLOUD+LOCAL";
+
+      $("syncChip").textContent = "SYNC: CLOUD+LOCAL";
       return true;
-    } catch {
+    } catch(err){
+      $("syncChip").textContent = "SYNC: OFFLINE";
       cloudReady = false;
-      if ($("syncChip")) $("syncChip").textContent = "SYNC: OFFLINE";
+      pushLog("log","SYS","CLOUD SAVE FAILED. LOCAL CONTINUES.");
       return false;
     }
   }
 
-  async function initSaves(){
-    const localLoaded = loadLocal();
+  // Offline progress on load (cap)
+  function applyOfflineProgress(){
+    const last = state.updatedAtMs || 0;
+    if (!last) return;
+    const now = Date.now();
+    let dt = (now - last) / 1000;
+    if (!isFinite(dt) || dt <= 1) return;
 
-    // If local didn't load, ensure blank can't appear “newer” than cloud
-    if (!localLoaded) state.updatedAtMs = 0;
+    const CAP = 6 * 60 * 60; // 6 hours
+    dt = Math.min(dt, CAP);
 
-    await ensureSession();
-    const cloud = await loadCloud();
+    recomputeDerived();
+    const sps = computeSPS();
+    const gained = sps * dt;
 
-    if (cloud?.cloudState){
-      const localUpdated = Number(state.updatedAtMs || 0);
-      const cloudUpdated = Number(cloud.cloudUpdatedMs || 0);
+    if (gained > 0){
+      gain(gained);
+      // corruption creeps a little offline but softer
+      state.corruption = clamp(state.corruption + (0.0000012 * Math.log10(state.total + 10)) * (dt / 60), 0, 1);
+      pushLog("log","SYS",`OFFLINE INTEGRATION: +${fmt(gained)} SIGNAL (${Math.floor(dt/60)}m).`);
+    }
+  }
 
-      if (cloudUpdated > localUpdated){
-        normalizeLoadedState(cloud.cloudState);
-        pushLog("log","SYS","CLOUD SAVE LOADED (NEWER THAN LOCAL).");
-        localStorage.setItem(LOCAL_KEYS[0], JSON.stringify(state));
+  // ===== AUTH (Email + Password)
+  const authStatus = $("authStatus");
+  const emailEl = $("authEmail");
+  const passEl  = $("authPassword");
+  const signInBtn = $("signInBtn");
+  const signUpBtn = $("signUpBtn");
+  const signOutBtn= $("signOutBtn");
+
+  function setAuthUI(signedIn){
+    authStatus.textContent = signedIn ? "SIGNED IN" : "NOT SIGNED IN";
+    signOutBtn.disabled = !signedIn;
+    $("syncChip").textContent = signedIn ? "SYNC: CLOUD" : "SYNC: LOCAL";
+    $("userChip").textContent = signedIn
+      ? ("USER: " + userId.slice(0,4) + "…" + userId.slice(-4))
+      : "USER: ----";
+    setAiChip(signedIn ? (state.aiEnabled ? "AI: READY" : "AI: DISABLED") : "AI: OFFLINE");
+  }
+
+  async function signUp(){
+    const email = emailEl.value.trim();
+    const password = passEl.value;
+    if (!email || !password) return alert("Enter email + password");
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) return alert(error.message);
+    alert("Account created. Now press SIGN IN.");
+  }
+
+  async function signIn(){
+    const email = emailEl.value.trim();
+    const password = passEl.value;
+    if (!email || !password) return alert("Enter email + password");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return alert(error.message);
+  }
+
+  async function signOut(){
+    const ok = confirm("Sign out? Your cloud save remains safe.");
+    if (!ok) return;
+    const { error } = await supabase.auth.signOut();
+    if (error) alert(error.message);
+  }
+
+  signUpBtn.onclick = () => { markActive("signup"); signUp(); };
+  signInBtn.onclick = () => { markActive("signin"); signIn(); };
+  signOutBtn.onclick= () => { markActive("signout"); signOut(); };
+
+  // Auth listener: handles session restore + save merge rules
+  supabase.auth.onAuthStateChange(async (_event, session) => {
+    if (session?.user?.id){
+      userId = session.user.id;
+      cloudReady = true;
+      setAuthUI(true);
+
+      // Merge rule: keep the newer save between local and cloud.
+      const cloud = await loadCloud();
+      const localUpdated = state.updatedAtMs || 0;
+      const cloudUpdated = cloud?.cloudUpdatedMs || 0;
+
+      if (cloud?.cloudState && cloudUpdated > localUpdated){
+        mergeIntoState(cloud.cloudState);
+        pushLog("log","SYS","CLOUD SAVE LOADED (NEWER).");
       } else {
-        // Only push local if it actually loaded (prevents blank overwrite)
-        if (localLoaded && cloudReady){
-          await saveCloud(true);
-          pushLog("log","SYS","LOCAL SAVE PUSHED TO CLOUD (NEWER).");
-        } else {
-          pushLog("log","SYS","CLOUD PRESENT; LOCAL NOT LOADED. SKIPPING CLOUD OVERWRITE.");
-        }
+        // Local is newer (or cloud empty) -> push local up
+        await saveCloud(true);
+        pushLog("log","SYS","LOCAL SAVE PUSHED TO CLOUD.");
       }
+
+      saveLocal();
+      renderUpfront();
     } else {
-      if (localLoaded) pushLog("log","SYS","LOCAL SAVE LOADED.");
-      else {
-        pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
-        pushLog("comms","OPS","Ping the Void so we can establish signal integrity.");
-        pushLog("comms","DR KESS","We need you to calibrate the dishes. That’s how the snowball starts.");
+      userId = null;
+      cloudReady = false;
+      setAuthUI(false);
+    }
+  });
+
+  async function initAuth(){
+    try{
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id){
+        userId = session.user.id;
+        cloudReady = true;
+        setAuthUI(true);
+      } else {
+        setAuthUI(false);
       }
+    } catch {
+      setAuthUI(false);
     }
   }
 
@@ -1389,185 +1210,475 @@ function wireAuthListener() {
     }
   });
 
-  // ===== Username edit
-  async function editUsername(){
-    const html = `
-      <div class="muted" style="margin:0 0 10px">Set a callsign. Used in comms.</div>
-      <input id="nameInput" maxlength="18"
-        value="${escapeHtml(state.username === "Operator" ? "" : state.username)}"
-        placeholder="e.g. Corey"
-        style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(57,255,106,.35);background:rgba(0,0,0,.35);color:var(--text);font:inherit" />`;
-    const ok = await openModal("SET USERNAME", html, { okText:"SAVE", cancelText:"CANCEL" });
-    if (!ok) return;
+  // ===== AI integration (via Supabase Edge Function)
+  const AI_COOLDOWN_MS = 180000; // 3 minutes
+  const HUMAN_CHATTER_SOFT_MS = 300000; // ~5 minutes
 
-    const v = ($("nameInput")?.value || "").trim().replace(/\s+/g," ");
-    state.username = v || "Operator";
-    touchUpdated();
+  function setAiChip(text){ $("aiChip").textContent = text; }
+
+  $("aiBtn").onclick = (e) => {
+    state.aiEnabled = !state.aiEnabled;
+    e.currentTarget.textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
+    setAiChip(!cloudReady ? "AI: OFFLINE" : (state.aiEnabled ? "AI: READY" : "AI: DISABLED"));
+    touchLocalUpdated();
     saveLocal();
-    saveCloud(true);
-    popupComms("OPS", `Alright, ${state.username}. Callsign confirmed.`);
+    feedback(e.currentTarget, "light");
+    markActive("toggle_ai");
+  };
+
+  function aiReadyNow(){
+    if (!state.aiEnabled) return false;
+    if (!cloudReady) return false;        // requires auth
+    if (!isActivelyUsed()) return false;  // never while idle
+    const now = Date.now();
+    if ((now - (state.lastAiAtMs || 0)) < AI_COOLDOWN_MS) return false;
+    return true;
   }
 
-  // ===== Controls
-  const pingBtn = $("ping");
-  const briefingBtn = $("briefing");
-  const saveBtn = $("save");
-  const wipeBtn = $("wipe");
-  const prestigeBtn = $("prestige");
-  const userChip = $("userChip");
+  async function maybeAiComms(eventName, speakerHint){
+    if (!aiReadyNow()) return;
 
-  if (pingBtn){
-    pingBtn.onclick = () => {
-      markActive();
-      gain(state.clickPower * globalMult());
-      state.corruption = clamp(state.corruption + 0.0006, 0, 1);
+    state.lastAiAtMs = Date.now();
+    touchLocalUpdated();
+    saveLocal();
 
-      touchUpdated();
-      renderHUD();
-      renderUpgrades();
-      renderDecoder();
+    setAiChip("AI: THINKING");
 
+    try{
+      const payload = {
+        event: eventName,
+        speaker_hint: speakerHint || "OPS",
+        phase: state.phase,
+        build: state.build,
+        signal: Math.floor(state.signal),
+        total: Math.floor(state.total),
+        sps: Math.floor(computeSPS()),
+        bandwidth: Number(state.bandwidth.toFixed(2)),
+        corruption: Number(state.corruption.toFixed(3))
+      };
+
+      const { data, error } = await supabase.functions.invoke("sygn1l-comms", { body: payload });
+      if (error) throw error;
+
+      const who = data?.who || speakerHint || "COMMS";
+      const msg = data?.text || "…";
+
+      popupComms(who, msg);
+      pushLog("comms", who, msg);
+
+      setAiChip("AI: READY");
+    } catch(_err){
+      setAiChip("AI: OFFLINE");
+      pushLog("log","SYS","AI COMMS FAILED. (EDGE FUNCTION OR KEY NOT CONFIGURED)");
+    }
+  }
+
+  // Casual team chatter: about every ~5 minutes, only while active (never idle)
+  async function maybeHumanChatter(){
+    if (!cloudReady || !state.aiEnabled) return;
+    if (!isActivelyUsed()) return;
+
+    const now = Date.now();
+    if ((now - (state.lastChatterAtMs || 0)) < HUMAN_CHATTER_SOFT_MS) return;
+
+    // soft randomness so it doesn't feel like a timer
+    if (Math.random() < 0.10){
+      state.lastChatterAtMs = now;
+      touchLocalUpdated();
       saveLocal();
-      saveCloud(false);
-
-      if (state.total < 40) popupComms("OPS", `Ping it a few times, ${state.username}. Then buy Dish Calibration.`);
-    };
+      await maybeAiComms("human_chatter", "LT VANCE");
+    }
   }
 
-  if (briefingBtn){
-    briefingBtn.onclick = () => {
-      markActive();
-      openModal(
-        "HOME BASE COMMUNIQUE",
-        `<div style="white-space:pre-wrap">
-<b>SYGN1L BRIEFING</b>
+  // ===== UI render
+  function renderHUD(){
+    $("signal").textContent = fmt(state.signal);
+    $("sps").textContent = fmt(computeSPS());
+    $("bw").textContent = state.bandwidth.toFixed(2) + "×";
+    $("buildChip").textContent = "BUILD: " + state.build;
+    $("relicChip").textContent = "RELICS: " + state.relics;
 
-Operator ${escapeHtml(state.username)}:
-Ping the Void to generate Signal.
-Spend Signal on Buffs to increase Signal/sec and Bandwidth.
-As phases unlock, the Array begins to answer.
+    const c = state.corruption;
+    $("corrFill").style.width = (c*100).toFixed(1) + "%";
+    $("corrText").textContent = (c*100).toFixed(1) + "% (" + corruptionLabel(c) + ")";
 
-When the Decoder unlocks in Phase V, each Engram reveals more of an intercepted warning.
-If it says to reset, do it. The Array forgets. You don’t.
-</div>`,
-        { okText:"ACKNOWLEDGED", cancelText:"CLOSE" }
-      );
-    };
+    const canPrestige = state.total >= 12000;
+    const gainR = prestigeGain();
+    const btn = $("prestige");
+    btn.disabled = !canPrestige;
+    btn.textContent = canPrestige ? `RITE RESET (+${gainR} RELICS)` : "RITE RESET (LOCKED)";
+
+    updateScopeLabel();
+
+    // Phase label UI
+    if (state.phase >= 5) $("phase").textContent = "PHASE V";
+    else if (state.phase === 4) $("phase").textContent = "PHASE IV";
+    else if (state.phase === 3) $("phase").textContent = "PHASE III";
+    else if (state.phase === 2) $("phase").textContent = "PHASE II";
+    else $("phase").textContent = "PHASE I";
+
+    $("decoderBtn").disabled = !state.decoder.unlocked;
   }
 
-  if (saveBtn){
-    saveBtn.onclick = () => {
-      markActive();
-      saveLocal();
-      saveCloud(true);
-      pushLog("log","SYS","STATE SAVED.");
-    };
-  }
-
-  if (wipeBtn){
-    wipeBtn.onclick = async () => {
-      markActive();
-      const ok = await confirmAction("WIPE", "This will delete LOCAL and CLOUD saves.\n\nAre you sure?", "WIPE");
-      if (!ok) return;
-
-      localStorage.removeItem(LOCAL_KEYS[0]);
-      // Optional: remove legacy keys too
-      for (const k of LOCAL_KEYS.slice(1)) localStorage.removeItem(k);
-
-      if (supabase && cloudReady && userId){
-        try{ await supabase.from("saves").delete().eq("player_id", userId); } catch(_){}
-      }
-      location.reload();
-    };
-  }
-
-  if (prestigeBtn){
-    prestigeBtn.onclick = async () => {
-      markActive();
-      const g = prestigeGain();
-      const ok = await confirmAction("RITE RESET", `You will reset this build for +${g} relics.\nDecoder progress persists.\n\nProceed?`, "RITE RESET");
-      if (!ok) return;
-
-      doRiteReset();
-      touchUpdated();
-      saveLocal();
-      saveCloud(true);
-
-      renderHUD();
-      renderUpgrades();
-      renderDecoder();
-    };
-  }
-
-  if (userChip){
-    userChip.onclick = () => {
-      markActive();
-      editUsername();
-    };
-  }
-
-  // ===== Upgrade refresh timer
+  // ===== Locked buttons fix: refresh upgrades frequently
   let upgradesRefreshAcc = 0;
   const UPGRADES_REFRESH_EVERY = 0.25;
 
-  // ===== Main loop
-  function tick(dt){
-    recompute();
-    const rate = sps();
-    if (rate > 0) gain(rate * dt);
+  function renderUpgrades(){
+    const root = $("upgrades");
+    root.innerHTML = "";
+
+    for (const u of UPG){
+      if (u.id === "relicAmp" && (state.relics <= 0 && upgradeLevel("relicAmp") === 0)) continue;
+
+      const unlocked = state.total >= u.unlockAt;
+      const lvl = upgradeLevel(u.id);
+      const cost = upgradeCost(u);
+      const currency = u.currency || "signal";
+      const have = currency === "relics" ? state.relics : state.signal;
+      const affordable = unlocked && have >= cost;
+
+      const row = document.createElement("div");
+      row.className = "up" + (affordable ? " affordable" : "") + (!unlocked ? " locked" : "");
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = `${u.name} (LV ${lvl})`;
+
+      const desc = document.createElement("div");
+      desc.className = "desc";
+      desc.textContent = unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlockAt)} TOTAL SIGNAL.`;
+
+      const costEl = document.createElement("div");
+      costEl.className = "cost";
+      costEl.textContent = unlocked ? `COST: ${fmt(cost)} ${currency.toUpperCase()}` : "STATUS: LOCKED";
+
+      meta.appendChild(name);
+      meta.appendChild(desc);
+      meta.appendChild(costEl);
+
+      const btn = document.createElement("button");
+      btn.textContent = unlocked ? (affordable ? "ACQUIRE" : "LOCKED") : "CLASSIFIED";
+      btn.disabled = !affordable;
+
+      btn.onclick = async () => {
+        if (!affordable) return;
+        markActive("buy_upgrade");
+        feedback(btn, "light");
+
+        if (currency === "relics") state.relics -= cost;
+        else state.signal -= cost;
+
+        u.buy();
+        touchLocalUpdated();
+        recomputeDerived();
+        renderHUD();
+        renderUpgrades();
+        saveLocal();
+        await saveCloud(false);
+
+        await maybeAiComms("buy_upgrade:" + u.id, u.id === "dark" ? "MOTHERLINE" : "OPS");
+      };
+
+      row.appendChild(meta);
+      row.appendChild(btn);
+      root.appendChild(row);
+    }
+  }
+
+  // ===== Controls
+  $("ping").addEventListener("click", async (e) => {
+    markActive("ping");
+    feedback(e.currentTarget, "light");
+
+    gain(state.clickPower * globalMultiplier());
+    state.corruption = clamp(state.corruption + 0.0006, 0, 1);
+
+    touchLocalUpdated();
+    renderHUD();
+    renderUpgrades();
+    saveLocal();
+    await saveCloud(false);
+
+    if (Math.random() < 0.12) await maybeAiComms("ping_void", "OPS");
+  }, { passive:true });
+
+  $("prestige").onclick = async (e) => {
+    if (e.currentTarget.disabled) return;
+
+    const gainR = prestigeGain();
+    const ok = confirm(`Rite Reset will restart this build.\nYou will gain +${gainR} Relics.\n\nProceed?`);
+    if (!ok) return;
+
+    markActive("prestige");
+    feedback(e.currentTarget, "strong");
+
+    doPrestige();
+    renderHUD();
+    renderUpgrades();
+    saveLocal();
+    await saveCloud(true);
+
+    await maybeAiComms("rite_reset", "MOTHERLINE");
+  };
+
+  $("save").onclick = async (e) => {
+    markActive("manual_save");
+    feedback(e.currentTarget, "light");
+    saveLocal();
+    await saveCloud(true);
+    pushLog("log","SYS","STATE SAVED.");
+    await maybeAiComms("manual_save", "OPS");
+  };
+
+  $("wipe").onclick = async (e) => {
+    markActive("wipe");
+    feedback(e.currentTarget, "strong");
+
+    const ok = confirm("WIPE will permanently delete your local save.\nIf you are signed in, it will also delete your cloud save.\n\nAre you sure?");
+    if (!ok) return;
+
+    localStorage.removeItem(LOCAL_KEY);
+    if (cloudReady && userId){
+      try{ await supabase.from("saves").delete().eq("player_id", userId); } catch(_){}
+    }
+    location.reload();
+  };
+
+  $("manualBtn").onclick = () => {
+    markActive("manual");
+    openModal("HOME BASE COMMUNIQUE", `
+      <p><span class="tag">HB</span><strong>Operator,</strong> you’ve been assigned to the Array because it listens longer than people do. Out beyond our quiet satellites, something is whispering through the cosmic static. We don’t know if it’s a distress call, a beacon, or a trap shaped like math.</p>
+      <p><span class="tag">HB</span><strong>Getting started:</strong><br>
+      1) Tap <strong>PING THE VOID</strong> to generate signal.<br>
+      2) Buy <strong>DISH CALIBRATION</strong to start passive signal per second.<br>
+      3) Reach milestones to unlock better buffs. If a buff glows, you can afford it.<br>
+      4) Watch <strong>CORRUPTION</strong. It starts as a whisper and ends as a rewrite.</p>
+      <p><span class="tag">TIP</span>Sign in to protect your save. If you don’t, your device may forget you. The Array won’t.</p>
+    `);
+  };
+
+  $("decoderBtn").onclick = () => {
+    markActive("decoder");
+    openDecoderModal();
+  };
+
+  // ===== Init narrative
+  function bootNarrativeIfEmpty(){
+    if ($("log").children.length === 0){
+      pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
+      pushLog("comms","OPS","Ping the void so we can start getting signal integrity.");
+      pushLog("comms","DR KESS","We need you to calibrate the dishes once you have enough signal.");
+    }
+  }
+
+  // ===== Scope visualizer
+  const scope = $("scope");
+  const ctx = scope.getContext("2d", { alpha: false });
+  let sw = 0, sh = 0, dpr = 1;
+  const signature = { cols: [], vel: [], phase: 0 };
+
+  function resizeScope(){
+    dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const cssW = scope.clientWidth || 300;
+    const cssH = 84;
+    scope.style.height = cssH + "px";
+    scope.width = Math.floor(cssW * dpr);
+    scope.height = Math.floor(cssH * dpr);
+    sw = scope.width;
+    sh = scope.height;
+
+    const cols = Math.max(120, Math.floor(sw / (2 * dpr)));
+    signature.cols = new Array(cols).fill(0);
+    signature.vel  = new Array(cols).fill(0);
+    signature.phase = 0;
+  }
+  window.addEventListener("resize", resizeScope);
+
+  function lockValue(){
+    const bw = state.bandwidth;
+    const sps = computeSPS();
+    const t = state.total;
+
+    const a = clamp(Math.log10(t + 1) / 5, 0, 1);
+    const b = clamp((bw - 1) / 4, 0, 1);
+    const c = clamp(Math.log10(sps + 1) / 4, 0, 1);
+    const raw = (0.45*a + 0.35*b + 0.20*c);
+    const corrupted = raw * (1 - 0.55*state.corruption);
+    return clamp(corrupted, 0, 1);
+  }
+  function updateScopeLabel(){
+    const lk = lockValue();
+    $("scopeLabel").textContent = "LOCK: " + Math.round(lk * 100) + "%";
+  }
+
+  function rand01(seed){
+    seed = (seed ^ 0x6D2B79F5) >>> 0;
+    seed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    seed ^= seed + Math.imul(seed ^ (seed >>> 7), 61 | seed);
+    return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
+  }
+
+  function drawScope(dt, timeMs){
+    if (!sw || !sh) return;
+
+    const lk = lockValue();
+    const corr = state.corruption;
+
+    ctx.fillStyle = "rgb(0,0,0)";
+    ctx.fillRect(0,0,sw,sh);
+
+    const noiseAmt = clamp(0.85 - 0.70*lk + 0.35*corr, 0.15, 0.95);
+    const spikeProb = clamp(0.04 + 0.36*lk + 0.10*(state.bandwidth-1)/4, 0.04, 0.70);
+
+    const cols = signature.cols.length;
+    signature.phase += dt * (0.6 + 1.8*lk) * (1 + 0.8*corr);
+
+    for (let i=0;i<cols;i++){
+      const base = Math.sin(signature.phase + i*0.07) * 0.25;
+      const chaos = (rand01((timeMs|0) + i*9973) - 0.5) * (0.45 + 0.9*corr);
+      const target = base + chaos;
+
+      const stiffness = 0.08 + 0.22*lk;
+      const damping = 0.82 - 0.35*corr;
+
+      signature.vel[i] = signature.vel[i]*damping + (target - signature.cols[i]) * stiffness;
+      signature.cols[i] += signature.vel[i];
+    }
+
+    const midY = Math.floor(sh * 0.60);
+    const px = Math.max(1, Math.floor(dpr));
+    const baseG = 190;
+
+    for (let y=0;y<sh;y+=px){
+      const lineFade = 0.72 + 0.28*Math.sin((y/sh)*Math.PI);
+      for (let x=0;x<sw;x+=px){
+        const n = rand01((x*131 + y*977 + (timeMs|0))|0);
+        if (n < noiseAmt){
+          const v = Math.floor((baseG + 55*n) * lineFade);
+          ctx.fillStyle = `rgb(0,${v},0)`;
+          ctx.fillRect(x,y,px,px);
+        }
+      }
+    }
+
+    ctx.lineWidth = Math.max(1, 1*dpr);
+    ctx.strokeStyle = "rgba(57,255,106,0.85)";
+    ctx.beginPath();
+
+    for (let i=0;i<cols;i++){
+      const x = Math.floor((i/(cols-1)) * (sw-1));
+      const s = signature.cols[i];
+
+      const focus = lk;
+      const spike = (rand01((timeMs|0) + i*71) < spikeProb) ? 1 : 0;
+
+      const spikeH = spike * (0.15 + 0.85*focus) * (0.75 + 0.25*Math.abs(s));
+      const noiseH = (s * (0.35 + 0.65*(1-focus))) * 0.35;
+
+      const echo = corr > 0.28 ? (0.10 + 0.35*corr) * Math.sin(signature.phase*2 + i*0.12) : 0;
+
+      const y = midY - (spikeH + noiseH + echo) * (sh * 0.70);
+      if (i===0) ctx.moveTo(x,y);
+      else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = "rgba(57,255,106,0.18)";
+    ctx.lineWidth = Math.max(2, 3*dpr);
+    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+
+    if (corr > 0.45){
+      const tears = Math.floor(2 + 8*corr);
+      for (let t=0;t<tears;t++){
+        const x = Math.floor(rand01((timeMs|0) + t*99991) * sw);
+        const w = Math.max(1, Math.floor(dpr));
+        ctx.fillStyle = `rgba(255,59,107,${0.04 + 0.08*corr})`;
+        ctx.fillRect(x, 0, w, sh);
+      }
+    }
+
+    ctx.strokeStyle = "rgba(57,255,106,0.18)";
+    ctx.lineWidth = Math.max(1, 1*dpr);
+    ctx.strokeRect(Math.floor(0.5*dpr), Math.floor(0.5*dpr), sw - Math.floor(1*dpr), sh - Math.floor(1*dpr));
+  }
+
+  // ===== Startup render
+  function renderUpfront(){
+    $("aiBtn").textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
+    setAiChip(!cloudReady ? "AI: OFFLINE" : (state.aiEnabled ? "AI: READY" : "AI: DISABLED"));
+
+    recomputeDerived();
+    updateObjectiveFallback();
+    renderHUD();
+    renderUpgrades();
+    bootNarrativeIfEmpty();
+
+    // Decoder button
+    $("decoderBtn").disabled = !state.decoder.unlocked;
+  }
+
+  // ===== Main loop (NO forced AI calls here)
+  let last = performance.now();
+
+  function loop(now){
+    const dt = Math.min(0.05, (now - last)/1000);
+    last = now;
+
+    recomputeDerived();
+
+    const sps = computeSPS();
+    if (sps > 0) gain(sps * dt);
 
     if (state.autoPingsPerSec > 0){
-      const p = state.autoPingsPerSec * dt;
-      gain(p * (state.clickPower * globalMult()));
+      const pings = state.autoPingsPerSec * dt;
+      gain(pings * (state.clickPower * globalMultiplier()));
     }
 
     updateCorruption(dt);
-    phaseCheck();
-  }
-
-  // ===== Boot render
-  function renderUpfront(){
-    recompute();
+    milestoneCheck();
     renderHUD();
-    renderUpgrades();
-    renderDecoder();
-  }
-
-  // ===== Start loop
-  let last = performance.now();
-  function loop(now){
-    const dt = Math.min(0.05, (now-last)/1000);
-    last = now;
-
-    tick(dt);
 
     upgradesRefreshAcc += dt;
     if (upgradesRefreshAcc >= UPGRADES_REFRESH_EVERY){
       upgradesRefreshAcc = 0;
       renderUpgrades();
-      renderDecoder();
     }
 
-    drawScope(dt);
-    renderHUD();
+    drawScope(dt, now|0);
 
-    state.lastTickMs = Date.now();
+    // Soft human chatter attempts
+    maybeHumanChatter();
+
     requestAnimationFrame(loop);
   }
 
   // ===== Start
   resizeScope();
-  renderUpfront();
 
-  initSaves().then(() => {
-    applyOfflineProgress();
-    renderUpfront();
-    pushLog("log","SYS","SAVE SYSTEM ONLINE: LOCAL + CLOUD (WHEN AVAILABLE).");
-  }).finally(() => {
-    renderUpfront();
+  // Load local first
+  const hadLocal = loadLocal();
+  if (!hadLocal){
+    pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
+    pushLog("comms","OPS","Ping the void so we can start getting signal integrity.");
+  }
+
+  // Apply offline progress from local state
+  applyOfflineProgress();
+
+  renderUpfront();
+  initAuth().finally(() => {
+    // On first paint, always ensure objective is sane
+    updateObjectiveFallback();
     requestAnimationFrame(loop);
   });
 
 })();
+</script>
 </body>
 </html>
