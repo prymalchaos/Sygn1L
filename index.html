@@ -298,7 +298,7 @@ canvas#scope{
   to{ transform:translateY(-4px); opacity:0; }
 }
 
-/* Modal confirm */
+/* Modal confirm / prompt */
 .modalHost{
   position:fixed; inset:0;
   z-index:2000;
@@ -335,6 +335,39 @@ canvas#scope{
 }
 .modal .dangerBtn:hover{ box-shadow:0 0 18px rgba(255,59,107,.18); }
 
+.inputWrap{
+  margin-top:10px;
+  border:1px solid rgba(57,255,106,.22);
+  border-radius:12px;
+  background:rgba(0,0,0,.28);
+  padding:10px;
+}
+.inputWrap label{
+  display:block;
+  font-size:10px;
+  letter-spacing:.12em;
+  color:rgba(126,219,146,.95);
+  text-transform:uppercase;
+  margin-bottom:8px;
+}
+.inputWrap input{
+  width:100%;
+  box-sizing:border-box;
+  border-radius:12px;
+  border:1px solid rgba(57,255,106,.25);
+  background:rgba(0,0,0,.35);
+  color:var(--text);
+  padding:12px 12px;
+  font:inherit;
+  outline:none;
+}
+.inputWrap .hint{
+  margin-top:8px;
+  font-size:11px;
+  color:rgba(126,219,146,.85);
+  line-height:1.45;
+}
+
 /* Decoder */
 .decoderStrip{
   margin-top:10px;
@@ -357,7 +390,6 @@ canvas#scope{
   word-break:break-word;
   text-shadow:0 0 10px rgba(57,255,106,.10);
 }
-.decoderText .ghost{ opacity:.35; }
 .decoderControls{
   margin-top:10px;
   display:grid; gap:10px;
@@ -371,6 +403,14 @@ canvas#scope{
 .decoderLocked{
   opacity:.70;
   border-style:dashed;
+}
+
+/* Clickable username chip */
+#userChip{
+  cursor:pointer;
+}
+#userChip:hover{
+  box-shadow:var(--glow);
 }
 </style>
 </head>
@@ -459,7 +499,7 @@ canvas#scope{
       </div>
       <div>
         <span class="chip" id="syncChip">SYNC: LOCAL</span>
-        <span class="chip" id="userChip">USER: ----</span>
+        <span class="chip" id="userChip" title="Tap to set username">USER: ----</span>
       </div>
     </div>
 
@@ -583,7 +623,7 @@ canvas#scope{
     markActive("toggle_feedback");
   };
 
-  // ===== Modal confirm
+  // ===== Modal confirm / prompt
   function confirmAction({title, body, okText="CONFIRM", cancelText="CANCEL", danger=true, tag="SYGN1L"}){
     return new Promise((resolve) => {
       const host = $("modalHost");
@@ -625,6 +665,88 @@ canvas#scope{
         if (ev.key === "Escape") cleanup(false);
       };
     });
+  }
+
+  function promptAction({title, label, initialValue="", placeholder="", hint="", okText="SAVE", cancelText="CANCEL", danger=false, tag="PROFILE"}){
+    return new Promise((resolve) => {
+      const host = $("modalHost");
+      $("modalTitle").textContent = title;
+
+      const safeInit = String(initialValue ?? "");
+      const safePH = String(placeholder ?? "");
+      const safeLabel = String(label ?? "INPUT");
+
+      $("modalBody").innerHTML = `
+        <div>${hint ? hint : ""}</div>
+        <div class="inputWrap">
+          <label>${escapeHtml(safeLabel)}</label>
+          <input id="modalInput" type="text" value="${escapeAttr(safeInit)}" placeholder="${escapeAttr(safePH)}" autocomplete="off" autocapitalize="none" spellcheck="false" />
+          <div class="hint">3–16 chars. Letters/numbers/underscore. Example: <span class="tag">corey_01</span></div>
+        </div>
+      `;
+
+      $("modalOk").textContent = okText;
+      $("modalCancel").textContent = cancelText;
+      $("modalTag").textContent = tag;
+
+      const dot = $("modalDot");
+      dot.className = "dot " + (danger ? "danger" : "warn");
+
+      host.style.display = "flex";
+      host.setAttribute("aria-hidden","false");
+
+      let done = false;
+      const input = () => document.getElementById("modalInput");
+
+      const cleanup = (val) => {
+        if (done) return;
+        done = true;
+        host.style.display = "none";
+        host.setAttribute("aria-hidden","true");
+        $("modalOk").onclick = null;
+        $("modalCancel").onclick = null;
+        host.onclick = null;
+        document.onkeydown = null;
+        resolve(val);
+      };
+
+      $("modalOk").onclick = () => cleanup(input()?.value ?? "");
+      $("modalCancel").onclick = () => cleanup(null);
+
+      host.onclick = (ev) => {
+        if (ev.target === host) cleanup(null);
+      };
+
+      document.onkeydown = (ev) => {
+        if (ev.key === "Escape") cleanup(null);
+        if (ev.key === "Enter"){
+          // only if focus is inside the input
+          const i = input();
+          if (i && document.activeElement === i){
+            ev.preventDefault();
+            cleanup(i.value ?? "");
+          }
+        }
+      };
+
+      // focus input
+      setTimeout(() => {
+        const i = input();
+        if (i){
+          i.focus();
+          i.setSelectionRange(i.value.length, i.value.length);
+        }
+      }, 40);
+    });
+  }
+
+  function escapeAttr(s){
+    return String(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
   }
 
   // ===== Utils
@@ -690,6 +812,20 @@ canvas#scope{
     return (Date.now() - lastUserActionAt) <= 15000;
   }
 
+  // ===== Username validation
+  function normalizeUsername(raw){
+    const s = String(raw ?? "").trim();
+    if (!s) return "";
+    // allow letters/numbers/underscore only
+    const cleaned = s.replace(/[^A-Za-z0-9_]/g, "");
+    return cleaned.slice(0, 16);
+  }
+  function isValidUsername(s){
+    if (!s) return false;
+    if (s.length < 3 || s.length > 16) return false;
+    return /^[A-Za-z0-9_]+$/.test(s);
+  }
+
   // ===== State
   const state = {
     build: 1,
@@ -703,13 +839,17 @@ canvas#scope{
     autoPingsPerSec: 0,
 
     corruption: 0,
-    integrity: 1.0,     // containment integrity
+    integrity: 1.0,
     phase: 1,
 
-    // New: Phase 4/5 arc
-    interpretation: 0,   // hidden until Phase 5
+    interpretation: 0,
     phase4: { active:false, shownOnce:false, repeatBursts:0 },
     phase5: { unlocked:false, unlockedAtMs:0, hasPrestigedSince:false, breachSeen:false },
+
+    // NEW: profile
+    profile: {
+      username: "" // player-defined handle
+    },
 
     flags: { sawPhase2:false, sawPhase3:false, sawPrestigeHint:false, sawPhase4:false, sawPhase5:false, sawWarning:false },
 
@@ -717,12 +857,7 @@ canvas#scope{
       dish: 0, probes: 0, scan: 0, tuning: 0,
       autopinger: 0, echo: 0, dark: 0, lattice: 0,
       relicAmp: 0,
-
-      // Phase 4 buffs
-      pattern: 0,        // Pattern Sampler (max 5)
-      semantic: 0,       // Semantic Filter (max 4)
-      memory: 0,         // Structural Memory (max 3) (relics)
-      bleed: 0           // Symbol Bleed (0/1)
+      pattern: 0, semantic: 0, memory: 0, bleed: 0
     },
 
     decoder: {
@@ -731,14 +866,13 @@ canvas#scope{
       clustering: false,
       solved: false,
       scrambledOrder: [],
-      revealed: {}, // map index->true
+      revealed: {},
       decodedLetters: 0,
       structUsed: 0
     },
 
     updatedAtMs: 0,
 
-    // AI comm settings
     aiEnabled: true,
     lastAiAtMs: 0
   };
@@ -785,7 +919,6 @@ canvas#scope{
     { id:"relicAmp", name:"RELIC AMPLIFIER", unlockAt:0, baseCost:3, costMult:1.65, currency:"relics",
       desc:"SPEND RELICS. PER LV: GLOBAL MULT +8% (PERMANENT).", buy(){ state.upgrades.relicAmp++; } },
 
-    // ===== Phase 4 buffs (unlockAt handled dynamically by Phase 4 activation)
     { id:"pattern", name:"PATTERN SAMPLER", unlockAt:25000, baseCost:4500, costMult:1.35, max:5, phase4:true,
       desc:"PHASE IV. LOCK EFFECT +3%/LV. QUIETLY ACCUMULATES INTERPRETATION.", buy(){ state.upgrades.pattern++; } },
 
@@ -803,7 +936,6 @@ canvas#scope{
   function upgradeCost(u){
     const lvl = upgradeLevel(u.id);
     if (u.id === "memory"){
-      // relics: +2 per level (2,4,6)
       return 2 + (lvl * 2);
     }
     return Math.floor(u.baseCost * Math.pow(u.costMult, lvl));
@@ -882,24 +1014,17 @@ canvas#scope{
     return "OVERRUN";
   }
 
-  // "Stability" is derived: semantic helps, corruption hurts.
   function stabilityValue(){
     const sem = upgradeLevel("semantic");
     const base = 0.55 + 0.04*sem;
     return clamp(base - 0.35*state.corruption, 0, 1);
   }
 
-  // Integrity drains based on corruption and activity; recovers slowly when user plays carefully.
   function updateIntegrity(dt){
     const stab = stabilityValue();
-
-    // drain increases with corruption and with "dark tech" (late game risk)
     const risk = 0.003 + 0.020*state.corruption + 0.004*upgradeLevel("dark");
     const drain = risk * (1.10 - stab) * dt;
-
-    // recovery when active and stable-ish
     const rec = (isActivelyUsed() ? (0.008 * stab) : 0.003 * stab) * dt;
-
     state.integrity = clamp(state.integrity - drain + rec, 0, 1);
   }
 
@@ -911,565 +1036,6 @@ canvas#scope{
     return "BREACH";
   }
 
-  // ===== Objectives & milestones
-  function setObjective(text){ $("objective").innerHTML = "OBJECTIVE: " + text; }
-
-  function milestoneCheck(){
-    if (!state.flags.sawPhase2 && state.total >= 500){
-      state.flags.sawPhase2 = true;
-      state.phase = Math.max(state.phase, 2);
-      $("phase").textContent = "PHASE II";
-      $("status").textContent = "ARRAY: DRIFT";
-      pushLog("log","SYS","PHASE II ENGAGED. THE ARRAY BEGINS RETURN TRANSMISSIONS.");
-      pushLog("comms","LT VANCE","If this thing talks back, we log it. If it begs, we mute it.");
-      setObjective("REACH 600 TOTAL SIGNAL TO UNLOCK AUTO-PINGER ROUTINE. INCREASE SIGNAL/SEC.");
-    }
-    if (!state.flags.sawPhase3 && state.total >= 1800){
-      state.flags.sawPhase3 = true;
-      state.phase = Math.max(state.phase, 3);
-      $("phase").textContent = "PHASE III";
-      $("status").textContent = "ARRAY: ACTIVE";
-      pushLog("log","SYS","PHASE III: RESPONSE PATTERNS DETECTED. NOT RANDOM. NOT FRIENDLY.");
-      pushLog("comms","DR KESS","It’s not a signal. It’s an instruction set pretending to be noise.");
-      setObjective("REACH 3500 TOTAL SIGNAL TO UNLOCK HARMONIC LATTICE. WATCH CORRUPTION.");
-    }
-    if (!state.flags.sawPrestigeHint && state.total >= 9000){
-      state.flags.sawPrestigeHint = true;
-      pushLog("comms","OPS","We can reset the Array and keep the residue. Call it a Rite. We’ll call it insurance.");
-      pushLog("log","SYS","RITE RESET PROTOCOL DISCOVERED. RELICS MAY PERSIST BETWEEN BUILDS.");
-      setObjective("REACH 12,000 TOTAL SIGNAL TO UNLOCK RITE RESET.");
-    }
-
-    phase4Check(); // activates Phase 4 when conditions met
-    phase5Check(); // unlocks decoder when interpretation threshold met
-    warningCheck(); // final message resolved hook
-  }
-
-  function updateObjectiveFallback(){
-    if (!state.flags.sawPhase2){
-      setObjective("ACQUIRE DISH CALIBRATION. REACH 100 TOTAL SIGNAL TO UNLOCK DEEP SCAN.");
-    } else if (!state.flags.sawPhase3){
-      setObjective("UNLOCK AUTO-PINGER ROUTINE AT 600 TOTAL SIGNAL. PUSH SIGNAL/SEC UP.");
-    } else if (state.total < 12000){
-      setObjective("UNLOCK HARMONIC LATTICE AT 3500 TOTAL SIGNAL. PREPARE FOR RITE RESET AT 12,000.");
-    } else if (!state.phase4.active){
-      setObjective("RITE RESET AVAILABLE. PUSH INTO HIGH LOCK / HIGH CORRUPTION TO TRIGGER PHASE IV.");
-    } else if (!state.phase5.unlocked){
-      setObjective("PHASE IV: SEEK REPETITION. MAINTAIN LOCK. INTERPRETATION IS ACCUMULATING.");
-    } else if (!state.decoder.solved){
-      setObjective("PHASE V: DECRYPT ENGRAMS. FINAL RESOLUTION REQUIRES A CIPHER KEY.");
-    } else {
-      setObjective("THE WARNING IS COMPLETE. PREPARE FOR WHAT COMES NEXT.");
-    }
-  }
-
-  // ===== Phase 4 activation
-  function lockValueRaw(){
-    const bw = state.bandwidth;
-    const sps = computeSPS();
-    const t = state.total;
-
-    const a = clamp(Math.log10(t + 1) / 5, 0, 1);
-    const b = clamp((bw - 1) / 4, 0, 1);
-    const c = clamp(Math.log10(sps + 1) / 4, 0, 1);
-    const raw = (0.45*a + 0.35*b + 0.20*c);
-
-    // corruption penalty
-    const corrupted = raw * (1 - 0.55*state.corruption);
-
-    // Pattern Sampler adds "lock effectiveness" after penalty
-    const pat = upgradeLevel("pattern");
-    const lockBonus = 1 + (0.03 * pat);
-    return clamp(corrupted * lockBonus, 0, 1);
-  }
-
-  function isPhase4Now(){
-    const lock = lockValueRaw();
-    const conds = [
-      state.total >= 25000,
-      state.corruption >= 0.65,
-      lock >= 0.80,
-      state.build >= 2 // has done at least one rite reset
-    ];
-    const count = conds.reduce((a,b)=>a + (b?1:0), 0);
-    return count >= 2;
-  }
-
-  function phase4Check(){
-    const nowActive = isPhase4Now();
-    if (nowActive && !state.phase4.active){
-      state.phase4.active = true;
-      state.phase = Math.max(state.phase, 4);
-      $("phase").textContent = "PHASE IV";
-      $("status").textContent = "ARRAY: INTERFERENCE";
-      state.flags.sawPhase4 = true;
-
-      pushLog("log","SYS","PHASE IV: INTERFERENCE. THE ARRAY STOPS SMOOTHING. STRUCTURE EMERGES.");
-      pushLog("comms","DR KESS","That alignment wasn’t random. We’ve been averaging meaning into silence.");
-      setObjective("PHASE IV: ACQUIRE PATTERN SAMPLER. MAINTAIN LOCK. INTERPRETATION BEGINS.");
-      touchLocalUpdated();
-    }
-  }
-
-  // ===== Interpretation (Phase 4+), active-play only
-  function corrMultiplier(){
-    const c = state.corruption;
-    if (c < 0.40) return 0.8;
-    if (c < 0.60) return 1.0;
-    if (c < 0.80) return 1.25;
-    return 0.9;
-  }
-  function lockMultiplier(lock){
-    if (lock < 0.60) return 1.0;
-    if (lock < 0.75) return 1.5;
-    return 2.0;
-  }
-  function stabilityMultiplier(stab){
-    const s = stab;
-    if (s >= 0.40 && s <= 0.70) return 1.1;
-    if (s <= 0.85) return 1.0;
-    return 0.85;
-  }
-
-  let lastRepeatBurstAt = 0;
-  let lastBleedBurstAt = 0;
-
-  function interpretationTick(dt){
-    if (!state.phase4.active) return;
-    if (!isActivelyUsed()) return; // no idle interpretation
-    if (state.decoder.solved) return;
-
-    const lock = lockValueRaw();
-    const stab = stabilityValue();
-
-    // Base sources from buffs
-    const pat = upgradeLevel("pattern");
-    const sem = upgradeLevel("semantic");
-    const bleed = upgradeLevel("bleed");
-
-    let base = 0;
-    base += 0.015 * pat;
-    if (state.corruption >= 0.60) base += 0.02 * sem;
-
-    // Context multipliers
-    let gain = base * lockMultiplier(lock) * corrMultiplier() * stabilityMultiplier(stab);
-
-    // Accumulate
-    if (gain > 0){
-      state.interpretation += gain * dt;
-    }
-
-    // Rare bursts:
-    const now = Date.now();
-
-    // Repeat-frame burst (driven by scope repeating detection flag)
-    if (scopeRepeatJustHappened && (now - lastRepeatBurstAt) > 20000){
-      lastRepeatBurstAt = now;
-      state.interpretation += 0.04;
-      state.phase4.repeatBursts++;
-      pushLog("log","SYS","REPETITION CONFIRMED. STRUCTURE PERSISTS.");
-      // one-time foreshadow
-      maybePhase5Foreshadow();
-    }
-
-    // Symbol Bleed proc burst
-    if (bleed > 0 && bleedProcJustHappened && (now - lastBleedBurstAt) > 30000){
-      lastBleedBurstAt = now;
-      state.interpretation += 0.08;
-      pushLog("log","SYS","SYMBOL BLEED EVENT. VERTICAL ALIGNMENT OBSERVED.");
-      maybePhase5Foreshadow();
-    }
-  }
-
-  function maybePhase5Foreshadow(){
-    // fire only once when interpretation crosses ~50% of unlock threshold
-    if (!state.flags.sawPhase5 && state.interpretation >= 6.0){
-      state.flags.sawPhase5 = true;
-      popupComms("UNKNOWN", "You keep seeing letters because you’re reading it.");
-      pushLog("comms","UNKNOWN","You keep seeing letters because you’re reading it.");
-      // show locked decoder card early
-      $("decoderCard").style.display = "block";
-      $("decoderCard").classList.add("decoderLocked");
-      $("decoderStatus").textContent = "STATUS: ENCRYPTED";
-      $("decoderHint").textContent = "INTERPRETATION REQUIRED. THE MESSAGE IS PRESENT BUT MISORDERED.";
-      touchLocalUpdated();
-    }
-  }
-
-  // ===== Phase 5 unlock
-  function phase5Check(){
-    if (state.phase5.unlocked) return;
-    if (!state.phase4.active) return;
-    if (state.corruption < 0.70) return;
-    if (state.interpretation < 12.0) return;
-
-    state.phase5.unlocked = true;
-    state.phase5.unlockedAtMs = Date.now();
-    state.phase = Math.max(state.phase, 5);
-    $("phase").textContent = "PHASE V";
-    $("status").textContent = "ARRAY: INTERPRETATION";
-
-    pushLog("log","SYS","PHASE V: INTERPRETATION. THE SIGNAL WAS MEANT TO BE READ.");
-    popupComms("UNKNOWN", "You’ve been decoding this for hours already.");
-    pushLog("comms","UNKNOWN","You’ve been decoding this for hours already.");
-
-    ensureDecoderSeeded();
-    showDecoder(true);
-
-    setObjective("PHASE V: DECRYPT ENGRAMS. THE MESSAGE REMAINS MISORDERED UNTIL THE CIPHER KEY.");
-    touchLocalUpdated();
-  }
-
-  // ===== Decoder helpers
-  function ensureDecoderSeeded(){
-    if (state.decoder.seeded && state.decoder.scrambledOrder?.length === TARGET_MSG.length) return;
-
-    // Create a stable scramble (persisted). If missing, generate.
-    const indices = [...Array(TARGET_MSG.length)].map((_,i)=>i);
-
-    // scramble everything except keep length same; we still display in scrambled order
-    // We want a consistent permutation.
-    for (let i=indices.length-1;i>0;i--){
-      const j = Math.floor(Math.random()*(i+1));
-      [indices[i], indices[j]] = [indices[j], indices[i]];
-    }
-
-    state.decoder.scrambledOrder = indices;
-    state.decoder.revealed = state.decoder.revealed || {};
-    state.decoder.decodedLetters = state.decoder.decodedLetters || 0;
-    state.decoder.structUsed = state.decoder.structUsed || 0;
-    state.decoder.seeded = true;
-    state.decoder.show = true;
-  }
-
-  function showDecoder(show){
-    const card = $("decoderCard");
-    card.style.display = show ? "block" : "none";
-    if (show){
-      card.classList.toggle("decoderLocked", !state.phase5.unlocked);
-      state.decoder.show = true;
-    }
-  }
-
-  function decoderDisplayString(){
-    if (!state.decoder.seeded) return "///";
-    const solved = !!state.decoder.solved;
-    const order = solved ? [...Array(TARGET_MSG.length)].map((_,i)=>i) : state.decoder.scrambledOrder;
-
-    const clusters = !!state.decoder.clustering;
-    const out = [];
-
-    for (let pos=0; pos<order.length; pos++){
-      const realIdx = order[pos];
-      const ch = TARGET_MSG[realIdx];
-
-      if (solved){
-        out.push(ch);
-        continue;
-      }
-
-      // Before solved: positions are scrambled.
-      // Revealed letters show true char; unrevealed letters show glyph.
-      if (/[A-Z]/.test(ch)){
-        if (state.decoder.revealed[realIdx]){
-          out.push(ch);
-        } else {
-          out.push("▒");
-        }
-      } else if (ch === " "){
-        // hide spaces until solved; show thin dot so it still wraps
-        out.push("·");
-      } else {
-        // punctuation hidden until solved
-        out.push("░");
-      }
-    }
-
-    // Optional: very light clustering visualization by inserting separators after known runs
-    // (does not reorder; purely cosmetic)
-    if (clusters){
-      // insert a tiny separator every ~12 chars to feel grouped
-      const grouped = [];
-      for (let i=0;i<out.length;i++){
-        grouped.push(out[i]);
-        if (i>0 && i%12===0) grouped.push(" ");
-      }
-      return grouped.join("");
-    }
-    return out.join("");
-  }
-
-  function updateDecoderUI(){
-    const card = $("decoderCard");
-    if (!state.phase4.active && !state.phase5.unlocked && !state.flags.sawPhase5){
-      card.style.display = "none";
-      return;
-    }
-
-    card.style.display = "block";
-    card.classList.toggle("decoderLocked", !state.phase5.unlocked);
-
-    const solved = !!state.decoder.solved;
-    const decoded = state.decoder.decodedLetters || 0;
-
-    $("decoderText").textContent = decoderDisplayString();
-
-    if (!state.phase5.unlocked){
-      $("decoderStatus").textContent = "STATUS: ENCRYPTED";
-      $("decoderHint").textContent = "INTERPRETATION REQUIRED. THE MESSAGE IS PRESENT BUT MISORDERED.";
-      $("engramBtn").disabled = true;
-      $("structEngramBtn").disabled = true;
-      $("cipherBtn").disabled = true;
-      $("clusterBtn").disabled = true;
-      return;
-    }
-
-    // Phase 5 active
-    $("decoderStatus").textContent = solved ? "STATUS: DECRYPTED" : (decoded >= TOTAL_LETTERS ? "STATUS: KEY MISSING" : "STATUS: PARTIAL TRANSLATION");
-
-    // Standard Engram
-    const engramCost = Math.floor(6000 * Math.pow(1.28, decoded));
-    const canEngram = !solved && decoded < TOTAL_LETTERS && state.signal >= engramCost;
-    $("engramBtn").textContent = solved ? "DECRYPT ENGRAM (DONE)" : `DECRYPT ENGRAM (${fmt(engramCost)} SIGNAL)`;
-    $("engramBtn").disabled = !canEngram;
-
-    // Structural Engram
-    const canStructUnlock = !solved && decoded >= 6 && state.interpretation >= 18 && state.decoder.structUsed < 4;
-    const structCost = 150000;
-    const canStruct = canStructUnlock && state.signal >= structCost;
-    $("structEngramBtn").textContent = solved ? "STRUCTURAL ENGRAM (DONE)" :
-      (canStructUnlock ? `STRUCTURAL ENGRAM (${fmt(structCost)} SIGNAL)` : "STRUCTURAL ENGRAM (LOCKED)");
-    $("structEngramBtn").disabled = !canStruct;
-
-    // Clustering toggle
-    $("clusterBtn").disabled = solved ? true : false;
-    $("clusterBtn").textContent = "SYMBOL CLUSTERING: " + (state.decoder.clustering ? "ON" : "OFF");
-
-    // Cipher Key
-    const canCipher =
-      !solved &&
-      decoded >= TOTAL_LETTERS &&
-      state.interpretation >= 25 &&
-      state.corruption >= 0.80 &&
-      state.phase5.hasPrestigedSince &&
-      state.phase5.breachSeen;
-
-    $("cipherBtn").textContent = solved ? "RESOLVE CIPHER (DONE)" : "RESOLVE CIPHER (IRREVERSIBLE)";
-    $("cipherBtn").disabled = !canCipher;
-
-    // hint text
-    if (solved){
-      $("decoderHint").textContent = "THE WARNING IS COMPLETE. LOGGED. PERSISTENT.";
-    } else if (decoded < TOTAL_LETTERS){
-      $("decoderHint").textContent = `ENGRAMS DECODE LETTERS (${decoded}/${TOTAL_LETTERS}). ORDER REMAINS SCRAMBLED UNTIL THE KEY.`;
-    } else {
-      const reqs = [];
-      if (state.interpretation < 25) reqs.push("INTERPRETATION");
-      if (state.corruption < 0.80) reqs.push("CORRUPTION");
-      if (!state.phase5.hasPrestigedSince) reqs.push("RITE RESET (AFTER PHASE V)");
-      if (!state.phase5.breachSeen) reqs.push("BREACH EVENT");
-      $("decoderHint").textContent = reqs.length ? ("CIPHER KEY REQUIRES: " + reqs.join(" + ")) : "CIPHER KEY READY.";
-    }
-  }
-
-  function pickRandomUndecodedLetter(){
-    const undecoded = LETTER_INDICES.filter(i => !state.decoder.revealed[i]);
-    if (undecoded.length === 0) return null;
-    return undecoded[Math.floor(Math.random()*undecoded.length)];
-  }
-
-  function pickAdjacentUndecodedLetter(){
-    const undecoded = new Set(LETTER_INDICES.filter(i => !state.decoder.revealed[i]));
-    if (undecoded.size === 0) return null;
-
-    const decoded = LETTER_INDICES.filter(i => state.decoder.revealed[i]);
-    if (decoded.length === 0) return pickRandomUndecodedLetter();
-
-    // Try adjacency to decoded letters
-    const candidates = [];
-    for (const i of decoded){
-      const left = i - 1;
-      const right = i + 1;
-      if (undecoded.has(left) && /[A-Z]/.test(TARGET_MSG[left])) candidates.push(left);
-      if (undecoded.has(right) && /[A-Z]/.test(TARGET_MSG[right])) candidates.push(right);
-    }
-    if (candidates.length){
-      return candidates[Math.floor(Math.random()*candidates.length)];
-    }
-    return pickRandomUndecodedLetter();
-  }
-
-  function revealLetter(idx){
-    if (idx == null) return false;
-    if (state.decoder.revealed[idx]) return false;
-    state.decoder.revealed[idx] = true;
-    state.decoder.decodedLetters = (state.decoder.decodedLetters || 0) + 1;
-    return true;
-  }
-
-  // Decoder controls
-  $("engramBtn").onclick = async (e) => {
-    markActive("engram");
-    feedback(e.currentTarget, "light");
-    if (!state.phase5.unlocked || state.decoder.solved) return;
-
-    const decoded = state.decoder.decodedLetters || 0;
-    const cost = Math.floor(6000 * Math.pow(1.28, decoded));
-    if (state.signal < cost) return;
-
-    state.signal -= cost;
-    ensureDecoderSeeded();
-
-    const idx = pickRandomUndecodedLetter();
-    if (revealLetter(idx)){
-      pushLog("log","SYS","ENGRAM DECRYPTED. LETTER RESOLVED (ORDER STILL MISALIGNED).");
-      if (Math.random() < 0.35) popupComms("UNKNOWN", "That symbol again.");
-    }
-
-    touchLocalUpdated();
-    saveLocal();
-    await saveCloud(false);
-    updateDecoderUI();
-
-    await maybeAiComms("decrypt_engram", "UNKNOWN");
-  };
-
-  $("structEngramBtn").onclick = async (e) => {
-    markActive("struct_engram");
-    feedback(e.currentTarget, "light");
-    if (!state.phase5.unlocked || state.decoder.solved) return;
-
-    const decoded = state.decoder.decodedLetters || 0;
-    if (decoded < 6 || state.interpretation < 18) return;
-    if (state.decoder.structUsed >= 4) return;
-
-    const cost = 150000;
-    if (state.signal < cost) return;
-
-    state.signal -= cost;
-    state.decoder.structUsed++;
-
-    const idx = pickAdjacentUndecodedLetter();
-    if (revealLetter(idx)){
-      pushLog("log","SYS","STRUCTURAL ENGRAM APPLIED. CLUSTER BOUNDARY SUSPECTED.");
-      popupComms("DR KESS", "It’s clustering. Not randomly. Like it wants to be read.");
-    }
-
-    touchLocalUpdated();
-    saveLocal();
-    await saveCloud(false);
-    updateDecoderUI();
-
-    await maybeAiComms("structural_engram", "DR KESS");
-  };
-
-  $("clusterBtn").onclick = (e) => {
-    markActive("cluster_toggle");
-    feedback(e.currentTarget, "light");
-    if (!state.phase5.unlocked) return;
-    state.decoder.clustering = !state.decoder.clustering;
-    touchLocalUpdated();
-    saveLocal();
-    updateDecoderUI();
-  };
-
-  $("cipherBtn").onclick = async (e) => {
-    markActive("cipher");
-    feedback(e.currentTarget, "strong");
-    if (state.decoder.solved) return;
-
-    updateDecoderUI();
-    const decoded = state.decoder.decodedLetters || 0;
-    const canCipher =
-      decoded >= TOTAL_LETTERS &&
-      state.interpretation >= 25 &&
-      state.corruption >= 0.80 &&
-      state.phase5.hasPrestigedSince &&
-      state.phase5.breachSeen;
-
-    if (!canCipher) return;
-
-    const ok = await confirmAction({
-      title: "RESOLVE CIPHER",
-      body: "This will permanently reorder the decoded message and reveal its meaning.<br><br><span class='tag'>IRREVERSIBLE</span> Continue?",
-      okText: "RESOLVE",
-      cancelText: "CANCEL",
-      danger: true,
-      tag: "XENO DECODER"
-    });
-
-    if (!ok) return;
-
-    state.decoder.solved = true;
-    touchLocalUpdated();
-
-    const final = "GREETINGS. THIS IS A WARNING. PREPARE FOR INVASION. THEY ARE COMING.";
-    popupComms("UNKNOWN", final);
-    pushLog("comms","UNKNOWN", final);
-    pushLog("log","SYS","CIPHER RESOLVED. MESSAGE ORDER RESTORED.");
-    state.flags.sawWarning = true;
-
-    saveLocal();
-    await saveCloud(true);
-    updateDecoderUI();
-
-    await maybeAiComms("cipher_resolved", "UNKNOWN");
-  };
-
-  // ===== Prestige
-  function prestigeGain(){
-    const over = Math.max(0, state.total - 12000);
-    const base = 1;
-    const extra = Math.floor(Math.sqrt(over / 6000));
-    return base + extra;
-  }
-
-  function doPrestige(){
-    const gainRelics = prestigeGain();
-    state.relics += gainRelics;
-    state.build += 1;
-
-    pushLog("log","SYS",`RITE RESET EXECUTED. +${gainRelics} RELICS RECOVERED.`);
-    pushLog("comms","MOTHERLINE","THE ARRAY FORGETS. YOU DO NOT.");
-
-    // Preserve relic amplifier
-    const keepRelicAmp = state.upgrades.relicAmp || 0;
-
-    // Preserve interpretation via Structural Memory
-    const mem = upgradeLevel("memory");
-    const keepI = (mem > 0) ? (state.interpretation * (0.12 * mem)) : 0;
-
-    // Preserve lock fraction (implemented as integrity/stability advantage, plus we note it in logs)
-    const keepLockFrac = 0.06 * mem;
-
-    state.signal = 0;
-    state.total = 0;
-    state.corruption = Math.max(0, state.corruption * 0.25);
-
-    // integrity partially recovers on reset, plus structural memory bonus
-    state.integrity = clamp(0.95 + keepLockFrac, 0, 1);
-
-    state.phase = 1;
-    state.phase4.active = false;
-    state.flags.sawPhase2 = false;
-    state.flags.sawPhase3 = false;
-    state.flags.sawPrestigeHint = false;
-    state.flags.sawPhase4 = false;
-    // phase5 stays unlocked? No, we keep it as "knowledge persists but access is negotiated":
-    // Keep decoder data and interpretation, but phase5 lock must be re-earned by conditions.
-    state.phase5.hasPrestigedSince = true;
-
-    // Apply preserved interpretation
-    state.interpretation = keepI;
-
-    for (const k in state.upgrades) state.upgrades[k] = 0;
-    state.upgrades.relicAmp = keepRelicAmp;
-
-    touchLocalUpdated();
-    recomputeDerived();
-    updateObjectiveFallback();
-  }
-
   // ===== Gain
   function gain(amount){
     state.signal += amount;
@@ -1477,7 +1043,7 @@ canvas#scope{
   }
 
   // ===== Save Manager (Local + Cloud)
-  const LOCAL_KEY = "sygn1l_cloudsave_v4_phase5";
+  const LOCAL_KEY = "sygn1l_cloudsave_v5_username";
   let userId = null;
   let cloudReady = false;
   let lastCloudSaveAt = 0;
@@ -1510,6 +1076,9 @@ canvas#scope{
         state[k] = data[k];
       }
     }
+    // Backfill profile if older save
+    state.profile = state.profile || { username:"" };
+    if (typeof state.profile.username !== "string") state.profile.username = "";
   }
 
   async function ensureSession(){
@@ -1521,14 +1090,12 @@ canvas#scope{
         session = data.session;
       }
       userId = session.user.id;
-      $("userChip").textContent = "USER: " + userId.slice(0, 4) + "…" + userId.slice(-4);
       cloudReady = true;
       $("syncChip").textContent = "SYNC: CLOUD";
       return userId;
     } catch(err){
       cloudReady = false;
       $("syncChip").textContent = "SYNC: OFFLINE";
-      pushLog("log","SYS","CLOUD SYNC UNAVAILABLE. LOCAL MODE ACTIVE.");
       return null;
     }
   }
@@ -1551,7 +1118,6 @@ canvas#scope{
     } catch(err){
       $("syncChip").textContent = "SYNC: OFFLINE";
       cloudReady = false;
-      pushLog("log","SYS","CLOUD LOAD FAILED. CONTINUING LOCAL.");
       return null;
     }
   }
@@ -1579,12 +1145,11 @@ canvas#scope{
     } catch(err){
       $("syncChip").textContent = "SYNC: OFFLINE";
       cloudReady = false;
-      pushLog("log","SYS","CLOUD SAVE FAILED. LOCAL CONTINUES.");
       return false;
     }
   }
 
-  // ===== Offline progress (Signal only, no AI, no interpretation)
+  // ===== Offline progress (Signal only)
   function applyOfflineProgress(){
     const lastMs = Number(state.updatedAtMs) || 0;
     if (!lastMs) return;
@@ -1593,27 +1158,23 @@ canvas#scope{
     let elapsed = (now - lastMs) / 1000;
     if (!isFinite(elapsed) || elapsed <= 2) return;
 
-    // cap offline gains
     const CAP = 8 * 60 * 60; // 8 hours
     const capped = Math.min(elapsed, CAP);
 
-    // Use current derived values (from saved upgrades).
     recomputeDerived();
     const sps = computeSPS();
     const autoP = state.autoPingsPerSec || 0;
 
-    // Signal gain while away:
-    // - base sps gain
-    // - auto-pings contribute similarly to active loop (but no extra corruption here)
     const gainedFromSPS = Math.max(0, sps) * capped;
     const gainedFromAuto = Math.max(0, autoP) * capped * (state.clickPower * globalMultiplier());
-
     const totalGain = gainedFromSPS + gainedFromAuto;
+
     if (totalGain > 0){
       state.signal += totalGain;
       state.total += totalGain;
-      pushLog("log","SYS",`OFFLINE RECOVERY: +${fmt(totalGain)} SIGNAL (${Math.floor(capped/60)}m ${Math.floor(capped%60)}s).`);
-      popupComms("OPS", `While you were away: +${fmt(totalGain)} signal.`);
+      const name = getUsernameOrAnon();
+      popupComms("OPS", `${name}, while you were away: +${fmt(totalGain)} signal.`);
+      pushLog("log","SYS",`OFFLINE RECOVERY: +${fmt(totalGain)} SIGNAL.`);
       touchLocalUpdated();
     }
   }
@@ -1642,8 +1203,8 @@ canvas#scope{
       }
     }
 
-    // Apply offline progress after final state selection
     applyOfflineProgress();
+    syncUserChip();
   }
 
   document.addEventListener("visibilitychange", () => {
@@ -1652,6 +1213,58 @@ canvas#scope{
       saveCloud(true);
     }
   });
+
+  // ===== Username UI
+  function getUsernameOrAnon(){
+    const u = (state.profile?.username || "").trim();
+    return u ? u : "Operator";
+  }
+
+  function syncUserChip(){
+    const u = (state.profile?.username || "").trim();
+    if (u){
+      $("userChip").textContent = "USER: " + u;
+    } else if (userId){
+      $("userChip").textContent = "USER: " + userId.slice(0,4) + "…" + userId.slice(-4);
+    } else {
+      $("userChip").textContent = "USER: ----";
+    }
+  }
+
+  $("userChip").onclick = async () => {
+    markActive("edit_username");
+    feedback($("userChip"), "light");
+
+    const current = state.profile?.username || "";
+    const val = await promptAction({
+      title: "SET USERNAME",
+      label: "USERNAME",
+      initialValue: current,
+      placeholder: "corey_01",
+      hint: "This name is stored in your save and can appear in dynamic comms.",
+      okText: "SAVE",
+      cancelText: "CANCEL",
+      danger: false,
+      tag: "PROFILE"
+    });
+
+    if (val === null) return;
+
+    const cleaned = normalizeUsername(val);
+    if (!isValidUsername(cleaned)){
+      popupComms("SYS", "INVALID USERNAME. USE 3–16 CHARACTERS: A–Z, 0–9, _");
+      return;
+    }
+
+    state.profile.username = cleaned;
+    touchLocalUpdated();
+    saveLocal();
+    await saveCloud(true);
+
+    syncUserChip();
+    popupComms("OPS", `Acknowledged, ${cleaned}.`);
+    pushLog("log","SYS",`USERNAME SET: <span class="tag">${escapeHtml(cleaned)}</span>`);
+  };
 
   // ===== AI integration (via Supabase Edge Function)
   const AI_COOLDOWN_MS = 180000;
@@ -1690,6 +1303,7 @@ canvas#scope{
       const payload = {
         event: eventName,
         speaker_hint: speakerHint || "OPS",
+        username: (state.profile?.username || "").trim(),   // NEW
         phase: state.phase,
         build: state.build,
         signal: Math.floor(state.signal),
@@ -1707,7 +1321,14 @@ canvas#scope{
       if (error) throw error;
 
       const who = data?.who || speakerHint || "COMMS";
-      const msg = data?.text || "…";
+      let msg = data?.text || "…";
+
+      // Optional: if your edge function doesn't yet use username, we can lightly weave it here.
+      const uname = (state.profile?.username || "").trim();
+      if (uname && typeof msg === "string" && Math.random() < 0.25){
+        // safe, subtle personalization
+        msg = msg.replace(/\bYOU\b/i, uname);
+      }
 
       popupComms(who, msg);
       pushLog("comms", who, msg);
@@ -1724,18 +1345,7 @@ canvas#scope{
     $("signal").textContent = fmt(state.signal);
     $("sps").textContent = fmt(computeSPS());
     $("bw").textContent = state.bandwidth.toFixed(2) + "×";
-    $("buildChip").textContent = "BUILD: " + state.build;
-    $("relicChip").textContent = "RELICS: " + state.relics;
 
-    // Phase dot color
-    const dot = $("phaseDot");
-    dot.className = "dot " + (
-      state.phase >= 5 ? "warn" :
-      state.phase >= 4 ? "warn" :
-      state.phase >= 3 ? "" : ""
-    );
-
-    // Stability
     const stab = stabilityValue();
     $("stab").textContent = Math.round(stab*100) + "%";
 
@@ -1749,101 +1359,7 @@ canvas#scope{
     $("intFill").style.width = (i*100).toFixed(1) + "%";
     $("intText").textContent = (i*100).toFixed(1) + "% (" + integrityLabel(i) + ")";
 
-    const canPrestige = state.total >= 12000;
-    const gainR = prestigeGain();
-    const btn = $("prestige");
-    btn.disabled = !canPrestige;
-    btn.textContent = canPrestige ? `RITE RESET (+${gainR} RELICS)` : "RITE RESET (LOCKED)";
-
-    updateScopeLabel();
-    updateDecoderUI();
-  }
-
-  // ===== Locked buttons fix (periodic re-render)
-  let upgradesRefreshAcc = 0;
-  const UPGRADES_REFRESH_EVERY = 0.25;
-
-  function renderUpgrades(){
-    const root = $("upgrades");
-    root.innerHTML = "";
-
-    for (const u of UPG){
-      // Phase 4 items appear only once Phase 4 is active (or foreshadow shown)
-      if (u.phase4 && !state.phase4.active) continue;
-
-      // Hide relicAmp if player has no relics and hasn't bought it yet
-      if (u.id === "relicAmp" && (state.relics <= 0 && upgradeLevel("relicAmp") === 0)) continue;
-
-      const unlocked = state.total >= u.unlockAt || (u.phase4 && state.phase4.active);
-      const lvl = upgradeLevel(u.id);
-      const maxed = atMax(u);
-      const cost = upgradeCost(u);
-      const currency = u.currency || "signal";
-      const have = currency === "relics" ? state.relics : state.signal;
-      const affordable = unlocked && !maxed && have >= cost;
-
-      const row = document.createElement("div");
-      row.className = "up" + (affordable ? " affordable" : "") + (!unlocked ? " locked" : "");
-
-      const meta = document.createElement("div");
-      meta.className = "meta";
-
-      const name = document.createElement("div");
-      name.className = "name";
-      const lvText = u.max ? `${lvl}/${u.max}` : `${lvl}`;
-      name.textContent = `${u.name} (LV ${lvText})`;
-
-      const desc = document.createElement("div");
-      desc.className = "desc";
-      desc.textContent = unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlockAt)} TOTAL SIGNAL.`;
-
-      const costEl = document.createElement("div");
-      costEl.className = "cost";
-      if (!unlocked){
-        costEl.textContent = "STATUS: LOCKED";
-      } else if (maxed){
-        costEl.textContent = "STATUS: MAXED";
-      } else {
-        costEl.textContent = `COST: ${fmt(cost)} ${currency.toUpperCase()}`;
-      }
-
-      meta.appendChild(name);
-      meta.appendChild(desc);
-      meta.appendChild(costEl);
-
-      const btn = document.createElement("button");
-      btn.textContent = !unlocked ? "CLASSIFIED" : (maxed ? "MAXED" : (affordable ? "ACQUIRE" : "LOCKED"));
-      btn.disabled = !affordable;
-
-      btn.onclick = async () => {
-        if (!affordable) return;
-        markActive("buy_upgrade");
-        feedback(btn, "light");
-
-        if (currency === "relics") state.relics -= cost;
-        else state.signal -= cost;
-
-        u.buy();
-        touchLocalUpdated();
-        recomputeDerived();
-        renderHUD();
-        renderUpgrades();
-        saveLocal();
-        await saveCloud(false);
-
-        // Phase 4 chatter
-        if (u.id === "pattern") popupComms("DR KESS","Sampling reveals structure.");
-        if (u.id === "semantic") popupComms("OPS","Clarity is a bias.");
-        if (u.id === "memory") popupComms("UNKNOWN","The Array forgets data. Not form.");
-        if (u.id === "bleed") popupComms("UNKNOWN","Those aren’t spikes.");
-
-        await maybeAiComms("buy_upgrade:" + u.id, (u.id === "dark") ? "MOTHERLINE" : "OPS");
-      };
-
-      row.appendChild(meta);
-      row.appendChild(btn);
-      root.appendChild(row);
-    }
+    syncUserChip();
   }
 
   // ===== Controls
@@ -1854,13 +1370,11 @@ canvas#scope{
     gain(state.clickPower * globalMultiplier());
     state.corruption = clamp(state.corruption + 0.0006, 0, 1);
 
-    // tiny integrity hit if player is hammering through low stability
     const stab = stabilityValue();
     state.integrity = clamp(state.integrity - (0.0008 * (1.1 - stab)), 0, 1);
 
     touchLocalUpdated();
     renderHUD();
-    renderUpgrades();
     saveLocal();
     await saveCloud(false);
 
@@ -1868,30 +1382,6 @@ canvas#scope{
       await maybeAiComms("ping_void", "OPS");
     }
   }, { passive:true });
-
-  $("prestige").onclick = async (e) => {
-    if (e.currentTarget.disabled) return;
-    markActive("prestige");
-    feedback(e.currentTarget, "strong");
-
-    const ok = await confirmAction({
-      title: "RITE RESET",
-      body: "Reset Signal and most buffs to recover <span class='tag'>RELICS</span>.<br><br>Some knowledge may persist. Some may not.<br><br>Proceed with the Rite?",
-      okText: "EXECUTE",
-      cancelText: "CANCEL",
-      danger: true,
-      tag: "RITE RESET"
-    });
-    if (!ok) return;
-
-    doPrestige();
-    renderHUD();
-    renderUpgrades();
-    saveLocal();
-    await saveCloud(true);
-
-    await maybeAiComms("rite_reset", "MOTHERLINE");
-  };
 
   $("save").onclick = async (e) => {
     markActive("manual_save");
@@ -1923,202 +1413,7 @@ canvas#scope{
     location.reload();
   };
 
-  // ===== Scope + repetition detection
-  const scope = $("scope");
-  const ctx = scope.getContext("2d", { alpha: false });
-  let sw = 0, sh = 0, dpr = 1;
-
-  const signature = { cols: [], vel: [], phase: 0 };
-
-  function resizeScope(){
-    dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-    const cssW = scope.clientWidth || 300;
-    const cssH = 84;
-    scope.style.height = cssH + "px";
-    scope.width = Math.floor(cssW * dpr);
-    scope.height = Math.floor(cssH * dpr);
-    sw = scope.width;
-    sh = scope.height;
-
-    const cols = Math.max(120, Math.floor(sw / (2 * dpr)));
-    signature.cols = new Array(cols).fill(0);
-    signature.vel  = new Array(cols).fill(0);
-    signature.phase = 0;
-  }
-  window.addEventListener("resize", resizeScope);
-
-  function updateScopeLabel(){
-    const lk = lockValueRaw();
-    $("scopeLabel").textContent = "LOCK: " + Math.round(lk * 100) + "%";
-  }
-
-  function rand01(seed){
-    seed = (seed ^ 0x6D2B79F5) >>> 0;
-    seed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    seed ^= seed + Math.imul(seed ^ (seed >>> 7), 61 | seed);
-    return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
-  }
-
-  let scopeRepeatJustHappened = false;
-  let bleedProcJustHappened = false;
-  let lastScopeFingerprint = 0;
-  let lastBleedVisualAt = 0;
-
-  function scopeFingerprint(){
-    // cheap fingerprint: sum of a few samples
-    let acc = 0;
-    const cols = signature.cols.length;
-    for (let i=0;i<cols;i+=Math.max(6, Math.floor(cols/24))){
-      acc += Math.round(signature.cols[i] * 1000);
-    }
-    return acc|0;
-  }
-
-  function drawScope(dt, timeMs){
-    if (!sw || !sh) return;
-
-    scopeRepeatJustHappened = false;
-    bleedProcJustHappened = false;
-
-    const lk = lockValueRaw();
-    const corr = state.corruption;
-    const bleed = upgradeLevel("bleed");
-
-    ctx.fillStyle = "rgb(0,0,0)";
-    ctx.fillRect(0,0,sw,sh);
-
-    // Phase 4+: noise becomes more structured at higher lock and corruption
-    const phase4 = state.phase4.active;
-    const structure = phase4 ? (0.20 + 0.55*lk + 0.35*corr) : 0.0;
-
-    const noiseAmt = clamp(0.85 - 0.70*lk + 0.35*corr - 0.20*structure, 0.10, 0.95);
-    const spikeProb = clamp(0.04 + 0.36*lk + 0.10*(state.bandwidth-1)/4 + 0.10*structure, 0.04, 0.85);
-
-    const cols = signature.cols.length;
-    signature.phase += dt * (0.6 + 1.8*lk) * (1 + 0.8*corr);
-
-    for (let i=0;i<cols;i++){
-      const base = Math.sin(signature.phase + i*0.07) * (0.25 + 0.10*structure);
-      const chaos = (rand01((timeMs|0) + i*9973) - 0.5) * (0.45 + 0.9*corr) * (1 - 0.35*structure);
-      const target = base + chaos;
-
-      const stiffness = 0.08 + 0.22*lk + 0.06*structure;
-      const damping = 0.82 - 0.35*corr;
-
-      signature.vel[i] = signature.vel[i]*damping + (target - signature.cols[i]) * stiffness;
-      signature.cols[i] += signature.vel[i];
-    }
-
-    // background raster noise
-    const midY = Math.floor(sh * 0.60);
-    const px = Math.max(1, Math.floor(dpr));
-    const baseG = 190;
-
-    for (let y=0;y<sh;y+=px){
-      const lineFade = 0.72 + 0.28*Math.sin((y/sh)*Math.PI);
-      for (let x=0;x<sw;x+=px){
-        const n = rand01((x*131 + y*977 + (timeMs|0))|0);
-        if (n < noiseAmt){
-          const v = Math.floor((baseG + 55*n) * lineFade);
-          ctx.fillStyle = `rgb(0,${v},0)`;
-          ctx.fillRect(x,y,px,px);
-        }
-      }
-    }
-
-    // waveform line
-    ctx.lineWidth = Math.max(1, 1*dpr);
-    ctx.strokeStyle = "rgba(57,255,106,0.85)";
-    ctx.beginPath();
-
-    // Symbol Bleed: rare vertical alignment bars (purely visual)
-    const now = Date.now();
-    const bleedChance = (phase4 && bleed > 0) ? clamp(0.002 + 0.010*lk + 0.010*corr, 0.002, 0.030) : 0;
-
-    let doBleed = false;
-    if (bleedChance > 0 && (now - lastBleedVisualAt) > 30000 && Math.random() < bleedChance){
-      doBleed = true;
-      lastBleedVisualAt = now;
-      bleedProcJustHappened = true;
-    }
-
-    for (let i=0;i<cols;i++){
-      const x = Math.floor((i/(cols-1)) * (sw-1));
-      const s = signature.cols[i];
-
-      const focus = lk;
-      const spike = (rand01((timeMs|0) + i*71) < spikeProb) ? 1 : 0;
-
-      const spikeH = spike * (0.15 + 0.85*focus) * (0.75 + 0.25*Math.abs(s));
-      const noiseH = (s * (0.35 + 0.65*(1-focus))) * 0.35;
-
-      const echo = corr > 0.28 ? (0.10 + 0.35*corr) * Math.sin(signature.phase*2 + i*0.12) : 0;
-
-      const y = midY - (spikeH + noiseH + echo) * (sh * 0.70);
-      if (i===0) ctx.moveTo(x,y);
-      else ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-
-    ctx.globalCompositeOperation = "lighter";
-    ctx.strokeStyle = "rgba(57,255,106,0.18)";
-    ctx.lineWidth = Math.max(2, 3*dpr);
-    ctx.stroke();
-    ctx.globalCompositeOperation = "source-over";
-
-    // bleed bars (vertical)
-    if (doBleed){
-      const bars = 10 + Math.floor(14*lk);
-      for (let b=0;b<bars;b++){
-        const x = Math.floor(rand01((timeMs|0) + b*99991) * sw);
-        const w = Math.max(1, Math.floor(1*dpr));
-        ctx.fillStyle = `rgba(57,255,106,${0.06 + 0.10*lk})`;
-        ctx.fillRect(x, 0, w, sh);
-      }
-    }
-
-    // corruption tears
-    if (corr > 0.45){
-      const tears = Math.floor(2 + 8*corr);
-      for (let t=0;t<tears;t++){
-        const x = Math.floor(rand01((timeMs|0) + t*99991) * sw);
-        const w = Math.max(1, Math.floor(dpr));
-        ctx.fillStyle = `rgba(255,59,107,${0.04 + 0.08*corr})`;
-        ctx.fillRect(x, 0, w, sh);
-      }
-    }
-
-    ctx.strokeStyle = "rgba(57,255,106,0.18)";
-    ctx.lineWidth = Math.max(1, 1*dpr);
-    ctx.strokeRect(Math.floor(0.5*dpr), Math.floor(0.5*dpr), sw - Math.floor(1*dpr), sh - Math.floor(1*dpr));
-
-    // Repeat detection: if fingerprint repeats at high lock, treat as repetition
-    if (phase4){
-      const fp = scopeFingerprint();
-      if (lk >= 0.80 && fp === lastScopeFingerprint){
-        scopeRepeatJustHappened = true;
-      }
-      lastScopeFingerprint = fp;
-    }
-  }
-
-  // ===== Breach detection (Phase 5 key requirement)
-  let lastBreachAt = 0;
-  function breachCheck(){
-    if (!state.phase5.unlocked) return;
-    const now = Date.now();
-    if (now - lastBreachAt < 60000) return;
-
-    if (state.integrity < 0.12 && state.corruption >= 0.75){
-      lastBreachAt = now;
-      state.phase5.breachSeen = true;
-      pushLog("log","SYS","BREACH EVENT. CONTAINMENT FAILED BRIEFLY.");
-      popupComms("LT VANCE","Containment flickered. Tell me you saw that.");
-      touchLocalUpdated();
-    }
-  }
-
-  // ===== Narrative init
+  // ===== Init narrative if empty
   function bootNarrativeIfEmpty(){
     if ($("log").children.length === 0){
       pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
@@ -2127,96 +1422,16 @@ canvas#scope{
     }
   }
 
-  // ===== Final warning hook (after cipher)
-  function warningCheck(){
-    if (!state.decoder.solved || state.flags.sawWarning) return;
-    state.flags.sawWarning = true;
-    touchLocalUpdated();
-  }
-
-  // ===== Main loop
-  let last = performance.now();
-
-  function loop(now){
-    const dt = Math.min(0.05, (now - last)/1000);
-    last = now;
-
-    recomputeDerived();
-
-    const sps = computeSPS();
-    if (sps > 0) gain(sps * dt);
-
-    if (state.autoPingsPerSec > 0){
-      const pings = state.autoPingsPerSec * dt;
-      gain(pings * (state.clickPower * globalMultiplier()));
-    }
-
-    updateCorruption(dt);
-    updateIntegrity(dt);
-
-    // Phase logic (no AI calls)
-    milestoneCheck();
-    interpretationTick(dt);
-    breachCheck();
-
-    renderHUD();
-
-    upgradesRefreshAcc += dt;
-    if (upgradesRefreshAcc >= UPGRADES_REFRESH_EVERY){
-      upgradesRefreshAcc = 0;
-      renderUpgrades();
-    }
-
-    drawScope(dt, now|0);
-
-    requestAnimationFrame(loop);
-  }
-
-  // ===== Startup render
-  function renderUpfront(){
-    $("aiBtn").textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
-    setAiChip(state.aiEnabled ? "AI: READY" : "AI: DISABLED");
-
-    // show decoder if foreshadow or unlocked
-    if (state.flags.sawPhase5 || state.phase5.unlocked){
-      $("decoderCard").style.display = "block";
-    }
-
-    recomputeDerived();
-    updateObjectiveFallback();
-    renderHUD();
-    renderUpgrades();
-    bootNarrativeIfEmpty();
-  }
-
   // ===== Start
-  resizeScope();
-  renderUpfront();
+  renderHUD();
+  bootNarrativeIfEmpty();
 
-  initSaves().then(async () => {
-    // Ensure decoder state consistency if unlocked/foreshadowed
-    if (state.phase5.unlocked || state.flags.sawPhase5){
-      ensureDecoderSeeded();
-      showDecoder(true);
-    }
-
-    phase4Check();
-    phase5Check();
-    renderUpfront();
-
+  initSaves().then(() => {
+    renderHUD();
     pushLog("log","SYS","SAVE SYSTEM ONLINE: LOCAL + CLOUD (WHEN AVAILABLE).");
     setAiChip(cloudReady ? (state.aiEnabled ? "AI: READY" : "AI: DISABLED") : "AI: OFFLINE");
-
-    // set phase display to match state.phase
-    if (state.phase >= 5) { $("phase").textContent = "PHASE V"; $("status").textContent = "ARRAY: INTERPRETATION"; }
-    else if (state.phase >= 4) { $("phase").textContent = "PHASE IV"; $("status").textContent = "ARRAY: INTERFERENCE"; }
-    else if (state.phase === 3) { $("phase").textContent = "PHASE III"; $("status").textContent = "ARRAY: ACTIVE"; }
-    else if (state.phase === 2) { $("phase").textContent = "PHASE II"; $("status").textContent = "ARRAY: DRIFT"; }
-
   }).catch(() => {
     setAiChip("AI: OFFLINE");
-  }).finally(() => {
-    requestAnimationFrame(loop);
   });
 
 })();
