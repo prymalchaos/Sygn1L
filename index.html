@@ -1,10 +1,8 @@
- <!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport"
-  content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"/>
-
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
 <title>SYGN1L</title>
 
 <style>
@@ -13,197 +11,322 @@
   --text:#CFFFD6; --muted:#7EDB92;
   --accent:#39FF6A; --danger:#FF3B6B;
   --border:rgba(57,255,106,.25);
-  --radius:16px;
-  --shadow:0 10px 22px rgba(0,0,0,.55);
+  --radius:16px; --shadow:0 10px 22px rgba(0,0,0,.55);
   --glow:0 0 18px rgba(57,255,106,.25);
 }
 
-html{background:var(--bg0);}
+html{ background:var(--bg0); -webkit-text-size-adjust:100%; }
 body{
   margin:0;
-  font-family:ui-monospace,Menlo,Consolas,monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color:var(--text);
   background:
     radial-gradient(900px 600px at 60% 15%, rgba(57,255,106,.10), transparent 60%),
-    linear-gradient(180deg,var(--bg1),var(--bg0));
-  padding:14px 12px calc(24px + env(safe-area-inset-bottom));
+    linear-gradient(180deg, var(--bg1), var(--bg0));
+  overflow-y:auto;
   -webkit-overflow-scrolling:touch;
+  touch-action:manipulation;
+  padding:14px 12px calc(24px + env(safe-area-inset-bottom));
 }
 
-.fx{
+body::before{
+  content:"";
   position:fixed; inset:0;
   pointer-events:none;
-  background:
-    repeating-linear-gradient(
-      to bottom,
-      rgba(57,255,106,.05),
-      rgba(57,255,106,.05) 1px,
-      transparent 4px,
-      transparent 8px
-    );
-  opacity:.22;
+  background: radial-gradient(1200px 900px at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.65) 100%);
+  z-index:0;
 }
 
-.wrap{max-width:860px;margin:0 auto;display:grid;gap:18px;}
+.fx{ position:fixed; inset:0; pointer-events:none; z-index:0; }
+.fx.scanlines{
+  background:repeating-linear-gradient(
+    to bottom,
+    rgba(57,255,106,.05),
+    rgba(57,255,106,.05) 1px,
+    rgba(0,0,0,0) 4px,
+    rgba(0,0,0,0) 8px
+  );
+  opacity:.24;
+}
+
+.wrap{
+  position:relative; z-index:1;
+  max-width:860px; margin:0 auto;
+  display:grid; gap:18px;
+}
 
 .card{
   border:1px solid var(--border);
   border-radius:var(--radius);
-  background:linear-gradient(180deg, rgba(6,28,12,.65), rgba(3,14,7,.45));
   box-shadow:var(--shadow);
+  background:linear-gradient(180deg, rgba(6,28,12,.62), rgba(3,14,7,.40));
   overflow:hidden;
+  position:relative;
+}
+.card::after{
+  content:"";
+  position:absolute; inset:-2px;
+  pointer-events:none;
+  box-shadow: inset 0 0 0 1px rgba(57,255,106,.08), inset 0 0 22px rgba(57,255,106,.06);
 }
 
-.pad{padding:14px;}
+.pad{ padding:14px; position:relative; }
 
-h1{margin:0;font-size:18px;letter-spacing:.3em;}
-.subtitle{font-size:12px;color:var(--muted);margin-top:6px;}
+h1{ margin:0; letter-spacing:.25em; font-size:18px; }
+.subtitle{ margin-top:6px; font-size:12px; color:var(--muted); letter-spacing:.06em; }
 
-.stats{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px;}
-@media(min-width:420px){.stats{grid-template-columns:repeat(3,1fr);}}
+.stats{
+  margin-top:12px;
+  display:grid; grid-template-columns:1fr;
+  gap:10px;
+}
+@media(min-width:420px){ .stats{ grid-template-columns:repeat(3,1fr); } }
 
 .stat{
-  border:1px solid rgba(57,255,106,.25);
+  border:1px solid rgba(57,255,106,.2);
   border-radius:12px;
   padding:10px;
-  background:rgba(0,0,0,.3);
+  background:rgba(0,0,0,.30);
 }
-.stat .k{font-size:11px;letter-spacing:.1em;color:var(--muted);}
-.stat .v{font-size:18px;margin-top:6px;}
+.stat .k{ font-size:11px; color:var(--muted); letter-spacing:.10em; text-transform:uppercase; }
+.stat .v{ margin-top:6px; font-size:18px; overflow-wrap:anywhere; text-shadow:0 0 10px rgba(57,255,106,.10); }
 
 .hd{
-  display:flex;flex-wrap:wrap;gap:8px;
+  display:flex; justify-content:space-between; align-items:center;
+  flex-wrap:wrap; gap:10px;
   padding:12px 14px;
   border-bottom:1px solid rgba(57,255,106,.2);
-  background:linear-gradient(180deg, rgba(0,0,0,.3), transparent);
+  background:linear-gradient(180deg, rgba(0,0,0,.22), rgba(0,0,0,0));
+  position:relative;
 }
 
 .chip{
   border:1px solid rgba(57,255,106,.25);
   border-radius:999px;
   padding:6px 10px;
-  font-size:10px;
-  letter-spacing:.14em;
-  background:rgba(0,0,0,.25);
-  display:inline-flex;gap:8px;align-items:center;
+  font-size:10px; letter-spacing:.14em;
+  display:inline-flex; align-items:center; gap:8px;
+  background:rgba(0,0,0,.22);
+  white-space:nowrap;
 }
-.dot{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:var(--glow);}
+.dot{ width:8px;height:8px;border-radius:50%; background:var(--accent); box-shadow:var(--glow); }
 
 button{
   font:inherit;
   border-radius:14px;
-  border:1px solid rgba(57,255,106,.35);
+  border:1px solid rgba(57,255,106,.32);
   background:rgba(57,255,106,.08);
   color:var(--text);
   padding:14px;
   cursor:pointer;
   user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  transition:.15s;
 }
-button.big{
+button:hover{ box-shadow:var(--glow); }
+button:active{ transform:translateY(1px); }
+button:disabled{ opacity:.5; cursor:not-allowed; box-shadow:none; }
+
+.big{
   width:100%;
-  font-size:18px;
   font-weight:900;
   letter-spacing:.14em;
-  padding:18px;
+  font-size:18px;
+  padding:18px 14px;
+  background:linear-gradient(180deg, rgba(57,255,106,.16), rgba(57,255,106,.06));
+  box-shadow: inset 0 0 0 1px rgba(57,255,106,.10);
 }
 
-.grid2{display:grid;gap:10px;margin-top:12px;}
-@media(min-width:420px){.grid2{grid-template-columns:1fr 1fr;}}
+.grid2{ display:grid; gap:10px; margin-top:12px; }
+@media(min-width:420px){ .grid2{ grid-template-columns:1fr 1fr; } }
 
-.upgrades{display:flex;flex-direction:column;gap:12px;}
+.muted{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.45; }
+
+.bar{
+  height:10px; border-radius:999px;
+  border:1px solid rgba(57,255,106,.22);
+  background:rgba(0,0,0,.28);
+  overflow:hidden;
+}
+.fill{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg, rgba(57,255,106,.55), rgba(57,255,106,.20));
+  box-shadow:0 0 18px rgba(57,255,106,.20);
+}
+.fill.danger{
+  background:linear-gradient(90deg, rgba(255,59,107,.55), rgba(255,59,107,.18));
+  box-shadow:0 0 18px rgba(255,59,107,.18);
+}
+
+.upgrades{ display:flex; flex-direction:column; gap:12px; }
 .up{
-  border:1px dashed rgba(57,255,106,.25);
+  border:1px solid rgba(57,255,106,.2);
   border-radius:14px;
   padding:12px;
-  background:rgba(0,0,0,.35);
-  display:flex;justify-content:space-between;align-items:center;
+  background:rgba(0,0,0,.30);
+  display:flex; flex-wrap:wrap;
+  gap:12px; align-items:center;
+  position:relative;
+}
+.up.affordable{ box-shadow:var(--glow); }
+.up.locked{ opacity:.60; border-style:dashed; }
+
+.up .meta{ flex:1; min-width:220px; }
+.up .name{ font-weight:900; letter-spacing:.04em; }
+.up .desc,.up .cost{ font-size:12px; margin-top:6px; color:var(--muted); }
+.up .cost{ color:rgba(207,255,214,.90); }
+
+.log{
+  max-height:320px;
+  overflow:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.log p{
+  margin:0 0 10px;
+  font-size:12px;
+  line-height:1.55;
+  color:rgba(207,255,214,.88);
+}
+.tag{
+  display:inline-block;
+  padding:2px 8px;
+  border:1px solid rgba(57,255,106,.22);
+  border-radius:999px;
+  font-size:10px;
+  letter-spacing:.10em;
+  color:rgba(207,255,214,.95);
+  margin-right:8px;
 }
 
 .scopeWrap{
   margin-top:10px;
   border:1px solid rgba(57,255,106,.22);
   border-radius:12px;
-  overflow:hidden;
   background:rgba(0,0,0,.35);
+  overflow:hidden;
 }
 .scopeTop{
+  display:flex;
+  justify-content:space-between;
+  gap:10px;
   padding:8px 10px;
+  border-bottom:1px solid rgba(57,255,106,.14);
   font-size:10px;
   letter-spacing:.12em;
-  border-bottom:1px solid rgba(57,255,106,.15);
+  color:rgba(207,255,214,.92);
 }
-canvas{display:block;width:100%;height:84px;}
-
-.log{
-  max-height:300px;
-  overflow:auto;
-  -webkit-overflow-scrolling:touch;
+.scopeMeta{
+  color:var(--muted);
+  letter-spacing:.10em;
+  text-transform:uppercase;
 }
-.log p{font-size:12px;line-height:1.55;margin:0 0 10px;}
+canvas#scope{
+  display:block;
+  width:100%;
+  height:84px;
+  background:rgba(0,0,0,.25);
+}
 
-.tag{
+/* Popup comm bubbles (tap-to-close enabled by JS) */
+.popHost{
+  position:fixed;
+  top:12px;
+  left:12px;
+  right:12px;
+  z-index:999;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  pointer-events:none;
+}
+.pop{
+  pointer-events:auto;
+  max-width:860px;
+  margin:0 auto;
   border:1px solid rgba(57,255,106,.25);
-  border-radius:999px;
-  padding:2px 8px;
+  border-radius:14px;
+  background:rgba(0,0,0,.72);
+  box-shadow:0 10px 26px rgba(0,0,0,.55), 0 0 20px rgba(57,255,106,.15);
+  padding:10px 12px;
+}
+.pop .who{
   font-size:10px;
-  letter-spacing:.1em;
-  margin-right:6px;
+  letter-spacing:.14em;
+  color:rgba(126,219,146,.95);
+  margin-bottom:6px;
+  text-transform:uppercase;
+}
+.pop .msg{
+  font-size:12px;
+  line-height:1.5;
+  color:rgba(207,255,214,.94);
 }
 
-/* ===== Modal ===== */
+/* Modal */
 .modalHost{
   position:fixed; inset:0;
-  display:none;
+  background:rgba(0,0,0,.72);
   z-index:2000;
-  padding:14px;
-  background:rgba(0,0,0,.75);
-  overflow:auto;
+  display:none;
+  padding:14px 12px calc(18px + env(safe-area-inset-bottom));
 }
-
 .modal{
   max-width:860px;
   margin:0 auto;
-  max-height:calc(100dvh - 28px);
+  border:1px solid rgba(57,255,106,.28);
+  border-radius:16px;
+  background:rgba(0,0,0,.78);
+  box-shadow:0 12px 30px rgba(0,0,0,.60), 0 0 24px rgba(57,255,106,.12);
+  overflow:hidden;
+}
+.modalHd{
+  padding:12px 14px;
+  border-bottom:1px solid rgba(57,255,106,.18);
   display:flex;
-  flex-direction:column;
-  border:1px solid rgba(57,255,106,.35);
-  border-radius:18px;
-  background:linear-gradient(180deg, rgba(6,28,12,.9), rgba(3,14,7,.85));
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
 }
-
-.modal .mhd{
-  padding:12px;
-  font-size:12px;
+.modalTitle{
+  font-size:11px;
   letter-spacing:.14em;
-  border-bottom:1px solid rgba(57,255,106,.2);
+  color:rgba(207,255,214,.96);
+  text-transform:uppercase;
 }
-
-.modal .mbody{
-  padding:14px;
+.modalBody{
+  padding:12px 14px;
+  max-height:62vh;
   overflow:auto;
+  -webkit-overflow-scrolling:touch;
   font-size:12px;
   line-height:1.55;
-  flex:1 1 auto;
+  color:rgba(207,255,214,.92);
 }
-
-.modal .mfoot{
-  padding:12px;
-  border-top:1px solid rgba(57,255,106,.2);
-  display:flex;gap:10px;
+.modalBtns{
+  padding:12px 14px;
+  border-top:1px solid rgba(57,255,106,.18);
+  display:grid;
+  gap:10px;
 }
-
+@media(min-width:420px){ .modalBtns{ grid-template-columns:1fr 1fr; } }
 </style>
 </head>
 
 <body>
-<div class="fx"></div>
+<div class="fx scanlines"></div>
+<div class="popHost" id="popHost"></div>
 
+<!-- Modal -->
 <div class="modalHost" id="modalHost">
   <div class="modal">
-    <div class="mhd" id="modalTitle">TRANSMISSION</div>
-    <div class="mbody" id="modalBody"></div>
-    <div class="mfoot">
-      <button id="modalOk">ACKNOWLEDGED</button>
+    <div class="modalHd">
+      <div class="modalTitle" id="modalTitle">TRANSMISSION</div>
+      <div class="chip">TAP OUTSIDE TO CLOSE</div>
+    </div>
+    <div class="modalBody" id="modalBody"></div>
+    <div class="modalBtns">
+      <button id="modalOk">OK</button>
       <button id="modalCancel">CLOSE</button>
     </div>
   </div>
@@ -211,104 +334,128 @@ canvas{display:block;width:100%;height:84px;}
 
 <div class="wrap">
 
-<header class="card">
-  <div class="pad">
-    <h1>SYGN1L</h1>
-    <div class="subtitle">THE ARRAY LISTENS.</div>
+  <header class="card">
+    <div class="pad">
+      <h1>SYGN1L</h1>
+      <div class="subtitle">THE ARRAY LISTENS. THE VOID REPLIES IN ARITHMETIC.</div>
 
-    <div class="stats">
-      <div class="stat"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
-      <div class="stat"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
-      <div class="stat"><div class="k">BANDWIDTH</div><div class="v" id="bw">1.00×</div></div>
-    </div>
+      <div class="stats">
+        <div class="stat"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
+        <div class="stat"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
+        <div class="stat"><div class="k">BANDWIDTH</div><div class="v" id="bw">1.00×</div></div>
+      </div>
 
-    <div class="scopeWrap">
-      <div class="scopeTop">ARRAY SCOPE</div>
-      <canvas id="scope"></canvas>
-    </div>
-    
-    <section class="card">
+      <div class="scopeWrap">
+        <div class="scopeTop">
+          <div>ARRAY SCOPE</div>
+          <div class="scopeMeta" id="scopeLabel">LOCK: 0%</div>
+        </div>
+        <canvas id="scope"></canvas>
+      </div>
+
+      <div style="height:10px"></div>
+
+      <!-- ✅ Corruption bar exists here -->
       <div class="stat">
-  <div class="k">CORRUPTION</div>
-  <div class="bar"><div class="fill danger" id="corrFill"></div></div>
-  <div class="muted" id="corrText">0% (DORMANT)</div>
+        <div class="k">CORRUPTION</div>
+        <div class="bar"><div class="fill danger" id="corrFill"></div></div>
+        <div class="muted" id="corrText">0% (DORMANT)</div>
+      </div>
+    </div>
+  </header>
+
+  <section class="card">
+    <div class="hd">
+      <div>
+        <span class="chip"><span class="dot"></span><span id="phase">PHASE I</span></span>
+        <span class="chip" id="status">ARRAY: STABLE</span>
+        <span class="chip" id="buildChip">BUILD: 1</span>
+        <span class="chip" id="relicChip">RELICS: 0</span>
+      </div>
+      <div>
+        <span class="chip" id="syncChip">SYNC: LOCAL</span>
+        <!-- ✅ Clickable username chip -->
+        <span class="chip" id="userChip" title="Tap to edit username">USER: Operator</span>
+        <!-- ✅ Optional but supported -->
+        <span class="chip" id="liveChip">LIVE: IDLE</span>
+      </div>
+    </div>
+
+    <div class="pad">
+      <button class="big" id="ping">PING THE VOID</button>
+
+      <div class="grid2">
+        <button id="briefing">BRIEFING</button>
+        <button id="save">SAVE</button>
+      </div>
+
+      <div class="grid2">
+        <button id="wipe">WIPE</button>
+        <button id="prestige" disabled>RITE RESET (LOCKED)</button>
+      </div>
+
+      <div class="muted" id="objective">
+        OBJECTIVE: START WITH DISH CALIBRATION. REACH 100 TOTAL SIGNAL TO UNLOCK DEEP SCAN.
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="hd">
+      <div>BUFFS</div>
+      <div class="muted">UNLOCKED BY MILESTONES. AVAILABLE BUFFS GLOW.</div>
+    </div>
+    <div class="pad">
+      <!-- ✅ Required -->
+      <div class="upgrades" id="upgrades"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="hd">
+      <div>DECODER</div>
+      <div class="muted">PHASE V UNLOCKS ENGRAM DECRYPTION</div>
+    </div>
+    <div class="pad">
+      <!-- ✅ Required -->
+      <div id="decoder"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="hd">
+      <div>COMMUNICATIONS</div>
+      <div class="muted">TAP A LINE TO DISMISS</div>
+    </div>
+    <div class="pad">
+      <div class="log" id="comms"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="hd">
+      <div>TRANSMISSION LOG</div>
+      <div class="muted">MILESTONES REVEAL CONTEXT</div>
+    </div>
+    <div class="pad">
+      <div class="log" id="log"></div>
+    </div>
+  </section>
+
 </div>
-      </section>
-  
 
-  
-  
-</header>
-
-<section class="card">
-  <div class="hd">
-    <span class="chip"><span class="dot"></span><span id="phase">PHASE I</span></span>
-    <span class="chip" id="userChip">USER: ----</span>
-    <span class="chip" id="liveChip">LIVE: ACTIVE</span>
-  </div>
-
-  <div class="pad">
-    <button class="big" id="ping">PING THE VOID</button>
-
-    <div class="grid2">
-      <button id="briefing">BRIEFING</button>
-      <button id="save">SAVE</button>
-    </div>
-
-    <div class="grid2">
-      <button id="wipe">WIPE</button>
-      <button id="prestige">RITE RESET</button>
-    </div>
-  </div>
-  
-  
-  
-</section>
-
-<section class="card">
-  <div class="hd">
-    <div>BUFFS</div>
-    <div class="chip">AVAILABLE BUFFS GLOW</div>
-  </div>
-  <div class="pad">
-    <div class="upgrades" id="upgrades">
-      <!-- populated by JS -->
-    </div>
-  </div>
-</section>
-
-
-<section class="card">
-  <div class="hd"><div>COMMUNICATIONS</div></div>
-  <div class="pad">
-    <div class="log" id="comms"></div>
-  </div>
-</section>
-
-<section class="card">
-  <div class="hd"><div>XENO DECODER</div></div>
-  <div class="pad" id="decoder">
-    <div class="subtitle">STATUS: ENCRYPTED</div>
-  </div>
-</section>
-
-
-</div>
-
-  <!-- Supabase (ENABLED) -->
+<!-- Supabase lib -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+<!-- Part B JS goes below -->
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
 
-  // Prevent double-tap zoom on buttons (mobile)
+  // Prevent double-tap zoom on buttons
   document.addEventListener("dblclick", (e) => {
     if (e.target && e.target.closest("button")) e.preventDefault();
   }, { passive:false });
-
-  document.documentElement.style.touchAction = "manipulation";
-  document.body.style.touchAction = "manipulation";
 
   // ===== Supabase config (yours)
   const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
@@ -321,10 +468,10 @@ canvas{display:block;width:100%;height:84px;}
     n = Number(n);
     if (!Number.isFinite(n)) return "0";
     if (n < 1000) return n.toFixed(0);
-    const u=["K","M","B","T","Qa","Qi"];
-    let i=-1;
-    while(n>=1000 && i<u.length-1){ n/=1000; i++; }
-    return n.toFixed(n<10?2:n<100?1:0)+u[i];
+    const units = ["K","M","B","T","Qa","Qi"];
+    let u = -1;
+    while (n >= 1000 && u < units.length-1){ n/=1000; u++; }
+    return n.toFixed(n<10?2:n<100?1:0)+units[u];
   }
   function escapeHtml(s){
     return String(s)
@@ -335,67 +482,85 @@ canvas{display:block;width:100%;height:84px;}
       .replaceAll("'","&#039;");
   }
 
-  // ===== Modal system (scrollable)
-  const modalHost = $("modalHost");
-  const modalTitle = $("modalTitle");
-  const modalBody  = $("modalBody");
-  const modalOk    = $("modalOk");
-  const modalCancel= $("modalCancel");
-
-  function openModal(title, html, opts={}){
-    modalTitle.textContent = title || "TRANSMISSION";
-    modalBody.innerHTML = html || "";
-    modalOk.textContent = opts.okText || "ACKNOWLEDGED";
-    modalCancel.textContent = opts.cancelText || "CLOSE";
-    modalCancel.style.display = opts.hideCancel ? "none" : "";
-    modalHost.style.display = "block";
-    requestAnimationFrame(() => { modalBody.scrollTop = 0; });
-
-    return new Promise((resolve) => {
-      const onOk = () => cleanup(true);
-      const onCancel = () => cleanup(false);
-
-      function cleanup(v){
-        modalOk.removeEventListener("click", onOk);
-        modalCancel.removeEventListener("click", onCancel);
-        modalHost.removeEventListener("click", onBack);
-        modalHost.style.display = "none";
-        resolve(v);
-      }
-      function onBack(e){
-        if (e.target === modalHost) cleanup(false);
-      }
-      modalOk.addEventListener("click", onOk);
-      modalCancel.addEventListener("click", onCancel);
-      modalHost.addEventListener("click", onBack);
-    });
+  function corruptionLabel(c){
+    if (c < 0.10) return "DORMANT";
+    if (c < 0.30) return "WHISPERING";
+    if (c < 0.60) return "INCIDENT";
+    if (c < 0.85) return "BREACH";
+    return "OVERRUN";
   }
 
-  async function confirmAction(title, message, okText){
-    const html = `<div style="white-space:pre-wrap">${escapeHtml(message)}</div>`;
-    return await openModal(title, html, { okText: okText || "CONFIRM", cancelText:"CANCEL" });
+  // ===== Popup comms (tap to close)
+  function popupComms(who, msg){
+    const host = $("popHost");
+    const box = document.createElement("div");
+    box.className = "pop";
+    box.innerHTML = `<div class="who">${escapeHtml(who)}</div><div class="msg">${escapeHtml(msg)}</div>`;
+    box.addEventListener("click", () => box.remove());
+    host.prepend(box);
   }
 
-  // ===== Comms log (tap-to-dismiss)
-  function pushComms(who, msg){
+  function pushLog(elId, who, msg){
     const p = document.createElement("p");
     p.innerHTML = `<span class="tag">${escapeHtml(who)}</span>${escapeHtml(msg)}`;
     p.style.cursor = "pointer";
     p.title = "Tap to dismiss";
-    p.addEventListener("click", () => p.remove());
-    $("comms").prepend(p);
+    p.addEventListener("click", ()=>p.remove());
+    $(elId).prepend(p);
   }
 
+  // ===== Modal
+  const modalHost = $("modalHost");
+  const modalTitle = $("modalTitle");
+  const modalBody = $("modalBody");
+  const modalOk = $("modalOk");
+  const modalCancel = $("modalCancel");
+
+  function openModal(title, html, opts={}){
+    modalTitle.textContent = title || "TRANSMISSION";
+    modalBody.innerHTML = html || "";
+    modalOk.textContent = opts.okText || "OK";
+    modalCancel.textContent = opts.cancelText || "CLOSE";
+    modalCancel.style.display = opts.hideCancel ? "none" : "";
+    modalHost.style.display = "block";
+    requestAnimationFrame(()=>{ modalBody.scrollTop = 0; });
+
+    return new Promise((resolve)=>{
+      const onOk = ()=>cleanup(true);
+      const onCancel = ()=>cleanup(false);
+      const onBackdrop = (e)=>{ if (e.target === modalHost) cleanup(false); };
+
+      function cleanup(v){
+        modalOk.removeEventListener("click", onOk);
+        modalCancel.removeEventListener("click", onCancel);
+        modalHost.removeEventListener("click", onBackdrop);
+        modalHost.style.display = "none";
+        resolve(v);
+      }
+
+      modalOk.addEventListener("click", onOk);
+      modalCancel.addEventListener("click", onCancel);
+      modalHost.addEventListener("click", onBackdrop);
+    });
+  }
+
+  async function confirmAction(title, message, okText){
+    return await openModal(
+      title,
+      `<div style="white-space:pre-wrap">${escapeHtml(message)}</div>`,
+      { okText: okText || "CONFIRM", cancelText:"CANCEL" }
+    );
+  }
+
+  // ===== Activity gating (for “live” chip + future AI gating)
+  let lastUserActionAt = 0;
+  function markActive(){ lastUserActionAt = Date.now(); }
+  window.addEventListener("pointerdown", markActive, { passive:true });
+  window.addEventListener("keydown", markActive, { passive:true });
+  function isActivelyUsed(){ return (Date.now() - lastUserActionAt) <= 20000; }
+
   // ===== State
-  const DEFAULT_ARCHIVE = () => ({
-    phase5Unlocked: false,
-    engramsSolved: 0,
-    engramsTotal: 0,
-    hasCipherKey: false,
-    awaitingRiteReset: false,
-    finalMessageRevealed: false,
-    scrambleSeed: (Math.floor(Math.random()*1e9) >>> 0)
-  });
+  const FINAL_MESSAGE = "Greetings! This is a warning. Prepare for invasion. They are coming";
 
   const state = {
     username: "Operator",
@@ -415,153 +580,79 @@ canvas{display:block;width:100%;height:84px;}
 
     updatedAtMs: Date.now(),
     lastTickMs: Date.now(),
-    lastUserActionAt: 0,
-
-    archive: DEFAULT_ARCHIVE(),
 
     upgrades: {
       dish: 0, scan: 0, probes: 0, tuning: 0,
       autopinger: 0, echo: 0, lattice: 0, dark: 0,
-      purifier: 0, firewall: 0, deadband: 0, decoderRig: 0,
+      firewall: 0, purifier: 0, deadband: 0, decoderRig: 0,
       relicAmp: 0
+    },
+
+    archive: {
+      engramsSolved: 0,
+      engramsTotal: FINAL_MESSAGE.length,
+      hasCipherKey: false,
+      awaitingRiteReset: false,
+      finalMessageRevealed: false,
+      scrambleSeed: (Math.floor(Math.random()*1e9)>>>0)
     }
   };
-  window.SYGN1L = state;
+  window.SYGN1L_STATE = state;
 
-  // ===== Activity gating
-  function markActive(){ state.lastUserActionAt = Date.now(); }
-  window.addEventListener("pointerdown", markActive, { passive:true });
-  window.addEventListener("keydown", markActive, { passive:true });
-  const isActivelyUsed = () => (Date.now() - state.lastUserActionAt) <= 20000;
+  // ===== Prestige gain (✅ was missing)
+  function prestigeGain(){
+    const THRESH = 12000;
+    const over = Math.max(0, state.total - THRESH);
+    const base = 1;
+    const extra = Math.floor(Math.sqrt(over / 6000));
+    return base + extra;
+  }
 
-  // ===== Local save migration
-  const LOCAL_KEY = "sygn1l_save_v6";
-  const LEGACY_KEYS = [
-    "sygn1l_cloudsave_v3","sygn1l_cloudsave_v2","sygn1l_cloudsave_v1",
-    "sygn1l_save_v5","sygn1l_save_v4","sygn1l_save_v3","sygn1l_save_v2","sygn1l_save_v1"
+  // ===== Upgrades
+  const lv = (id)=>state.upgrades[id]||0;
+  function upgradeCost(u){
+    return Math.floor(u.baseCost * Math.pow(u.costMult, lv(u.id)));
+  }
+
+  const UPG = [
+    { id:"dish", name:"DISH CALIBRATION", unlockAt:0, baseCost:10, costMult:1.18,
+      desc:"+1 SIGNAL/SEC PER LEVEL.", buy(){ state.upgrades.dish++; } },
+
+    { id:"scan", name:"DEEP SCAN", unlockAt:100, baseCost:50, costMult:1.25,
+      desc:"+10% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.scan++; } },
+
+    { id:"probes", name:"PROBE SWARM", unlockAt:120, baseCost:80, costMult:1.22,
+      desc:"+1 CLICK POWER PER LEVEL.", buy(){ state.upgrades.probes++; } },
+
+    { id:"tuning", name:"HARMONIC TUNING", unlockAt:240, baseCost:140, costMult:1.27,
+      desc:"+0.35 SPS +1% BANDWIDTH PER LEVEL.", buy(){ state.upgrades.tuning++; } },
+
+    { id:"autopinger", name:"AUTO-PINGER ROUTINE", unlockAt:600, baseCost:520, costMult:1.30,
+      desc:"ADDS AUTO-PINGS/SEC. SCALES WITH PROBES.", buy(){ state.upgrades.autopinger++; } },
+
+    { id:"echo", name:"ECHO INTEGRATOR", unlockAt:1800, baseCost:1400, costMult:1.35,
+      desc:"BANDWIDTH BONUS SCALES WITH LOG(SIGNAL).", buy(){ state.upgrades.echo++; } },
+
+    { id:"lattice", name:"HARMONIC LATTICE", unlockAt:3500, baseCost:3200, costMult:1.38,
+      desc:"SPS MULT SCALES WITH CORRUPTION.", buy(){ state.upgrades.lattice++; } },
+
+    { id:"dark", name:"DARK LISTENING", unlockAt:7000, baseCost:9000, costMult:1.45,
+      desc:"IF CORRUPTION>30%: GAINS × (1 + 0.12*LV).", buy(){ state.upgrades.dark++; } },
+
+    { id:"firewall", name:"FIREWALL SIGIL", unlockAt:9000, baseCost:8500, costMult:1.42,
+      desc:"SLOWS CORRUPTION GROWTH PER LEVEL.", buy(){ state.upgrades.firewall++; } },
+
+    { id:"purifier", name:"SIGNAL PURIFIER", unlockAt:11000, baseCost:12000, costMult:1.48,
+      desc:"PASSIVELY REDUCES CORRUPTION OVER TIME.", buy(){ state.upgrades.purifier++; } },
+
+    { id:"deadband", name:"DEADBAND AMPLIFIER", unlockAt:13000, baseCost:16000, costMult:1.52,
+      desc:"+BANDWIDTH BUT ADDS CORRUPTION PRESSURE.", buy(){ state.upgrades.deadband++; } },
+
+    { id:"decoderRig", name:"DECODER RIG", unlockAt:15000, baseCost:24000, costMult:1.60,
+      desc:"REDUCES ENGRAM COSTS BY 6% PER LEVEL.", buy(){ state.upgrades.decoderRig++; } }
   ];
 
-  function mergeIntoState(data){
-    if (!data || typeof data !== "object") return;
-
-    const arch = (data.archive && typeof data.archive === "object") ? data.archive : null;
-    data.archive = Object.assign(DEFAULT_ARCHIVE(), arch || {});
-    data.upgrades = Object.assign({}, state.upgrades, data.upgrades || {});
-
-    for (const k in data){
-      if (data[k] && typeof data[k] === "object" && state[k] && typeof state[k] === "object"){
-        Object.assign(state[k], data[k]);
-      } else {
-        state[k] = data[k];
-      }
-    }
-  }
-
-  function tryParseState(raw){
-    try{
-      const data = JSON.parse(raw);
-      const t = Number(data.updatedAtMs || data.lastTickMs || 0);
-      return { data, t: Number.isFinite(t) ? t : 0 };
-    } catch { return null; }
-  }
-
-  function saveLocal(){
-    state.updatedAtMs = Date.now();
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
-  }
-
-  function loadLocal(){
-    const keys = [LOCAL_KEY, ...LEGACY_KEYS];
-    let best = null;
-
-    for (const k of keys){
-      const raw = localStorage.getItem(k);
-      if (!raw) continue;
-      const parsed = tryParseState(raw);
-      if (!parsed) continue;
-      if (!best || parsed.t > best.t) best = { key:k, data:parsed.data, t:parsed.t };
-    }
-    if (!best) return false;
-
-    mergeIntoState(best.data);
-    if (best.key !== LOCAL_KEY){
-      saveLocal();
-      pushComms("SYS", `LOCAL SAVE MIGRATED (${best.key} → ${LOCAL_KEY})`);
-    } else {
-      pushComms("SYS", "LOCAL SAVE LOADED.");
-    }
-    return true;
-  }
-
-  // ===== Supabase saves (cloud)
-  let userId = null;
-  let cloudReady = false;
-  let lastCloudSaveAt = 0;
-
-  async function ensureSession(){
-    try{
-      let { data: { session } } = await supabase.auth.getSession();
-      if (!session){
-        const { data, error } = await supabase.auth.signInAnonymously();
-        if (error) throw error;
-        session = data.session;
-      }
-      userId = session.user.id;
-      cloudReady = true;
-      return userId;
-    } catch {
-      cloudReady = false;
-      return null;
-    }
-  }
-
-  async function loadCloud(){
-    if (!cloudReady || !userId) return null;
-    try{
-      const { data, error } = await supabase
-        .from("saves")
-        .select("state, updated_at")
-        .eq("player_id", userId)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data || !data.state) return null;
-
-      const cloudState = data.state;
-      const cloudUpdatedMs = cloudState.updatedAtMs || (data.updated_at ? Date.parse(data.updated_at) : 0);
-      return { cloudState, cloudUpdatedMs };
-    } catch {
-      cloudReady = false;
-      return null;
-    }
-  }
-
-  async function saveCloud(force=false){
-    if (!cloudReady || !userId) return false;
-
-    const now = Date.now();
-    if (!force && (now - lastCloudSaveAt) < 45000) return false;
-    lastCloudSaveAt = now;
-
-    try{
-      state.updatedAtMs = Date.now();
-      const payload = {
-        player_id: userId,
-        updated_at: new Date().toISOString(),
-        state: JSON.parse(JSON.stringify(state))
-      };
-      const { error } = await supabase.from("saves").upsert(payload);
-      if (error) throw error;
-      return true;
-    } catch {
-      cloudReady = false;
-      return false;
-    }
-  }
-
   // ===== Derived math
-  const lv = (id)=>state.upgrades[id]||0;
-  const cost = (u)=>Math.floor(u.baseCost * Math.pow(u.costMult, lv(u.id)));
-
   function computeBaseSPS(){ return lv("dish")*1.0 + lv("tuning")*0.35; }
   function computeClickPower(){ return 1 + lv("probes")*1.0; }
   function computeBaseBandwidth(){
@@ -575,7 +666,7 @@ canvas{display:block;width:100%;height:84px;}
     const e = lv("echo");
     return e<=0 ? 1 : (1 + 0.03*e*Math.log10(state.signal+1));
   }
-  function computeRelicMultiplier(){ return 1 + 0.08*(state.upgrades.relicAmp||0); }
+  function computeRelicMultiplier(){ return 1 + 0.08*lv("relicAmp"); }
   function computeLatticeMultiplier(){
     const l = lv("lattice");
     if (l<=0) return 1;
@@ -620,67 +711,17 @@ canvas{display:block;width:100%;height:84px;}
     }
   }
 
-  // ===== Upgrades list
-  const UPG = [
-    { id:"dish", name:"DISH CALIBRATION", unlockAt:0, baseCost:10, costMult:1.18,
-      desc:"+1 SIGNAL/SEC PER LEVEL.", buy(){ state.upgrades.dish++; } },
-
-    { id:"scan", name:"DEEP SCAN", unlockAt:100, baseCost:50, costMult:1.25,
-      desc:"+10% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.scan++; } },
-
-    { id:"probes", name:"PROBE SWARM", unlockAt:120, baseCost:80, costMult:1.22,
-      desc:"+1 CLICK POWER PER LEVEL.", buy(){ state.upgrades.probes++; } },
-
-    { id:"tuning", name:"HARMONIC TUNING", unlockAt:240, baseCost:140, costMult:1.27,
-      desc:"+0.35 SPS +1% BANDWIDTH PER LEVEL.", buy(){ state.upgrades.tuning++; } },
-
-    { id:"autopinger", name:"AUTO-PINGER ROUTINE", unlockAt:600, baseCost:520, costMult:1.30,
-      desc:"ADDS AUTO-PINGS/SEC. SCALES WITH PROBES.", buy(){ state.upgrades.autopinger++; } },
-
-    { id:"echo", name:"ECHO INTEGRATOR", unlockAt:1800, baseCost:1400, costMult:1.35,
-      desc:"BANDWIDTH BONUS SCALES WITH LOG(SIGNAL).", buy(){ state.upgrades.echo++; } },
-
-    { id:"lattice", name:"HARMONIC LATTICE", unlockAt:3500, baseCost:3200, costMult:1.38,
-      desc:"SPS MULT SCALES WITH CORRUPTION.", buy(){ state.upgrades.lattice++; } },
-
-    { id:"dark", name:"DARK LISTENING", unlockAt:7000, baseCost:9000, costMult:1.45,
-      desc:"IF CORRUPTION>30%: GAINS × (1 + 0.12*LV).", buy(){ state.upgrades.dark++; } },
-
-    { id:"firewall", name:"FIREWALL SIGIL", unlockAt:9000, baseCost:8500, costMult:1.42,
-      desc:"SLOWS CORRUPTION GROWTH PER LEVEL.", buy(){ state.upgrades.firewall++; } },
-
-    { id:"purifier", name:"SIGNAL PURIFIER", unlockAt:11000, baseCost:12000, costMult:1.48,
-      desc:"PASSIVELY REDUCES CORRUPTION OVER TIME.", buy(){ state.upgrades.purifier++; } },
-
-    { id:"deadband", name:"DEADBAND AMPLIFIER", unlockAt:13000, baseCost:16000, costMult:1.52,
-      desc:"+BANDWIDTH BUT ADDS CORRUPTION PRESSURE.", buy(){ state.upgrades.deadband++; } },
-
-    { id:"decoderRig", name:"DECODER RIG", unlockAt:15000, baseCost:24000, costMult:1.60,
-      desc:"REDUCES ENGRAM COSTS BY 6% PER LEVEL.", buy(){ state.upgrades.decoderRig++; } },
-  ];
-
-  // ===== Phases
+  // ===== Phases (simple)
   const PHASE2 = 500, PHASE3 = 1800, PHASE4 = 9000, PHASE5 = 15000;
-  function setPhase(p){
-    state.phase = Math.max(state.phase, p);
-    $("phase").textContent = p===1?"PHASE I":p===2?"PHASE II":p===3?"PHASE III":p===4?"PHASE IV":"PHASE V";
-  }
   function phaseCheck(){
-    if (state.total >= PHASE2) setPhase(2);
-    if (state.total >= PHASE3) setPhase(3);
-    if (state.total >= PHASE4) setPhase(4);
-    if (state.total >= PHASE5) setPhase(5);
+    const p = state.total >= PHASE5 ? 5 :
+              state.total >= PHASE4 ? 4 :
+              state.total >= PHASE3 ? 3 :
+              state.total >= PHASE2 ? 2 : 1;
+    state.phase = Math.max(state.phase, p);
   }
 
-  // ===== Decoder
-  const FINAL_MESSAGE = "Greetings! This is a warning. Prepare for invasion. They are coming";
-  function initDecoderIfNeeded(){
-    if (!state.archive || typeof state.archive !== "object") state.archive = DEFAULT_ARCHIVE();
-    if (!state.archive.engramsTotal || state.archive.engramsTotal <= 0){
-      state.archive.engramsTotal = FINAL_MESSAGE.length;
-      state.archive.engramsSolved = clamp(state.archive.engramsSolved, 0, state.archive.engramsTotal);
-    }
-  }
+  // ===== Decoder (Phase V)
   function engramCost(){
     const n = state.archive.engramsSolved;
     const rigDiscount = Math.pow(0.94, lv("decoderRig"));
@@ -688,6 +729,7 @@ canvas{display:block;width:100%;height:84px;}
     const ramp = Math.pow(1.14, n);
     return Math.floor(base * ramp * rigDiscount);
   }
+
   function scrambleDisplay(seed, revealedCount){
     const text = FINAL_MESSAGE;
     const len = text.length;
@@ -699,16 +741,10 @@ canvas{display:block;width:100%;height:84px;}
       return (s >>> 0) / 4294967296;
     };
 
-    const idx = [...Array(len).keys()];
-    for (let i = len - 1; i > 0; i--){
-      const j = Math.floor(rnd() * (i+1));
-      [idx[i], idx[j]] = [idx[j], idx[i]];
-    }
-    const revealedPos = new Set(idx.slice(0, revealedCount));
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!?.,:;-' ";
     const out = [];
     for (let i=0;i<len;i++){
-      if (revealedPos.has(i)) out.push(text[i]);
+      if (i < revealedCount) out.push(text[i]);
       else out.push(alphabet[Math.floor(rnd()*alphabet.length)]);
     }
     return out.join("");
@@ -716,13 +752,10 @@ canvas{display:block;width:100%;height:84px;}
 
   function renderDecoder(){
     const root = $("decoder");
-    initDecoderIfNeeded();
+    if (!root) return;
 
     if (state.phase < 5){
-      root.innerHTML = `<div class="subtitle">STATUS: LOCKED</div>
-      <div style="margin-top:10px;color:var(--muted);font-size:12px;line-height:1.5">
-        Reach PHASE V (15,000 total signal) to unlock the decoder.
-      </div>`;
+      root.innerHTML = `<div class="muted">STATUS: LOCKED. REACH PHASE V (15,000 TOTAL SIGNAL).</div>`;
       return;
     }
 
@@ -735,20 +768,13 @@ canvas{display:block;width:100%;height:84px;}
     const canBuy = state.signal >= price && !done;
 
     root.innerHTML = `
-      <div class="subtitle">STATUS: ${done ? "CIPHER KEY ACQUIRED" : "DECRYPTING"}</div>
-
+      <div class="muted">STATUS: ${done ? "CIPHER KEY ACQUIRED" : "DECRYPTING"}</div>
       <div style="margin-top:10px;border:1px solid rgba(57,255,106,.25);border-radius:12px;padding:10px;background:rgba(0,0,0,.30)">
         <div style="font-size:10px;letter-spacing:.12em;color:var(--muted);margin-bottom:6px">INTERCEPTED STRING</div>
-        <div style="white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.55">
-          ${escapeHtml(scrambled)}
-        </div>
+        <div style="white-space:pre-wrap;word-break:break-word;font-size:12px;line-height:1.55">${escapeHtml(scrambled)}</div>
       </div>
-
-      <div style="margin-top:10px;font-size:12px;color:var(--muted)">
-        ENGRAMS: <b style="color:var(--text)">${solved}</b> / ${total}
-      </div>
-
-      <div style="margin-top:12px;display:grid;gap:10px;grid-template-columns:1fr">
+      <div class="muted" style="margin-top:10px">ENGRAMS: <b style="color:var(--text)">${solved}</b> / ${total}</div>
+      <div style="margin-top:12px">
         <button id="decryptBtn" ${canBuy ? "" : "disabled"}>
           ${done ? "DECRYPT COMPLETE" : (canBuy ? `DECRYPT ENGRAM (COST ${fmt(price)})` : `INSUFFICIENT SIGNAL (COST ${fmt(price)})`)}
         </button>
@@ -757,11 +783,9 @@ canvas{display:block;width:100%;height:84px;}
 
     const btn = $("decryptBtn");
     if (btn){
-      btn.addEventListener("click", async () => {
+      btn.onclick = () => {
         markActive();
-        initDecoderIfNeeded();
-
-        // recompute at click-time (no stale affordability)
+        // recompute at click time
         const priceNow = engramCost();
         if (state.signal < priceNow) return;
 
@@ -772,41 +796,172 @@ canvas{display:block;width:100%;height:84px;}
           state.archive.engramsSolved = state.archive.engramsTotal;
           state.archive.hasCipherKey = true;
           state.archive.awaitingRiteReset = true;
-          pushComms("DR KESS", `${state.username}, final engram is a key. We need a Rite Reset to apply it.`);
+          popupComms("DR KESS", `${state.username}, final engram is a key. We need a Rite Reset to apply it.`);
+          pushLog("comms","DR KESS", `${state.username}, final engram is a key. We need a Rite Reset to apply it.`);
         }
 
-        saveLocal(); await saveCloud(false);
-        renderHUD(); renderUpgrades(); renderDecoder();
-      });
+        touchUpdated();
+        renderHUD();
+        renderUpgrades();
+        renderDecoder();
+        saveLocal();
+        saveCloud(false);
+      };
     }
-  }function prestigeGain(){
-  // Unlock threshold for Rite Reset
-  const THRESH = 12000;
-
-  // Extra relics scale gently after threshold
-  const over = Math.max(0, state.total - THRESH);
-
-  // Base relic always 1 once you can reset
-  const base = 1;
-
-  // +1 relic per ~6000 signal “over”, square-root softened
-  const extra = Math.floor(Math.sqrt(over / 6000));
-
-  return base + extra;
-}
-
-  // ===== Rite Reset / Wipe
-  function prestigeGain(){
-    const over = Math.max(0, state.total - 12000);
-    return 1 + Math.floor(Math.sqrt(over / 6000));
   }
 
-  function doRiteReset(){
-    const keepArchive = JSON.parse(JSON.stringify(state.archive || DEFAULT_ARCHIVE()));
-    const keepUsername = state.username;
+  // ===== Saves (Local + Cloud)
+  const LOCAL_KEY = "sygn1l_save_vA";
+  let userId = null;
+  let cloudReady = false;
+  let lastCloudSaveAt = 0;
 
-    state.relics += prestigeGain();
+  function touchUpdated(){ state.updatedAtMs = Date.now(); }
+
+  function saveLocal(){
+    touchUpdated();
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
+    $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
+  }
+
+  function loadLocal(){
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if (!raw) return false;
+    try{
+      const data = JSON.parse(raw);
+      Object.assign(state, data);
+      // ensure nested objects exist
+      state.upgrades = Object.assign({
+        dish:0,scan:0,probes:0,tuning:0,autopinger:0,echo:0,lattice:0,dark:0,
+        firewall:0,purifier:0,deadband:0,decoderRig:0,relicAmp:0
+      }, state.upgrades||{});
+      state.archive = Object.assign({
+        engramsSolved:0,engramsTotal:FINAL_MESSAGE.length,hasCipherKey:false,awaitingRiteReset:false,finalMessageRevealed:false,
+        scrambleSeed:(Math.floor(Math.random()*1e9)>>>0)
+      }, state.archive||{});
+      return true;
+    }catch(_){ return false; }
+  }
+
+  async function ensureSession(){
+    try{
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session){
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) throw error;
+        session = data.session;
+      }
+      userId = session.user.id;
+      cloudReady = true;
+      $("syncChip").textContent = "SYNC: CLOUD";
+      return userId;
+    } catch {
+      cloudReady = false;
+      $("syncChip").textContent = "SYNC: OFFLINE";
+      return null;
+    }
+  }
+
+  async function loadCloud(){
+    if (!cloudReady || !userId) return null;
+    try{
+      const { data, error } = await supabase
+        .from("saves")
+        .select("state, updated_at")
+        .eq("player_id", userId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data?.state) return null;
+
+      const cloudState = data.state;
+      const cloudUpdatedMs = cloudState.updatedAtMs || (data.updated_at ? Date.parse(data.updated_at) : 0);
+      return { cloudState, cloudUpdatedMs };
+    } catch {
+      cloudReady = false;
+      $("syncChip").textContent = "SYNC: OFFLINE";
+      return null;
+    }
+  }
+
+  async function saveCloud(force=false){
+    if (!cloudReady || !userId) return false;
+    const now = Date.now();
+    if (!force && (now - lastCloudSaveAt) < 45000) return false;
+    lastCloudSaveAt = now;
+
+    try{
+      touchUpdated();
+      const payload = {
+        player_id: userId,
+        updated_at: new Date().toISOString(),
+        state: JSON.parse(JSON.stringify(state))
+      };
+      const { error } = await supabase.from("saves").upsert(payload);
+      if (error) throw error;
+      $("syncChip").textContent = "SYNC: CLOUD+LOCAL";
+      return true;
+    } catch {
+      cloudReady = false;
+      $("syncChip").textContent = "SYNC: OFFLINE";
+      return false;
+    }
+  }
+
+  async function initSaves(){
+    const hasLocal = loadLocal();
+    await ensureSession();
+    const cloud = await loadCloud();
+
+    if (cloud?.cloudState){
+      const localUpdated = state.updatedAtMs || 0;
+      if (cloud.cloudUpdatedMs > localUpdated){
+        Object.assign(state, cloud.cloudState);
+        pushLog("log","SYS","CLOUD SAVE LOADED (NEWER THAN LOCAL).");
+      } else if (cloudReady) {
+        await saveCloud(true);
+        pushLog("log","SYS","LOCAL SAVE PUSHED TO CLOUD (NEWER).");
+      }
+    } else {
+      if (hasLocal) pushLog("log","SYS","LOCAL SAVE LOADED.");
+      else {
+        pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
+        pushLog("comms","OPS","Ping the Void so we can establish signal integrity.");
+        pushLog("comms","DR KESS","We need you to calibrate the dishes. That’s how the snowball starts.");
+      }
+    }
+  }
+
+  // ===== Username edit (tap USER chip)
+  async function editUsername(){
+    const html = `
+      <div class="muted" style="margin:0 0 10px">Set a callsign. Used in comms.</div>
+      <input id="nameInput" maxlength="18"
+        value="${escapeHtml(state.username === "Operator" ? "" : state.username)}"
+        placeholder="e.g. Corey"
+        style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(57,255,106,.35);background:rgba(0,0,0,.35);color:var(--text);font:inherit" />`;
+    const ok = await openModal("SET USERNAME", html, { okText:"SAVE", cancelText:"CANCEL" });
+    if (!ok) return;
+
+    const v = ($("nameInput")?.value || "").trim().replace(/\s+/g," ");
+    state.username = v || "Operator";
+    $("userChip").textContent = "USER: " + state.username;
+
+    touchUpdated();
+    saveLocal();
+    saveCloud(true);
+
+    popupComms("OPS", `Alright, ${state.username}. Callsign confirmed.`);
+  }
+
+  // ===== Rite Reset
+  function doRiteReset(){
+    const gainR = prestigeGain();
+    state.relics += gainR;
     state.build += 1;
+
+    // Keep archive + username
+    const keepArchive = JSON.parse(JSON.stringify(state.archive));
+    const keepName = state.username;
 
     state.signal = 0;
     state.total = 0;
@@ -816,86 +971,202 @@ canvas{display:block;width:100%;height:84px;}
     for (const k in state.upgrades) state.upgrades[k] = 0;
 
     state.archive = keepArchive;
-    state.username = keepUsername;
+    state.username = keepName;
 
+    // If cipher key solved, Rite Reset reveals the real message
     if (state.archive.awaitingRiteReset && state.archive.hasCipherKey && !state.archive.finalMessageRevealed){
       state.archive.awaitingRiteReset = false;
       state.archive.finalMessageRevealed = true;
-      pushComms("DECRYPT", FINAL_MESSAGE);
-      pushComms("OPS", `…We have a clean decode, ${state.username}. That’s not a drill.`);
+      popupComms("DECRYPT", FINAL_MESSAGE);
+      pushLog("comms","DECRYPT", FINAL_MESSAGE);
+      pushLog("log","SYS","CIPHER KEY APPLIED. STRING UNSCRAMBLED.");
     }
   }
 
-  // ===== Briefing
-  async function showBriefing(){
-    const html = `
-<div style="white-space:pre-wrap">
-<b>HOME BASE COMMUNIQUE</b>
+  // ===== Objective
+  function updateObjective(){
+    const o = $("objective");
+    if (!o) return;
 
-${escapeHtml(`Operator ${state.username}:
-
-Ping the Void to generate Signal.
-Spend Signal on Buffs to increase Signal/second and Bandwidth.
-As Signal accumulates, phases unlock and the Array begins to answer.
-
-Early steps:
-1) Buy DISH CALIBRATION (starts Signal/second).
-2) Reach 100 total Signal to unlock DEEP SCAN.
-3) Push toward PHASE V to unlock the decoder.
-
-Corruption is pressure: it can empower upgrades, but it also destabilizes the Array.
-
-Proceed.`)}
-</div>`;
-    await openModal("BRIEFING", html, { okText:"ACKNOWLEDGED", cancelText:"CLOSE" });
+    if (state.total < 100) o.textContent = "OBJECTIVE: BUY DISH CALIBRATION. REACH 100 TOTAL SIGNAL FOR DEEP SCAN.";
+    else if (state.total < 600) o.textContent = "OBJECTIVE: UNLOCK AUTO-PINGER AT 600 TOTAL SIGNAL. PUSH SIGNAL/SEC.";
+    else if (state.total < 3500) o.textContent = "OBJECTIVE: PREPARE HARMONIC LATTICE AT 3500 TOTAL SIGNAL. WATCH CORRUPTION.";
+    else if (state.total < 12000) o.textContent = "OBJECTIVE: RITE RESET UNLOCKS AT 12,000 TOTAL SIGNAL. RELICS PERSIST.";
+    else if (state.total < 15000) o.textContent = "OBJECTIVE: PHASE V AT 15,000 TOTAL SIGNAL UNLOCKS THE DECODER.";
+    else o.textContent = "OBJECTIVE: DECRYPT ENGRAMS. APPLY CIPHER KEY VIA RITE RESET.";
   }
 
-  // ===== Username editing
-  async function editUsername(){
-    const html = `
-<div style="font-size:12px;line-height:1.55;color:rgba(207,255,214,.92)">
-  <div style="margin-bottom:10px;color:var(--muted)">Set a callsign. Used in comms.</div>
-  <input id="nameInput" maxlength="18"
-    value="${escapeHtml(state.username === "Operator" ? "" : state.username)}"
-    placeholder="e.g. Corey"
-    style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(57,255,106,.35);background:rgba(0,0,0,.35);color:var(--text);font:inherit"/>
-</div>`;
-    const ok = await openModal("SET USERNAME", html, { okText:"SAVE", cancelText:"CANCEL" });
-    if (!ok) return;
-    const el = $("nameInput");
-    let v = (el?.value || "").trim().replace(/\s+/g," ");
-    if (!v) v = "Operator";
-    state.username = v;
-    renderHUD();
-    saveLocal(); await saveCloud(true);
-    pushComms("OPS", `Alright, ${state.username}. Callsign confirmed.`);
+  // ===== HUD render (includes ✅ RITE RESET (+X RELICS))
+  function renderHUD(){
+    $("signal").textContent = fmt(state.signal);
+    $("sps").textContent = fmt(sps());
+    $("bw").textContent = state.bandwidth.toFixed(2) + "×";
+
+    $("buildChip").textContent = "BUILD: " + state.build;
+    $("relicChip").textContent = "RELICS: " + state.relics;
+
+    $("phase").textContent =
+      state.phase===1 ? "PHASE I" :
+      state.phase===2 ? "PHASE II" :
+      state.phase===3 ? "PHASE III" :
+      state.phase===4 ? "PHASE IV" : "PHASE V";
+
+    $("userChip").textContent = "USER: " + state.username;
+
+    const live = $("liveChip");
+    if (live){
+      live.textContent = isActivelyUsed() ? "LIVE: ACTIVE" : "LIVE: IDLE";
+      live.style.opacity = isActivelyUsed() ? "1" : "0.65";
+    }
+
+    // Corruption bar
+    const c = clamp(state.corruption,0,1);
+    $("corrFill").style.width = (c*100).toFixed(1) + "%";
+    $("corrText").textContent = (c*100).toFixed(1) + "% (" + corruptionLabel(c) + ")";
+
+    // Prestige button label
+    const btn = $("prestige");
+    const canReset = state.total >= 12000;
+    const gainR = prestigeGain();
+    btn.disabled = !canReset;
+    btn.textContent = canReset ? `RITE RESET (+${gainR} RELICS)` : "RITE RESET (LOCKED)";
+
+    $("status").textContent =
+      state.phase<=1 ? "ARRAY: STABLE" :
+      state.phase===2 ? "ARRAY: DRIFT" :
+      state.phase===3 ? "ARRAY: ACTIVE" :
+      state.phase===4 ? "ARRAY: FRACTURE" : "ARRAY: OPEN";
+
+    updateObjective();
+    updateScopeLabel();
   }
 
-  // ===== Casual human chatter every 4–6 mins (active only)
-  let nextChatterAt = Date.now() + 120000;
-  const CHATTER = [
-    (n)=>`Hey ${n}. Quick check in. You alright?`,
-    (n)=>`If you need a breather, take it. The Array isn’t going anywhere.`,
-    (n)=>`Okay, that spike was not normal. You saw it too, right ${n}?`,
-    (n)=>`Not gonna lie, ${n}, I hate how it “feels” when the scope locks in.`,
-    (n)=>`Coffee update: it’s awful. Signal update: how’s yours, ${n}?`,
-    (n)=>`${n}, reminder: dishes first. Everything else starts behaving after that.`,
-    (n)=>`We’re all pretending this is science. It’s… not. Keep going, ${n}.`,
-    (n)=>`I’m here if you want to pause. But also… don’t stop now, ${n}.`,
-  ];
-  const SPEAKERS = ["OPS","TECH RIV","DR KESS","LT VANCE"];
+  // ===== Locked buttons fix (critical)
+  // - Re-render upgrades periodically
+  // - Recompute affordability inside click handler (no stale closure)
+  function renderUpgrades(){
+    const root = $("upgrades");
+    root.innerHTML = "";
 
-  function maybeChatter(){
-    const now = Date.now();
-    if (document.visibilityState !== "visible") return;
-    if (!isActivelyUsed()) return;
-    if (now < nextChatterAt) return;
+    for (const u of UPG){
+      const unlocked = state.total >= u.unlockAt;
+      const lvlNow = lv(u.id);
+      const price = upgradeCost(u);
+      const affordable = unlocked && state.signal >= price;
 
-    const who = SPEAKERS[Math.floor(Math.random()*SPEAKERS.length)];
-    const line = CHATTER[Math.floor(Math.random()*CHATTER.length)](state.username || "Operator");
-    pushComms(who, line);
+      const row = document.createElement("div");
+      row.className = "up" + (affordable ? " affordable" : "") + (!unlocked ? " locked" : "");
 
-    nextChatterAt = now + (240000 + Math.floor(Math.random()*120000));
+      const meta = document.createElement("div");
+      meta.className = "meta";
+
+      meta.innerHTML = `
+        <div class="name">${escapeHtml(u.name)} (LV ${lvlNow})</div>
+        <div class="desc">${escapeHtml(unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlockAt)} TOTAL SIGNAL.`)}</div>
+        <div class="cost">${unlocked ? `COST: ${fmt(price)} SIGNAL` : "STATUS: LOCKED"}</div>
+      `;
+
+      const btn = document.createElement("button");
+      btn.textContent = unlocked ? (affordable ? "ACQUIRE" : "LOCKED") : "CLASSIFIED";
+      btn.disabled = !affordable;
+
+      btn.onclick = () => {
+        markActive();
+
+        // ✅ recompute at click time
+        const unlockedNow = state.total >= u.unlockAt;
+        const priceNow = upgradeCost(u);
+        const canBuyNow = unlockedNow && state.signal >= priceNow;
+        if (!canBuyNow) return;
+
+        state.signal -= priceNow;
+        u.buy();
+
+        touchUpdated();
+        recompute();
+        renderHUD();
+        renderUpgrades();
+        renderDecoder();
+
+        saveLocal();
+        saveCloud(false);
+      };
+
+      row.appendChild(meta);
+      row.appendChild(btn);
+      root.appendChild(row);
+    }
+  }
+
+  // ===== Scope / Noise visualiser
+  const scope = $("scope");
+  const ctx = scope.getContext("2d", { alpha:false });
+  let sw=0, sh=0, dpr=1;
+  let sigPhase = 0;
+
+  function resizeScope(){
+    dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const cssW = scope.clientWidth || 320;
+    const cssH = 84;
+    scope.width = Math.floor(cssW * dpr);
+    scope.height = Math.floor(cssH * dpr);
+    sw = scope.width;
+    sh = scope.height;
+  }
+  window.addEventListener("resize", resizeScope);
+
+  function lockValue(){
+    const a = clamp(Math.log10(state.total + 1) / 5, 0, 1);
+    const b = clamp((state.bandwidth - 1) / 4, 0, 1);
+    const c = clamp(Math.log10(sps() + 1) / 4, 0, 1);
+    const raw = (0.45*a + 0.35*b + 0.20*c);
+    const corrupted = raw * (1 - 0.55*state.corruption);
+    return clamp(corrupted, 0, 1);
+  }
+  function updateScopeLabel(){
+    const lk = lockValue();
+    $("scopeLabel").textContent = "LOCK: " + Math.round(lk*100) + "%";
+  }
+
+  function drawScope(dt, nowMs){
+    if (!sw || !sh) return;
+
+    const lk = lockValue();
+    const corr = state.corruption;
+
+    ctx.fillStyle = "rgb(0,0,0)";
+    ctx.fillRect(0,0,sw,sh);
+
+    const noiseAmt = clamp(0.85 - 0.70*lk + 0.35*corr, 0.15, 0.95);
+    const spikeProb = clamp(0.04 + 0.36*lk, 0.04, 0.70);
+
+    const px = Math.max(1, Math.floor(dpr));
+
+    for (let y=0;y<sh;y+=px){
+      for (let x=0;x<sw;x+=px){
+        if (Math.random() < noiseAmt){
+          const g = Math.floor(150 + 90*Math.random());
+          ctx.fillStyle = `rgb(0,${g},0)`;
+          ctx.fillRect(x,y,px,px);
+        }
+      }
+    }
+
+    sigPhase += dt * (0.6 + 1.8*lk) * (1 + 0.8*corr);
+    const midY = Math.floor(sh*0.60);
+
+    ctx.strokeStyle = "rgba(57,255,106,0.85)";
+    ctx.lineWidth = Math.max(1, 1*dpr);
+    ctx.beginPath();
+    for (let i=0;i<120;i++){
+      const x = (i/119)*(sw-1);
+      const spike = (Math.random() < spikeProb) ? (0.2 + 0.8*Math.random()) : 0;
+      const wave = Math.sin(sigPhase + i*0.12) * (0.10 + 0.15*(1-lk));
+      const tear = corr > 0.45 ? Math.sin(sigPhase*4 + i*0.22) * (0.06 + 0.10*corr) : 0;
+      const y = midY - (spike + wave + tear) * (sh * 0.70);
+      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
   }
 
   // ===== Offline progress
@@ -903,12 +1174,11 @@ Proceed.`)}
     const now = Date.now();
     const then = state.lastTickMs || state.updatedAtMs || now;
     const dtMs = clamp(now - then, 0, 1000*60*60*12);
-    const dt = dtMs / 1000;
+    const dt = dtMs/1000;
     if (dt < 10) return;
 
     recompute();
     const rate = sps();
-
     const cap = 60*20 + (state.phase*60*10) + (lv("purifier")*60*10);
     const effective = Math.min(dt, cap);
 
@@ -918,172 +1188,17 @@ Proceed.`)}
 
     updateCorruption(effective * 0.6);
 
-    pushComms("SYS", `OFFLINE RECOVERY: +${fmt(gained)} SIGNAL (${Math.floor(effective)}s simulated)`);
+    pushLog("log","SYS",`OFFLINE RECOVERY: +${fmt(gained)} SIGNAL (${Math.floor(effective)}s simulated)`);
   }
 
-  // ===== UI render
-  function renderHUD(){
-  $("signal").textContent = fmt(state.signal);
-  $("sps").textContent = fmt(sps());
-  $("bw").textContent = state.bandwidth.toFixed(2) + "×";
-  $("userChip").textContent = `USER: ${state.username}`;
-
-  const live = $("liveChip");
-  if (live){
-    live.textContent = isActivelyUsed() ? "LIVE: ACTIVE" : "LIVE: IDLE";
-    live.style.opacity = isActivelyUsed() ? "1" : "0.65";
-  }
-
-  // ✅ Corruption bar + label (only if elements exist)
-  const cf = $("corrFill");
-  const ct = $("corrText");
-  if (cf) cf.style.width = (state.corruption * 100).toFixed(1) + "%";
-  if (ct) ct.textContent =
-    (state.corruption * 100).toFixed(1) + "% (" + corruptionLabel(state.corruption) + ")";
-}
-
-  // ===== IMPORTANT FIX: renderUpgrades recomputes affordability fresh each time
-  function renderUpgrades(){
-    const root = $("upgrades");
-    root.innerHTML = "";
-
-    for (const u of UPG){
-      const unlocked = state.total >= u.unlockAt;
-      const lvlNow = lv(u.id);
-      const price = cost(u);
-      const affordable = unlocked && state.signal >= price;
-
-      const row = document.createElement("div");
-      row.className = "up";
-      row.style.borderStyle = unlocked ? "solid" : "dashed";
-      row.style.opacity = unlocked ? "1" : "0.65";
-      if (affordable) row.style.boxShadow = "0 0 18px rgba(57,255,106,.18)";
-
-      const left = document.createElement("div");
-      left.style.flex = "1";
-      left.style.minWidth = "220px";
-      left.innerHTML = `
-        <div style="font-weight:900;letter-spacing:.04em">${escapeHtml(u.name)} (LV ${lvlNow})</div>
-        <div style="margin-top:6px;font-size:12px;color:var(--muted)">
-          ${escapeHtml(unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlockAt)} TOTAL SIGNAL.`)}
-        </div>
-        <div style="margin-top:6px;font-size:12px;color:rgba(207,255,214,.92)">
-          ${unlocked ? `COST: ${fmt(price)} SIGNAL` : `STATUS: LOCKED`}
-        </div>
-      `;
-
-      const btn = document.createElement("button");
-      btn.textContent = unlocked ? (affordable ? "ACQUIRE" : "LOCKED") : "CLASSIFIED";
-      btn.disabled = !affordable;
-      btn.style.padding = "12px 14px";
-
-      // Click handler RECOMPUTES affordability at click time (no stale closure)
-      btn.addEventListener("click", async () => {
-        markActive();
-
-        const unlockedNow = state.total >= u.unlockAt;
-        const priceNow = cost(u);
-        const affordableNow = unlockedNow && state.signal >= priceNow;
-
-        if (!affordableNow) return;
-
-        state.signal -= priceNow;
-        u.buy();
-
-        saveLocal();
-        await saveCloud(false);
-
-        renderHUD();
-        renderUpgrades();
-        renderDecoder();
-      });
-
-      row.appendChild(left);
-      row.appendChild(btn);
-      root.appendChild(row);
-    }
-  }
-
-  // ===== Scope visualizer
-  const scope = $("scope");
-  const ctx = scope.getContext("2d", { alpha:false });
-  let dpr = 1, sw = 0, sh = 0;
-  let t = 0;
-
-  function resizeScope(){
-    dpr = Math.max(1, Math.min(3, window.devicePixelRatio||1));
-    const cssW = scope.clientWidth || 320;
-    const cssH = 84;
-    scope.width = Math.floor(cssW * dpr);
-    scope.height = Math.floor(cssH * dpr);
-    sw = scope.width; sh = scope.height;
-  }
-  window.addEventListener("resize", resizeScope);
-
-  function drawScope(dt){
-    if (!sw || !sh) return;
-    t += dt;
-
-    const lock = clamp((Math.log10(state.total+1)/5) * (1 - 0.55*state.corruption), 0, 1);
-
-    ctx.fillStyle = "rgb(0,0,0)";
-    ctx.fillRect(0,0,sw,sh);
-
-    const noiseAmt = clamp(0.75 - 0.55*lock + 0.25*state.corruption, 0.15, 0.9);
-    const px = Math.max(1, Math.floor(dpr));
-
-    for (let y=0;y<sh;y+=px){
-      for (let x=0;x<sw;x+=px){
-        const n = Math.random();
-        if (n < noiseAmt){
-          const g = Math.floor(120 + 130*n);
-          ctx.fillStyle = `rgb(0,${g},0)`;
-          ctx.fillRect(x,y,px,px);
-        }
-      }
-    }
-
-    const mid = Math.floor(sh*0.60);
-    ctx.strokeStyle = "rgba(57,255,106,0.85)";
-    ctx.lineWidth = Math.max(1, 1*dpr);
-    ctx.beginPath();
-    for (let i=0;i<120;i++){
-      const x = (i/119)*(sw-1);
-      const spike = (Math.random() < (0.05 + 0.35*lock)) ? (0.2 + 0.8*Math.random()) : 0;
-      const wave  = Math.sin(t*2 + i*0.12) * (0.08 + 0.12*(1-lock));
-      const corr  = state.corruption > 0.45 ? Math.sin(t*8+i*0.2)*(0.05+0.18*state.corruption) : 0;
-      const y = mid - (spike + wave + corr) * (sh*0.70);
-      if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-
-    if (state.phase >= 4){
-      const tears = Math.floor(2 + 6*state.corruption);
-      for (let i=0;i<tears;i++){
-        const x = Math.floor(Math.random()*sw);
-        ctx.fillStyle = `rgba(255,59,107,${0.03 + 0.10*state.corruption})`;
-        ctx.fillRect(x, 0, Math.max(1, Math.floor(dpr)), sh);
-      }
-    }
-  }
-function corruptionLabel(c){
-  if (c < 0.10) return "DORMANT";
-  if (c < 0.30) return "WHISPERING";
-  if (c < 0.60) return "INCIDENT";
-  if (c < 0.85) return "BREACH";
-  return "OVERRUN";
-}
-  // ===== Core loop
-  function gain(x){
-    state.signal += x;
-    state.total += x;
-  }
+  // ===== Main tick
+  function gain(x){ state.signal += x; state.total += x; }
 
   function tick(dt){
     recompute();
 
     const rate = sps();
-    if (rate > 0) gain(rate*dt);
+    if (rate > 0) gain(rate * dt);
 
     if (state.autoPingsPerSec > 0){
       const p = state.autoPingsPerSec * dt;
@@ -1092,104 +1207,105 @@ function corruptionLabel(c){
 
     updateCorruption(dt);
     phaseCheck();
-    initDecoderIfNeeded();
-    maybeChatter();
   }
 
   // ===== Controls
-  $("ping").addEventListener("click", async () => {
+  $("ping").onclick = () => {
     markActive();
     gain(state.clickPower * globalMult());
     state.corruption = clamp(state.corruption + 0.0006, 0, 1);
-    saveLocal(); await saveCloud(false);
-    renderHUD(); renderUpgrades(); renderDecoder();
-  }, { passive:true });
 
-  $("briefing").addEventListener("click", () => { markActive(); showBriefing(); }, { passive:true });
-  $("save").addEventListener("click", async () => { markActive(); saveLocal(); await saveCloud(true); pushComms("SYS","STATE SAVED."); }, { passive:true });
+    touchUpdated();
+    renderHUD();
+    renderUpgrades();
+    renderDecoder();
 
-  $("wipe").addEventListener("click", async () => {
+    saveLocal();
+    saveCloud(false);
+
+    // gentle early hints
+    if (state.total < 40) popupComms("OPS", `Ping it a few times, ${state.username}. Then buy Dish Calibration.`);
+  };
+
+  $("briefing").onclick = () => {
+    markActive();
+    openModal(
+      "HOME BASE COMMUNIQUE",
+      `<div style="white-space:pre-wrap">
+<b>SYGN1L BRIEFING</b>
+
+Operator ${escapeHtml(state.username)}:
+Ping the Void to generate Signal.
+Spend Signal on Buffs to increase Signal/sec and Bandwidth.
+As phases unlock, the Array begins to answer.
+
+When the Decoder unlocks in Phase V, each Engram reveals more of an intercepted warning.
+If it says to reset, do it. The Array forgets. You don’t.
+</div>`,
+      { okText:"ACKNOWLEDGED", cancelText:"CLOSE" }
+    );
+  };
+
+  $("save").onclick = () => {
+    markActive();
+    saveLocal();
+    saveCloud(true);
+    pushLog("log","SYS","STATE SAVED.");
+  };
+
+  $("wipe").onclick = async () => {
     markActive();
     const ok = await confirmAction("WIPE", "This will delete LOCAL and CLOUD saves.\n\nAre you sure?", "WIPE");
     if (!ok) return;
 
     localStorage.removeItem(LOCAL_KEY);
-    for (const k of LEGACY_KEYS) localStorage.removeItem(k);
-
     if (cloudReady && userId){
-      try{ await supabase.from("saves").delete().eq("player_id", userId); }catch{}
+      try{ await supabase.from("saves").delete().eq("player_id", userId); } catch(_){}
     }
     location.reload();
-  });
+  };
 
-  $("prestige").addEventListener("click", async () => {
+  $("prestige").onclick = async () => {
     markActive();
     const g = prestigeGain();
-    const ok = await confirmAction("RITE RESET", `You will reset this build for +${g} relics.\nDecoder discoveries persist.\n\nProceed?`, "RITE RESET");
+    const ok = await confirmAction("RITE RESET", `You will reset this build for +${g} relics.\nDecoder progress persists.\n\nProceed?`, "RITE RESET");
     if (!ok) return;
 
     doRiteReset();
-    saveLocal(); await saveCloud(true);
-    renderHUD(); renderUpgrades(); renderDecoder();
-  });
-
-  $("userChip").addEventListener("click", () => { markActive(); editUsername(); });
-
-  // ===== Boot comms
-  function bootComms(){
-    if ($("comms").children.length === 0){
-      pushComms("OPS", "Ping the Void so we can establish signal integrity.");
-      pushComms("DR KESS", "We need you to calibrate the dishes. That’s how the snowball starts.");
-      pushComms("TECH RIV", "If anything starts sounding like language… tell us. Immediately.");
-    }
-  }
-
-  // ===== Init + loop
-  async function init(){
-    const hadLocal = loadLocal();
-    await ensureSession();
-
-    const cloud = await loadCloud();
-    if (cloud?.cloudState){
-      const localUpdated = Number(state.updatedAtMs || 0);
-      if (cloud.cloudUpdatedMs > localUpdated){
-        mergeIntoState(cloud.cloudState);
-        pushComms("SYS", "CLOUD SAVE LOADED (NEWER THAN LOCAL).");
-      } else if (cloudReady){
-        await saveCloud(true);
-      }
-    }
-
-    applyOfflineProgress();
-
-    resizeScope();
-    bootComms();
+    touchUpdated();
+    saveLocal();
+    saveCloud(true);
 
     renderHUD();
     renderUpgrades();
     renderDecoder();
+  };
 
-    if (!hadLocal){
-      pushComms("OPS", `Welcome aboard, ${state.username}. Start with DISH CALIBRATION.`);
-    }
+  $("userChip").onclick = () => {
+    markActive();
+    editUsername();
+  };
 
-    saveLocal(); await saveCloud(true);
-  }
-
-  // ===== THE IMPORTANT FIX: periodic upgrades refresh while AFK
+  // ===== Upgrades refresh timer (Fix for “stays locked until refresh”)
   let upgradesRefreshAcc = 0;
   const UPGRADES_REFRESH_EVERY = 0.25; // seconds
 
+  // ===== Boot
+  function renderUpfront(){
+    recompute();
+    renderHUD();
+    renderUpgrades();
+    renderDecoder();
+  }
+
+  // ===== Loop
   let last = performance.now();
   function loop(now){
     const dt = Math.min(0.05, (now-last)/1000);
     last = now;
 
     tick(dt);
-    drawScope(dt);
-    renderHUD();
 
-    // periodic refresh so buttons unlock/relight while idling
     upgradesRefreshAcc += dt;
     if (upgradesRefreshAcc >= UPGRADES_REFRESH_EVERY){
       upgradesRefreshAcc = 0;
@@ -1197,22 +1313,30 @@ function corruptionLabel(c){
       renderDecoder();
     }
 
-    if (Math.random() < 0.02){
-      saveLocal();
-      saveCloud(false);
-    }
+    drawScope(dt, now|0);
+    renderHUD();
 
     state.lastTickMs = Date.now();
     requestAnimationFrame(loop);
   }
 
-  document.addEventListener("visibilitychange", async () => {
+  document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden"){
-      saveLocal(); await saveCloud(true);
+      saveLocal();
+      saveCloud(true);
     }
   });
 
-  init().then(() => requestAnimationFrame(loop));
+  // ===== Start
+  resizeScope();
+  initSaves().then(() => {
+    applyOfflineProgress();
+    renderUpfront();
+    pushLog("log","SYS","SAVE SYSTEM ONLINE: LOCAL + CLOUD (WHEN AVAILABLE).");
+  }).finally(() => {
+    renderUpfront();
+    requestAnimationFrame(loop);
+  });
 
 })();
 </script>
