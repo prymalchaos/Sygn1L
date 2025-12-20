@@ -479,7 +479,7 @@ canvas#scope{
   <section class="card">
     <div class="hd">
       <div>TRANSMISSION LOG</div>
-      <div class="muted">MILESTONES REVEAL CONTEXT</div>
+      <div class="muted">ERRORS + MILESTONES SHOW UP HERE</div>
     </div>
     <div class="pad">
       <div class="log" id="log"></div>
@@ -491,6 +491,8 @@ canvas#scope{
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (() => {
+  "use strict";
+
   const $ = (id) => document.getElementById(id);
 
   // Prevent double-click zoom on buttons
@@ -498,15 +500,69 @@ canvas#scope{
     if (e.target && e.target.closest("button")) e.preventDefault();
   }, { passive: false });
 
-  // Supabase Config (yours)
-  const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  // ====== HTML escaping
+  function escapeHtml(s){
+    return String(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+  function escapeAttr(s){ return escapeHtml(s).replaceAll("`","&#096;"); }
+
+  // ====== Logging with safety (never crash if log panel missing)
+  function safePrepend(el, node){
+    try{
+      if (el && el.prepend) el.prepend(node);
+    }catch(_){}
+  }
+  function pushLog(elId, tag, msg){
+    const el = $(elId);
+    const p = document.createElement("p");
+    p.innerHTML = `<span class="tag">${escapeHtml(tag)}</span>${msg}`;
+    safePrepend(el, p);
+  }
+
+  // Global error trap: surface crashes to the log
+  window.addEventListener("error", (e) => {
+    const msg = e?.message || "Unknown error";
+    const where = e?.filename ? `${e.filename.split("/").slice(-1)[0]}:${e.lineno||0}` : "runtime";
+    pushLog("log", "ERR", `${escapeHtml(msg)} <span class="tag">${escapeHtml(where)}</span>`);
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    const msg = (e?.reason && (e.reason.message || String(e.reason))) || "Unhandled promise rejection";
+    pushLog("log", "ERR", `${escapeHtml(msg)}`);
+  });
+
+  // ===== Popup comm bubbles (tap to close)
+  function popupComms(who, msg){
+    const host = $("popHost");
+    if (!host) return;
+
+    const kids = [...host.children];
+    if (kids.length >= 3) kids[kids.length-1].remove();
+
+    const box = document.createElement("div");
+    box.className = "pop";
+    box.innerHTML = `<div class="who">${escapeHtml(who)}</div><div class="msg">${escapeHtml(msg)}</div><div class="hint">TAP TO CLOSE</div>`;
+    box.onclick = (e) => {
+      e.stopPropagation();
+      box.classList.add("fade");
+      setTimeout(() => box.remove(), 190);
+    };
+    host.prepend(box);
+
+    setTimeout(() => {
+      if (!box.isConnected) return;
+      box.classList.add("fade");
+      setTimeout(() => box.remove(), 190);
+    }, 25000);
+  }
 
   // ===== Feedback (vibrate if possible, else tiny click)
   let feedbackOn = true;
   let audioCtx = null;
-
   function tinyClickSound(){
     if (!feedbackOn) return;
     try{
@@ -540,38 +596,16 @@ canvas#scope{
       void el.offsetWidth;
       el.classList.add("flash");
     }
-    const h = (strength === "strong") ? hapticPulse(18) : hapticPulse(10);
-    if (!h) tinyClickSound();
+    const ok = (strength === "strong") ? hapticPulse(18) : hapticPulse(10);
+    if (!ok) tinyClickSound();
   }
-
-  $("feedbackBtn").onclick = (e) => {
-    feedbackOn = !feedbackOn;
-    e.currentTarget.textContent = feedbackOn ? "FEEDBACK: ON" : "FEEDBACK: OFF";
-    feedback(e.currentTarget, "light");
-    markActive("toggle_feedback");
-  };
 
   // ===== Modal confirm / prompt
-  function escapeHtml(s){
-    return String(s)
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
-  function escapeAttr(s){
-    return String(s)
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
-
   function confirmAction({title, body, okText="CONFIRM", cancelText="CANCEL", danger=true, tag="SYGN1L"}){
     return new Promise((resolve) => {
       const host = $("modalHost");
+      if (!host) return resolve(false);
+
       $("modalTitle").textContent = title;
       $("modalBody").innerHTML = body;
       $("modalOk").textContent = okText;
@@ -608,8 +642,9 @@ canvas#scope{
   function promptAction({title, label, initialValue="", placeholder="", hint="", okText="SAVE", cancelText="CANCEL", danger=false, tag="PROFILE"}){
     return new Promise((resolve) => {
       const host = $("modalHost");
-      $("modalTitle").textContent = title;
+      if (!host) return resolve(null);
 
+      $("modalTitle").textContent = title;
       $("modalBody").innerHTML = `
         <div>${hint ? hint : ""}</div>
         <div class="inputWrap">
@@ -649,7 +684,6 @@ canvas#scope{
       $("modalCancel").onclick = () => cleanup(null);
 
       host.onclick = (ev) => { if (ev.target === host) cleanup(null); };
-
       document.onkeydown = (ev) => {
         if (ev.key === "Escape") cleanup(null);
         if (ev.key === "Enter"){
@@ -682,40 +716,11 @@ canvas#scope{
   }
   function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
 
-  function pushLog(elId, tag, msg){
-    const p = document.createElement("p");
-    p.innerHTML = `<span class="tag">${tag}</span>${msg}`;
-    $(elId).prepend(p);
-  }
-
-  // Tap to close popup; auto-expire after 25s
-  function popupComms(who, msg){
-    const host = $("popHost");
-    const kids = [...host.children];
-    if (kids.length >= 3) kids[kids.length-1].remove();
-
-    const box = document.createElement("div");
-    box.className = "pop";
-    box.innerHTML = `<div class="who">${escapeHtml(who)}</div><div class="msg">${escapeHtml(msg)}</div><div class="hint">TAP TO CLOSE</div>`;
-    box.onclick = (e) => {
-      e.stopPropagation();
-      box.classList.add("fade");
-      setTimeout(() => box.remove(), 190);
-    };
-    host.prepend(box);
-
-    setTimeout(() => {
-      if (!box.isConnected) return;
-      box.classList.add("fade");
-      setTimeout(() => box.remove(), 190);
-    }, 25000);
-  }
-
   // ===== Activity gating (AI never triggers while idling)
   let lastUserActionAt = 0;
-  function markActive(reason){ lastUserActionAt = Date.now(); }
-  window.addEventListener("pointerdown", () => markActive("pointer"), { passive:true });
-  window.addEventListener("keydown", () => markActive("key"), { passive:true });
+  function markActive(){ lastUserActionAt = Date.now(); }
+  window.addEventListener("pointerdown", markActive, { passive:true });
+  window.addEventListener("keydown", markActive, { passive:true });
   function isActivelyUsed(){ return (Date.now() - lastUserActionAt) <= 15000; }
 
   // ===== Username validation
@@ -731,14 +736,13 @@ canvas#scope{
   }
 
   // ===== LIVE status chip
-  let lastFrameAt = performance.now();
   let lastLiveLabel = "";
   let offlineRecoveryFlag = false;
-
   function setLive(label){
     if (label === lastLiveLabel) return;
     lastLiveLabel = label;
-    $("liveChip").textContent = "LIVE: " + label;
+    const chip = $("liveChip");
+    if (chip) chip.textContent = "LIVE: " + label;
   }
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") setLive("HIDDEN");
@@ -771,7 +775,6 @@ canvas#scope{
       relicAmp: 0
     },
 
-    // profile (username)
     profile: { username:"" },
 
     tutorial: {
@@ -785,11 +788,9 @@ canvas#scope{
 
     updatedAtMs: 0,
 
-    // AI comm settings
     aiEnabled: true,
     lastAiAtMs: 0
   };
-  window.SYGN1L_STATE = state;
 
   // ===== Conversational comms helper
   function playerName(){
@@ -802,14 +803,14 @@ canvas#scope{
     if (log) pushLog("comms", who, escapeHtml(text));
   }
 
-  // ===== Upgrades
+  // ===== Upgrades data
   const UPG = [
     { id:"dish", name:"DISH CALIBRATION", unlockAt:0, baseCost:10, costMult:1.18,
       desc:"+1 SIGNAL/SEC PER LEVEL.", buy(){ state.upgrades.dish++; } },
-    { id:"probes", name:"PROBE SWARM", unlockAt:120, baseCost:80, costMult:1.22,
-      desc:"+1 CLICK POWER PER LEVEL.", buy(){ state.upgrades.probes++; } },
     { id:"scan", name:"DEEP SCAN", unlockAt:100, baseCost:50, costMult:1.25,
       desc:"+10% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.scan++; } },
+    { id:"probes", name:"PROBE SWARM", unlockAt:120, baseCost:80, costMult:1.22,
+      desc:"+1 CLICK POWER PER LEVEL.", buy(){ state.upgrades.probes++; } },
     { id:"tuning", name:"HARMONIC TUNING", unlockAt:240, baseCost:140, costMult:1.27,
       desc:"+0.3 SIGNAL/SEC AND +1% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.tuning++; } },
     { id:"autopinger", name:"AUTO-PINGER ROUTINE", unlockAt:600, baseCost:520, costMult:1.30,
@@ -870,7 +871,6 @@ canvas#scope{
     const probeFactor = 1 + upgradeLevel("probes") * 0.15;
     return lv * 0.65 * probeFactor;
   }
-
   function recomputeDerived(){
     state.baseSPS = computeBaseSPS();
     state.clickPower = computeClickPower();
@@ -900,7 +900,10 @@ canvas#scope{
   }
 
   // ===== Objectives & milestones
-  function setObjective(text){ $("objective").innerHTML = "OBJECTIVE: " + text; }
+  function setObjective(text){
+    const el = $("objective");
+    if (el) el.innerHTML = "OBJECTIVE: " + text;
+  }
 
   function milestoneCheck(){
     if (!state.flags.sawPhase2 && state.total >= 500){
@@ -909,7 +912,7 @@ canvas#scope{
       $("phase").textContent = "PHASE II";
       $("status").textContent = "ARRAY: DRIFT";
       pushLog("log","SYS","PHASE II ENGAGED. THE ARRAY BEGINS RETURN TRANSMISSIONS.");
-      say("LT VANCE","If this thing talks back, we log it. If it begs, we mute it.", {popup:true, log:true});
+      say("LT VANCE","If this thing talks back, we log it. If it begs, we mute it.");
       setObjective("REACH 600 TOTAL SIGNAL TO UNLOCK AUTO-PINGER ROUTINE. INCREASE SIGNAL/SEC.");
     }
     if (!state.flags.sawPhase3 && state.total >= 1800){
@@ -918,12 +921,12 @@ canvas#scope{
       $("phase").textContent = "PHASE III";
       $("status").textContent = "ARRAY: ACTIVE";
       pushLog("log","SYS","PHASE III: RESPONSE PATTERNS DETECTED. NOT RANDOM. NOT FRIENDLY.");
-      say("DR KESS","It’s not a signal. It’s an instruction set pretending to be noise.", {popup:true, log:true});
+      say("DR KESS","It’s not a signal. It’s an instruction set pretending to be noise.");
       setObjective("REACH 3500 TOTAL SIGNAL TO UNLOCK HARMONIC LATTICE. WATCH CORRUPTION.");
     }
     if (!state.flags.sawPrestigeHint && state.total >= 9000){
       state.flags.sawPrestigeHint = true;
-      say("OPS","We can reset the Array and keep the residue. Call it a Rite. We’ll call it insurance.", {popup:true, log:true});
+      say("OPS","We can reset the Array and keep the residue. Call it a Rite. We’ll call it insurance.");
       pushLog("log","SYS","RITE RESET PROTOCOL DISCOVERED. RELICS MAY PERSIST BETWEEN BUILDS.");
       setObjective("REACH 12,000 TOTAL SIGNAL TO UNLOCK RITE RESET.");
     }
@@ -945,41 +948,28 @@ canvas#scope{
   function tutorialCheck(){
     if (!state.tutorial.welcomed){
       state.tutorial.welcomed = true;
-      say("OPS","Alright {user}, you’re on Array duty. Tap PING to kick the receiver awake.", {popup:true, log:true});
-      say("DR KESS","We’re scanning for intention in the static. Start with a ping. Watch what changes.", {popup:false, log:true});
-      saveLocal();
+      say("OPS","Alright {user}, you’re on Array duty. Tap PING to wake the receiver.");
+      say("TECH RIV","Then grab DISH CALIBRATION in BUFFS so Signal keeps rising while you breathe.", {popup:true, log:true});
     }
-
-    // Dish hint
     if (!state.tutorial.dishHint && state.total >= 10 && (state.upgrades.dish||0) === 0){
       state.tutorial.dishHint = true;
-      say("TECH RIV","We need cleaner readings. Grab DISH CALIBRATION in BUFFS. It gives you Signal per second.", {popup:true, log:true});
-      saveLocal();
+      say("TECH RIV","You’ve got enough Signal. Buy DISH CALIBRATION. That’s our baseline stability.");
     }
-
-    // Deep Scan hint
     if (!state.tutorial.scanHint && state.total >= 100 && (state.upgrades.scan||0) === 0){
       state.tutorial.scanHint = true;
-      say("DR KESS","Deep Scan is now available. It boosts bandwidth. Bandwidth multiplies everything you do.", {popup:true, log:true});
-      saveLocal();
+      say("DR KESS","Deep Scan is online. It increases bandwidth. Bandwidth multiplies your progress.");
     }
-
-    // Probe hint
     if (!state.tutorial.probesHint && state.total >= 120 && (state.upgrades.probes||0) === 0){
       state.tutorial.probesHint = true;
-      say("LT VANCE","Want faster manual gain? Buy PROBE SWARM. More click power, less wrist suffering.", {popup:true, log:true});
-      saveLocal();
+      say("LT VANCE","Buy PROBE SWARM if you’re tapping a lot. More click power, less time wasted.");
     }
-
-    // Autopinger hint
     if (!state.tutorial.autopingerHint && state.total >= 600 && (state.upgrades.autopinger||0) === 0){
       state.tutorial.autopingerHint = true;
-      say("OPS","Auto-Pinger unlocked. This is where it stops being a job and starts being a machine.", {popup:true, log:true});
-      saveLocal();
+      say("OPS","Auto-Pinger unlocked. Now the Array works even when you’re not babysitting it.");
     }
   }
 
-  // ===== Banter (human-ish chatter)
+  // ===== Banter (cooldown)
   const banter = {
     ping: [
       "Pulse logged. The noise looks… opinionated today.",
@@ -999,18 +989,16 @@ canvas#scope{
       "If you hear your name in the static, do not answer."
     ]
   };
-
   let lastBanterAt = 0;
   function maybeBanter(type){
     const now = Date.now();
     if (now - lastBanterAt < 45000) return;
     lastBanterAt = now;
-
     const list = banter[type] || [];
     if (!list.length) return;
     const msg = list[Math.floor(Math.random()*list.length)];
     const who = (type === "corruption") ? "DR KESS" : (type === "upgrade" ? "OPS" : "TECH RIV");
-    say(who, msg, {popup:true, log:true});
+    say(who, msg);
   }
 
   // ===== Prestige
@@ -1026,7 +1014,7 @@ canvas#scope{
     state.build += 1;
 
     pushLog("log","SYS",`RITE RESET EXECUTED. +${gainRelics} RELICS RECOVERED.`);
-    say("MOTHERLINE","THE ARRAY FORGETS. YOU DO NOT.", {popup:true, log:true});
+    say("MOTHERLINE","THE ARRAY FORGETS. YOU DO NOT.");
 
     const keepRelicAmp = state.upgrades.relicAmp || 0;
     const keepUsername = (state.profile?.username || "");
@@ -1035,6 +1023,7 @@ canvas#scope{
     state.total = 0;
     state.corruption = Math.max(0, state.corruption * 0.25);
     state.phase = 1;
+
     state.flags.sawPhase2 = false;
     state.flags.sawPhase3 = false;
     state.flags.sawPrestigeHint = false;
@@ -1042,7 +1031,6 @@ canvas#scope{
 
     for (const k in state.upgrades) state.upgrades[k] = 0;
     state.upgrades.relicAmp = keepRelicAmp;
-
     state.profile.username = keepUsername;
 
     touchLocalUpdated();
@@ -1057,19 +1045,12 @@ canvas#scope{
   }
 
   // ===== Save Manager (Local + Cloud)
-  const LOCAL_KEY = "sygn1l_cloudsave_v7_live_tutorial";
-  let userId = null;
-  let cloudReady = false;
-  let lastCloudSaveAt = 0;
-
+  const LOCAL_KEY = "sygn1l_full_v8_hardened";
   function touchLocalUpdated(){ state.updatedAtMs = Date.now(); }
-
   function saveLocal(){
     touchLocalUpdated();
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
-    $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
+    try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); }catch(_){}
   }
-
   function mergeIntoState(data){
     for (const k in data){
       if (data[k] && typeof data[k] === "object" && state[k] && typeof state[k] === "object"){
@@ -1079,58 +1060,58 @@ canvas#scope{
       }
     }
     state.profile = state.profile || { username:"" };
-    if (typeof state.profile.username !== "string") state.profile.username = "";
     state.tutorial = state.tutorial || {};
+    state.flags = state.flags || {};
+    state.upgrades = state.upgrades || {};
   }
-
   function loadLocal(){
-    const raw = localStorage.getItem(LOCAL_KEY);
-    if (!raw) return false;
     try{
+      const raw = localStorage.getItem(LOCAL_KEY);
+      if (!raw) return false;
       mergeIntoState(JSON.parse(raw));
       return true;
     }catch(_){ return false; }
   }
 
-  async function ensureSession(){
+  // ===== Supabase (optional): game still runs without it
+  const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
+
+  let supabase = null;
+  let userId = null;
+  let cloudReady = false;
+  let lastCloudSaveAt = 0;
+
+  function setSyncChip(){
+    const el = $("syncChip");
+    if (!el) return;
+    el.textContent = cloudReady ? "SYNC: CLOUD" : "SYNC: LOCAL";
+  }
+
+  async function initSupabase(){
     try{
+      if (!window.supabase || !window.supabase.createClient) throw new Error("Supabase SDK missing");
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
       let { data: { session } } = await supabase.auth.getSession();
       if (!session){
         const { data, error } = await supabase.auth.signInAnonymously();
         if (error) throw error;
         session = data.session;
       }
+
       userId = session.user.id;
       cloudReady = true;
-      return userId;
-    } catch(_){
+      setSyncChip();
+    } catch(err){
       cloudReady = false;
-      return null;
-    }
-  }
-
-  async function loadCloud(){
-    if (!cloudReady || !userId) return null;
-    try{
-      const { data, error } = await supabase
-        .from("saves")
-        .select("state, updated_at")
-        .eq("player_id", userId)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data || !data.state) return null;
-
-      const cloudState = data.state;
-      const cloudUpdatedMs = cloudState.updatedAtMs || (data.updated_at ? Date.parse(data.updated_at) : 0);
-      return { cloudState, cloudUpdatedMs };
-    } catch(_){
-      cloudReady = false;
-      return null;
+      setSyncChip();
+      pushLog("log","SYS","CLOUD SYNC OFFLINE. LOCAL MODE ACTIVE.");
     }
   }
 
   async function saveCloud(force=false){
-    if (!cloudReady || !userId) return false;
+    if (!cloudReady || !supabase || !userId) return false;
 
     const now = Date.now();
     if (!force && (now - lastCloudSaveAt) < 60000) return false;
@@ -1148,34 +1129,61 @@ canvas#scope{
       return true;
     } catch(_){
       cloudReady = false;
+      setSyncChip();
+      pushLog("log","SYS","CLOUD SAVE FAILED. LOCAL CONTINUES.");
       return false;
     }
   }
 
-  // Offline progress (signal only) capped 8 hours
+  async function loadCloudIfNewer(){
+    if (!cloudReady || !supabase || !userId) return false;
+    try{
+      const { data, error } = await supabase
+        .from("saves")
+        .select("state, updated_at")
+        .eq("player_id", userId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data || !data.state) return false;
+
+      const cloudState = data.state;
+      const cloudUpdatedMs = cloudState.updatedAtMs || (data.updated_at ? Date.parse(data.updated_at) : 0);
+      const localUpdated = state.updatedAtMs || 0;
+
+      if (cloudUpdatedMs > localUpdated){
+        mergeIntoState(cloudState);
+        pushLog("log","SYS","CLOUD SAVE LOADED (NEWER).");
+        return true;
+      }
+      return false;
+    } catch(_){
+      cloudReady = false;
+      setSyncChip();
+      pushLog("log","SYS","CLOUD LOAD FAILED. LOCAL CONTINUES.");
+      return false;
+    }
+  }
+
+  // Offline progress capped 8 hours
   function applyOfflineProgress(){
     offlineRecoveryFlag = true;
-
     const lastMs = Number(state.updatedAtMs) || 0;
     if (!lastMs){
       offlineRecoveryFlag = false;
       return;
     }
-
     const now = Date.now();
     let elapsed = (now - lastMs) / 1000;
     if (!isFinite(elapsed) || elapsed <= 2){
       offlineRecoveryFlag = false;
       return;
     }
-
     const CAP = 8 * 60 * 60;
     const capped = Math.min(elapsed, CAP);
 
     recomputeDerived();
     const sps = computeSPS();
     const autoP = state.autoPingsPerSec || 0;
-
     const gainedFromSPS = Math.max(0, sps) * capped;
     const gainedFromAuto = Math.max(0, autoP) * capped * (state.clickPower * globalMultiplier());
     const totalGain = gainedFromSPS + gainedFromAuto;
@@ -1186,54 +1194,22 @@ canvas#scope{
       pushLog("log","SYS",`OFFLINE RECOVERY: +${fmt(totalGain)} SIGNAL.`);
       popupComms("OPS", `While you were away: +${fmt(totalGain)} signal.`);
       touchLocalUpdated();
+      saveLocal();
     }
 
     offlineRecoveryFlag = false;
     setLive("ACTIVE");
   }
 
-  async function initSaves(){
-    const hasLocal = loadLocal();
-    await ensureSession();
-    const cloud = await loadCloud();
-
-    if (cloud && cloud.cloudState){
-      const localUpdated = state.updatedAtMs || 0;
-      if (cloud.cloudUpdatedMs > localUpdated){
-        mergeIntoState(cloud.cloudState);
-        pushLog("log","SYS","CLOUD SAVE LOADED (NEWER THAN LOCAL).");
-      } else if (cloudReady) {
-        await saveCloud(true);
-        pushLog("log","SYS","LOCAL SAVE PUSHED TO CLOUD (NEWER).");
-      }
-    } else {
-      if (hasLocal){
-        pushLog("log","SYS","LOCAL SAVE LOADED.");
-      } else {
-        pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
-        say("OPS","Start small, {user}. Ping it. If it answers, don’t answer back.", {popup:true, log:true});
-        say("DR KESS","We’re not mining a signal. We’re excavating intent.", {popup:false, log:true});
-      }
-    }
-
-    applyOfflineProgress();
-  }
-
-  // Heartbeat autosave to keep updatedAtMs fresh (helps iOS throttling)
+  // Heartbeat autosave to keep updatedAtMs fresh
   let heartbeatTimer = null;
   function startHeartbeat(){
-    stopHeartbeat();
+    if (heartbeatTimer) clearInterval(heartbeatTimer);
     heartbeatTimer = setInterval(() => {
       if (document.visibilityState !== "visible") return;
       touchLocalUpdated();
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
+      saveLocal();
     }, 25000);
-  }
-  function stopHeartbeat(){
-    if (heartbeatTimer){
-      clearInterval(heartbeatTimer);
-      heartbeatTimer = null;
-    }
   }
   startHeartbeat();
 
@@ -1244,20 +1220,23 @@ canvas#scope{
       setLive("HIDDEN");
     } else {
       startHeartbeat();
+      applyOfflineProgress();
       setLive("ACTIVE");
     }
   });
 
   // ===== Username chip
   function syncUserChip(){
+    const chip = $("userChip");
+    if (!chip) return;
     const u = (state.profile?.username || "").trim();
-    if (u) $("userChip").textContent = "USER: " + u;
-    else if (userId) $("userChip").textContent = "USER: " + userId.slice(0,4) + "…" + userId.slice(-4);
-    else $("userChip").textContent = "USER: ----";
+    if (u) chip.textContent = "USER: " + u;
+    else if (userId) chip.textContent = "USER: " + userId.slice(0,4) + "…" + userId.slice(-4);
+    else chip.textContent = "USER: ----";
   }
 
   $("userChip").onclick = async () => {
-    markActive("edit_username");
+    markActive();
     feedback($("userChip"), "light");
 
     const current = state.profile?.username || "";
@@ -1272,7 +1251,6 @@ canvas#scope{
       danger: false,
       tag: "PROFILE"
     });
-
     if (val === null) return;
 
     const cleaned = normalizeUsername(val);
@@ -1282,32 +1260,28 @@ canvas#scope{
     }
 
     state.profile.username = cleaned;
-    touchLocalUpdated();
     saveLocal();
     await saveCloud(true);
-
     syncUserChip();
-    say("OPS", `Acknowledged, ${cleaned}.`, {popup:true, log:true});
+    say("OPS", `Acknowledged, ${cleaned}.`);
   };
 
-  // ===== AI integration (Supabase Edge Function)
+  // ===== AI integration (optional)
   const AI_COOLDOWN_MS = 180000;
-
-  function setAiChip(text){ $("aiChip").textContent = text; }
+  function setAiChip(text){ const el = $("aiChip"); if (el) el.textContent = text; }
 
   $("aiBtn").onclick = (e) => {
     state.aiEnabled = !state.aiEnabled;
     e.currentTarget.textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
     setAiChip(state.aiEnabled ? "AI: READY" : "AI: DISABLED");
-    touchLocalUpdated();
     saveLocal();
     feedback(e.currentTarget, "light");
-    markActive("toggle_ai");
+    markActive();
   };
 
   function aiReadyNow(){
     if (!state.aiEnabled) return false;
-    if (!cloudReady) return false;
+    if (!cloudReady || !supabase) return false;
     if (!isActivelyUsed()) return false;
     const now = Date.now();
     if ((now - (state.lastAiAtMs || 0)) < AI_COOLDOWN_MS) return false;
@@ -1316,9 +1290,7 @@ canvas#scope{
 
   async function maybeAiComms(eventName, speakerHint){
     if (!aiReadyNow()) return;
-
     state.lastAiAtMs = Date.now();
-    touchLocalUpdated();
     saveLocal();
     setAiChip("AI: THINKING");
 
@@ -1370,17 +1342,15 @@ canvas#scope{
     btn.disabled = !canPrestige;
     btn.textContent = canPrestige ? `RITE RESET (+${gainR} RELICS)` : "RITE RESET (LOCKED)";
 
-    $("syncChip").textContent = cloudReady ? "SYNC: CLOUD" : "SYNC: LOCAL";
+    setSyncChip();
     syncUserChip();
     updateScopeLabel();
   }
 
-  // ===== Locked buttons fix: periodic refresh + immediate refresh after spending
-  let upgradesRefreshAcc = 0;
-  const UPGRADES_REFRESH_EVERY = 0.25;
-
+  // ===== BUFFS rendering (always runs)
   function renderUpgrades(){
     const root = $("upgrades");
+    if (!root) return;
     root.innerHTML = "";
 
     for (const u of UPG){
@@ -1421,21 +1391,20 @@ canvas#scope{
 
       btn.onclick = async () => {
         if (!affordable) return;
-        markActive("buy_upgrade");
+        markActive();
         feedback(btn, "light");
 
         if (currency === "relics") state.relics -= cost;
         else state.signal -= cost;
 
         u.buy();
-        touchLocalUpdated();
+        saveLocal();
         recomputeDerived();
         renderHUD();
         renderUpgrades();
-        saveLocal();
+        if (Math.random() < 0.35) maybeBanter("upgrade");
         await saveCloud(false);
 
-        if (Math.random() < 0.35) maybeBanter("upgrade");
         await maybeAiComms("buy_upgrade:" + u.id, u.id === "dark" ? "MOTHERLINE" : "OPS");
       };
 
@@ -1446,8 +1415,15 @@ canvas#scope{
   }
 
   // ===== Controls
+  $("feedbackBtn").onclick = (e) => {
+    feedbackOn = !feedbackOn;
+    e.currentTarget.textContent = feedbackOn ? "FEEDBACK: ON" : "FEEDBACK: OFF";
+    feedback(e.currentTarget, "light");
+    markActive();
+  };
+
   $("ping").addEventListener("click", async (e) => {
-    markActive("ping");
+    markActive();
     feedback(e.currentTarget, "light");
 
     gain(state.clickPower * globalMultiplier());
@@ -1455,16 +1431,15 @@ canvas#scope{
 
     if (!state.tutorial.firstPing){
       state.tutorial.firstPing = true;
-      say("OPS","Good. That’s a baseline ping. Now watch SIGNAL/SEC. We need the Array running while you breathe.", {popup:true, log:true});
-      say("TECH RIV","Next step: DISH CALIBRATION. It’s the difference between noise and numbers.", {popup:true, log:false});
+      say("OPS","Good. Baseline ping recorded. Now get DISH CALIBRATION so Signal keeps growing.");
     } else if (Math.random() < 0.18){
       maybeBanter("ping");
     }
 
-    touchLocalUpdated();
+    saveLocal();
+    recomputeDerived();
     renderHUD();
     renderUpgrades();
-    saveLocal();
     await saveCloud(false);
 
     if (Math.random() < 0.10) await maybeAiComms("ping_void", "OPS");
@@ -1472,7 +1447,7 @@ canvas#scope{
 
   $("prestige").onclick = async (e) => {
     if (e.currentTarget.disabled) return;
-    markActive("prestige");
+    markActive();
     feedback(e.currentTarget, "strong");
 
     const gainR = prestigeGain();
@@ -1487,16 +1462,15 @@ canvas#scope{
     if (!ok) return;
 
     doPrestige();
+    saveLocal();
     renderHUD();
     renderUpgrades();
-    saveLocal();
     await saveCloud(true);
-
     await maybeAiComms("rite_reset", "MOTHERLINE");
   };
 
   $("save").onclick = async (e) => {
-    markActive("manual_save");
+    markActive();
     feedback(e.currentTarget, "light");
     saveLocal();
     await saveCloud(true);
@@ -1505,7 +1479,7 @@ canvas#scope{
   };
 
   $("wipe").onclick = async () => {
-    markActive("wipe");
+    markActive();
     feedback($("wipe"), "strong");
 
     const ok = await confirmAction({
@@ -1518,23 +1492,22 @@ canvas#scope{
     });
     if (!ok) return;
 
-    localStorage.removeItem(LOCAL_KEY);
-    if (cloudReady && userId){
-      try{ await supabase.from("saves").delete().eq("player_id", userId); } catch(_){}
+    try{ localStorage.removeItem(LOCAL_KEY); }catch(_){}
+    if (cloudReady && supabase && userId){
+      try{ await supabase.from("saves").delete().eq("player_id", userId); }catch(_){}
     }
     location.reload();
   };
 
-  // ===== Array Scope (Noise -> Signal lock)
+  // ===== Array Scope (always draws)
   const scope = $("scope");
   const ctx = scope.getContext("2d", { alpha: false });
   let sw = 0, sh = 0, dpr = 1;
-
   const signature = { cols: [], vel: [], phase: 0 };
 
   function resizeScope(){
     dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
-    const cssW = scope.clientWidth || 300;
+    const cssW = scope.clientWidth || 320;
     const cssH = 84;
     scope.style.height = cssH + "px";
     scope.width = Math.floor(cssW * dpr);
@@ -1547,7 +1520,9 @@ canvas#scope{
     signature.vel  = new Array(cols).fill(0);
     signature.phase = 0;
   }
-  window.addEventListener("resize", resizeScope);
+  window.addEventListener("resize", () => {
+    resizeScope();
+  });
 
   function lockValue(){
     const bw = state.bandwidth;
@@ -1562,8 +1537,7 @@ canvas#scope{
     return clamp(corrupted, 0, 1);
   }
   function updateScopeLabel(){
-    const lk = lockValue();
-    $("scopeLabel").textContent = "LOCK: " + Math.round(lk * 100) + "%";
+    $("scopeLabel").textContent = "LOCK: " + Math.round(lockValue() * 100) + "%";
   }
 
   function rand01(seed){
@@ -1623,13 +1597,11 @@ canvas#scope{
     for (let i=0;i<cols;i++){
       const x = Math.floor((i/(cols-1)) * (sw-1));
       const s = signature.cols[i];
-
       const focus = lk;
       const spike = (rand01((timeMs|0) + i*71) < spikeProb) ? 1 : 0;
 
       const spikeH = spike * (0.15 + 0.85*focus) * (0.75 + 0.25*Math.abs(s));
       const noiseH = (s * (0.35 + 0.65*(1-focus))) * 0.35;
-
       const echo = corr > 0.28 ? (0.10 + 0.35*corr) * Math.sin(signature.phase*2 + i*0.12) : 0;
 
       const y = midY - (spikeH + noiseH + echo) * (sh * 0.70);
@@ -1659,11 +1631,17 @@ canvas#scope{
     ctx.strokeRect(Math.floor(0.5*dpr), Math.floor(0.5*dpr), sw - Math.floor(1*dpr), sh - Math.floor(1*dpr));
   }
 
-  // ===== AI + LIVE driven by loop
-  function loop(now){
-    const dt = Math.min(0.05, (now - lastFrameAt)/1000);
-    const gap = (now - lastFrameAt)/1000;
-    lastFrameAt = now;
+  // ===== Loop timing (fixed, separate lastNow)
+  let lastNow = performance.now();
+
+  // ===== Locked buttons fix: periodic refresh
+  let upgradesRefreshAcc = 0;
+  const UPGRADES_REFRESH_EVERY = 0.25;
+
+  function mainLoop(now){
+    const dt = Math.min(0.05, (now - lastNow) / 1000);
+    const gap = (now - lastNow) / 1000;
+    lastNow = now;
 
     if (document.visibilityState !== "visible") setLive("HIDDEN");
     else if (offlineRecoveryFlag) setLive("OFFLINE");
@@ -1698,37 +1676,46 @@ canvas#scope{
     }
 
     drawScope(dt, now|0);
-    requestAnimationFrame(loop);
+    requestAnimationFrame(mainLoop);
   }
 
-  function renderUpfront(){
-    $("aiBtn").textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
-    setAiChip(state.aiEnabled ? "AI: READY" : "AI: DISABLED");
+  // ===== Startup render
+  function bootNarrativeIfEmpty(){
+    if ($("log").children.length === 0){
+      pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
+      pushLog("comms","OPS","Ping the void so we can establish signal integrity. Then calibrate the dishes.");
+      pushLog("comms","DR KESS","We’re scanning because something is already scanning us. We need to know the shape of it.");
+    }
+  }
 
+  // ===== Init sequence (BUFFS ALWAYS RENDER, even if Supabase dies)
+  (async function init(){
+    loadLocal();
     recomputeDerived();
     updateObjectiveFallback();
     renderHUD();
     renderUpgrades();
+    bootNarrativeIfEmpty();
 
-    if ($("log").children.length === 0){
-      pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
-    }
-  }
+    // Make sure scope has a real width on mobile: resize after layout
+    resizeScope();
+    setTimeout(resizeScope, 80);
+    setTimeout(resizeScope, 250);
 
-  // ===== Start
-  resizeScope();
-  renderUpfront();
+    // Supabase init is optional; do not block the game
+    await initSupabase();
+    await loadCloudIfNewer();
+    setSyncChip();
+    syncUserChip();
 
-  initSaves().then(() => {
-    recomputeDerived();
-    renderUpfront();
-    pushLog("log","SYS","SAVE SYSTEM ONLINE: LOCAL + CLOUD (WHEN AVAILABLE).");
-    setAiChip(cloudReady ? (state.aiEnabled ? "AI: READY" : "AI: DISABLED") : "AI: OFFLINE");
-  }).catch(() => {
-    setAiChip("AI: OFFLINE");
-  }).finally(() => {
-    requestAnimationFrame(loop);
-  });
+    applyOfflineProgress();
+
+    // AI chip state
+    setAiChip((cloudReady && state.aiEnabled) ? "AI: READY" : (state.aiEnabled ? "AI: OFFLINE" : "AI: DISABLED"));
+
+    pushLog("log","SYS","BOOT COMPLETE. ARRAY STANDING BY.");
+    requestAnimationFrame(mainLoop);
+  })();
 
 })();
 </script>
