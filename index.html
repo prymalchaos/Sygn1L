@@ -363,7 +363,35 @@ canvas#scope{
       </div>
     </div>
   </header>
+<section class="card" id="accountCard">
+  <div class="hd">
+    <div>ACCOUNT</div>
+    <div class="muted" id="authStatus">NOT SIGNED IN</div>
+  </div>
 
+  <div class="pad">
+    <input id="authEmail" type="email" placeholder="email"
+      style="width:100%;margin-bottom:8px;padding:12px;border-radius:10px;
+      border:1px solid rgba(57,255,106,.3);background:rgba(0,0,0,.3);color:inherit">
+
+    <input id="authPassword" type="password" placeholder="password"
+      style="width:100%;margin-bottom:12px;padding:12px;border-radius:10px;
+      border:1px solid rgba(57,255,106,.3);background:rgba(0,0,0,.3);color:inherit">
+
+    <div class="grid2">
+      <button id="signInBtn">SIGN IN</button>
+      <button id="signUpBtn">SIGN UP</button>
+    </div>
+
+    <div style="margin-top:10px">
+      <button id="signOutBtn" disabled>SIGN OUT</button>
+    </div>
+
+    <div class="muted" style="margin-top:10px;font-size:11px">
+      Signing in protects your save across devices.
+    </div>
+  </div>
+</section>
   <section class="card">
     <div class="hd">
       <div>
@@ -452,7 +480,66 @@ async function signUpEmailPassword(email, password) {
   if (error) throw error;
   return data;
 }
+// ===== SIMPLE EMAIL + PASSWORD AUTH
+const authStatus = document.getElementById("authStatus");
+const signInBtn = document.getElementById("signInBtn");
+const signUpBtn = document.getElementById("signUpBtn");
+const signOutBtn = document.getElementById("signOutBtn");
+const emailEl = document.getElementById("authEmail");
+const passEl = document.getElementById("authPassword");
 
+async function signIn() {
+  const email = emailEl.value.trim();
+  const password = passEl.value.trim();
+  if (!email || !password) return alert("Enter email and password");
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) alert(error.message);
+}
+
+async function signUp() {
+  const email = emailEl.value.trim();
+  const password = passEl.value.trim();
+  if (!email || !password) return alert("Enter email and password");
+
+  const { error } = await supabase.auth.signUp({ email, password });
+  if (error) alert(error.message);
+  else alert("Account created. You can sign in now.");
+}
+
+async function signOut() {
+  await supabase.auth.signOut();
+}
+
+// Button wiring
+signInBtn.onclick = signIn;
+signUpBtn.onclick = signUp;
+signOutBtn.onclick = signOut;
+
+// ===== AUTH STATE LISTENER (THIS IS THE IMPORTANT BIT)
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    userId = session.user.id;
+    cloudReady = true;
+
+    authStatus.textContent = "SIGNED IN";
+    signOutBtn.disabled = false;
+
+    // Load cloud save safely
+    const cloud = await loadCloud();
+    if (cloud?.cloudState) {
+      mergeIntoState(cloud.cloudState);
+      saveLocal();
+      renderUpfront();
+    }
+  } else {
+    userId = null;
+    cloudReady = false;
+
+    authStatus.textContent = "NOT SIGNED IN";
+    signOutBtn.disabled = true;
+  }
+});
 async function signInEmailPassword(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
