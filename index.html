@@ -82,7 +82,7 @@ h1{ margin:0; letter-spacing:.25em; font-size:18px; }
   display:grid; grid-template-columns:1fr;
   gap:10px;
 }
-@media(min-width:420px){ .stats{ grid-template-columns:repeat(4,1fr); } }
+@media(min-width:420px){ .stats{ grid-template-columns:repeat(3,1fr); } }
 
 .stat{
   border:1px solid rgba(57,255,106,.2);
@@ -162,10 +162,6 @@ button:disabled{ opacity:.5; cursor:not-allowed; box-shadow:none; }
 .fill.danger{
   background:linear-gradient(90deg, rgba(255,59,107,.55), rgba(255,59,107,.18));
   box-shadow:0 0 18px rgba(255,59,107,.18);
-}
-.fill.warn{
-  background:linear-gradient(90deg, rgba(255,211,77,.55), rgba(255,211,77,.18));
-  box-shadow:0 0 18px rgba(255,211,77,.18);
 }
 
 .upgrades{ display:flex; flex-direction:column; gap:12px; }
@@ -291,9 +287,7 @@ canvas#scope{
   color:rgba(126,219,146,.85);
   text-transform:uppercase;
 }
-.pop.fade{
-  animation: popout .18s ease-in forwards;
-}
+.pop.fade{ animation: popout .18s ease-in forwards; }
 @keyframes popout{
   to{ transform:translateY(-4px); opacity:0; }
 }
@@ -368,50 +362,9 @@ canvas#scope{
   line-height:1.45;
 }
 
-/* Decoder */
-.decoderStrip{
-  margin-top:10px;
-  border:1px solid rgba(57,255,106,.22);
-  border-radius:12px;
-  background:rgba(0,0,0,.35);
-  padding:10px;
-}
-.decoderHeader{
-  display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap;
-  font-size:10px; letter-spacing:.14em; color:rgba(207,255,214,.92);
-  text-transform:uppercase;
-  margin-bottom:8px;
-}
-.decoderText{
-  font-size:14px;
-  letter-spacing:.12em;
-  line-height:1.6;
-  color:rgba(207,255,214,.95);
-  word-break:break-word;
-  text-shadow:0 0 10px rgba(57,255,106,.10);
-}
-.decoderControls{
-  margin-top:10px;
-  display:grid; gap:10px;
-}
-@media(min-width:420px){ .decoderControls{ grid-template-columns:1fr 1fr; } }
-.smallBtn{
-  padding:12px;
-  font-size:12px;
-  letter-spacing:.10em;
-}
-.decoderLocked{
-  opacity:.70;
-  border-style:dashed;
-}
-
 /* Clickable username chip */
-#userChip{
-  cursor:pointer;
-}
-#userChip:hover{
-  box-shadow:var(--glow);
-}
+#userChip{ cursor:pointer; }
+#userChip:hover{ box-shadow:var(--glow); }
 </style>
 </head>
 
@@ -428,8 +381,8 @@ canvas#scope{
     </div>
     <div class="mbody" id="modalBody"></div>
     <div class="mfoot">
-      <button class="smallBtn" id="modalCancel">CANCEL</button>
-      <button class="smallBtn dangerBtn" id="modalOk">CONFIRM</button>
+      <button id="modalCancel">CANCEL</button>
+      <button class="dangerBtn" id="modalOk">CONFIRM</button>
     </div>
   </div>
 </div>
@@ -445,7 +398,6 @@ canvas#scope{
         <div class="stat"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
         <div class="stat"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
         <div class="stat"><div class="k">BANDWIDTH</div><div class="v" id="bw">1.00×</div></div>
-        <div class="stat"><div class="k">STABILITY</div><div class="v" id="stab">--</div></div>
       </div>
 
       <div class="scopeWrap">
@@ -462,43 +414,20 @@ canvas#scope{
         <div class="bar"><div class="fill danger" id="corrFill"></div></div>
         <div class="muted" id="corrText">0% (DORMANT)</div>
       </div>
-
-      <div class="stat" style="margin-top:10px">
-        <div class="k">INTEGRITY</div>
-        <div class="bar"><div class="fill warn" id="intFill"></div></div>
-        <div class="muted" id="intText">100% (CONTAINMENT OK)</div>
-      </div>
-
-      <div id="decoderCard" class="decoderStrip decoderLocked" style="display:none">
-        <div class="decoderHeader">
-          <div>XENO DECODER</div>
-          <div id="decoderStatus">STATUS: ENCRYPTED</div>
-        </div>
-        <div class="decoderText" id="decoderText">///</div>
-        <div class="decoderControls">
-          <button class="smallBtn" id="engramBtn" disabled>DECRYPT ENGRAM</button>
-          <button class="smallBtn" id="structEngramBtn" disabled>STRUCTURAL ENGRAM</button>
-          <button class="smallBtn" id="cipherBtn" disabled>RESOLVE CIPHER (IRREVERSIBLE)</button>
-          <button class="smallBtn" id="clusterBtn" disabled>SYMBOL CLUSTERING: OFF</button>
-        </div>
-        <div class="muted" id="decoderHint" style="margin-top:8px">
-          INTERPRETATION REQUIRED. THE MESSAGE IS PRESENT BUT MISORDERED.
-        </div>
-      </div>
-
     </div>
   </header>
 
   <section class="card">
     <div class="hd">
       <div>
-        <span class="chip"><span class="dot" id="phaseDot"></span><span id="phase">PHASE I</span></span>
+        <span class="chip"><span class="dot"></span><span id="phase">PHASE I</span></span>
         <span class="chip" id="status">ARRAY: STABLE</span>
         <span class="chip" id="buildChip">BUILD: 1</span>
         <span class="chip" id="relicChip">RELICS: 0</span>
       </div>
       <div>
         <span class="chip" id="syncChip">SYNC: LOCAL</span>
+        <span class="chip" id="liveChip">LIVE: ACTIVE</span>
         <span class="chip" id="userChip" title="Tap to set username">USER: ----</span>
       </div>
     </div>
@@ -560,7 +489,6 @@ canvas#scope{
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -624,6 +552,23 @@ canvas#scope{
   };
 
   // ===== Modal confirm / prompt
+  function escapeHtml(s){
+    return String(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+  function escapeAttr(s){
+    return String(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
   function confirmAction({title, body, okText="CONFIRM", cancelText="CANCEL", danger=true, tag="SYGN1L"}){
     return new Promise((resolve) => {
       const host = $("modalHost");
@@ -655,15 +600,8 @@ canvas#scope{
       $("modalOk").onclick = () => cleanup(true);
       $("modalCancel").onclick = () => cleanup(false);
 
-      // click outside modal = cancel
-      host.onclick = (ev) => {
-        if (ev.target === host) cleanup(false);
-      };
-
-      // ESC cancels
-      document.onkeydown = (ev) => {
-        if (ev.key === "Escape") cleanup(false);
-      };
+      host.onclick = (ev) => { if (ev.target === host) cleanup(false); };
+      document.onkeydown = (ev) => { if (ev.key === "Escape") cleanup(false); };
     });
   }
 
@@ -672,16 +610,13 @@ canvas#scope{
       const host = $("modalHost");
       $("modalTitle").textContent = title;
 
-      const safeInit = String(initialValue ?? "");
-      const safePH = String(placeholder ?? "");
-      const safeLabel = String(label ?? "INPUT");
-
       $("modalBody").innerHTML = `
         <div>${hint ? hint : ""}</div>
         <div class="inputWrap">
-          <label>${escapeHtml(safeLabel)}</label>
-          <input id="modalInput" type="text" value="${escapeAttr(safeInit)}" placeholder="${escapeAttr(safePH)}" autocomplete="off" autocapitalize="none" spellcheck="false" />
-          <div class="hint">3–16 chars. Letters/numbers/underscore. Example: <span class="tag">corey_01</span></div>
+          <label>${escapeHtml(label || "INPUT")}</label>
+          <input id="modalInput" type="text" value="${escapeAttr(initialValue)}" placeholder="${escapeAttr(placeholder)}"
+                 autocomplete="off" autocapitalize="none" spellcheck="false" />
+          <div class="hint">3–16 chars. Letters/numbers/underscore only. Example: <span class="tag">corey_01</span></div>
         </div>
       `;
 
@@ -713,14 +648,11 @@ canvas#scope{
       $("modalOk").onclick = () => cleanup(input()?.value ?? "");
       $("modalCancel").onclick = () => cleanup(null);
 
-      host.onclick = (ev) => {
-        if (ev.target === host) cleanup(null);
-      };
+      host.onclick = (ev) => { if (ev.target === host) cleanup(null); };
 
       document.onkeydown = (ev) => {
         if (ev.key === "Escape") cleanup(null);
         if (ev.key === "Enter"){
-          // only if focus is inside the input
           const i = input();
           if (i && document.activeElement === i){
             ev.preventDefault();
@@ -729,24 +661,14 @@ canvas#scope{
         }
       };
 
-      // focus input
       setTimeout(() => {
         const i = input();
         if (i){
           i.focus();
           i.setSelectionRange(i.value.length, i.value.length);
         }
-      }, 40);
+      }, 50);
     });
-  }
-
-  function escapeAttr(s){
-    return String(s)
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
   }
 
   // ===== Utils
@@ -766,17 +688,15 @@ canvas#scope{
     $(elId).prepend(p);
   }
 
-  // Tap-to-close popups; also auto-expire after 25s as safety.
+  // Tap to close popup; auto-expire after 25s
   function popupComms(who, msg){
     const host = $("popHost");
-
-    // keep at most 3 visible
     const kids = [...host.children];
     if (kids.length >= 3) kids[kids.length-1].remove();
 
     const box = document.createElement("div");
     box.className = "pop";
-    box.innerHTML = `<div class="who">${escapeHtml(who || "COMMS")}</div><div class="msg">${escapeHtml(msg)}</div><div class="hint">TAP TO CLOSE</div>`;
+    box.innerHTML = `<div class="who">${escapeHtml(who)}</div><div class="msg">${escapeHtml(msg)}</div><div class="hint">TAP TO CLOSE</div>`;
     box.onclick = (e) => {
       e.stopPropagation();
       box.classList.add("fade");
@@ -791,40 +711,39 @@ canvas#scope{
     }, 25000);
   }
 
-  function escapeHtml(s){
-    return String(s)
-      .replaceAll("&","&amp;")
-      .replaceAll("<","&lt;")
-      .replaceAll(">","&gt;")
-      .replaceAll('"',"&quot;")
-      .replaceAll("'","&#039;");
-  }
-
   // ===== Activity gating (AI never triggers while idling)
   let lastUserActionAt = 0;
-  function markActive(reason){
-    lastUserActionAt = Date.now();
-  }
+  function markActive(reason){ lastUserActionAt = Date.now(); }
   window.addEventListener("pointerdown", () => markActive("pointer"), { passive:true });
   window.addEventListener("keydown", () => markActive("key"), { passive:true });
-
-  function isActivelyUsed(){
-    return (Date.now() - lastUserActionAt) <= 15000;
-  }
+  function isActivelyUsed(){ return (Date.now() - lastUserActionAt) <= 15000; }
 
   // ===== Username validation
   function normalizeUsername(raw){
     const s = String(raw ?? "").trim();
     if (!s) return "";
-    // allow letters/numbers/underscore only
-    const cleaned = s.replace(/[^A-Za-z0-9_]/g, "");
-    return cleaned.slice(0, 16);
+    return s.replace(/[^A-Za-z0-9_]/g, "").slice(0, 16);
   }
   function isValidUsername(s){
     if (!s) return false;
     if (s.length < 3 || s.length > 16) return false;
     return /^[A-Za-z0-9_]+$/.test(s);
   }
+
+  // ===== LIVE status chip
+  let lastFrameAt = performance.now();
+  let lastLiveLabel = "";
+  let offlineRecoveryFlag = false;
+
+  function setLive(label){
+    if (label === lastLiveLabel) return;
+    lastLiveLabel = label;
+    $("liveChip").textContent = "LIVE: " + label;
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") setLive("HIDDEN");
+    else setLive("ACTIVE");
+  });
 
   // ===== State
   const state = {
@@ -839,110 +758,76 @@ canvas#scope{
     autoPingsPerSec: 0,
 
     corruption: 0,
-    integrity: 1.0,
     phase: 1,
 
-    interpretation: 0,
-    phase4: { active:false, shownOnce:false, repeatBursts:0 },
-    phase5: { unlocked:false, unlockedAtMs:0, hasPrestigedSince:false, breachSeen:false },
-
-    // NEW: profile
-    profile: {
-      username: "" // player-defined handle
+    flags: {
+      sawPhase2:false, sawPhase3:false, sawPrestigeHint:false,
+      warnedCorrupt30:false
     },
-
-    flags: { sawPhase2:false, sawPhase3:false, sawPrestigeHint:false, sawPhase4:false, sawPhase5:false, sawWarning:false },
 
     upgrades: {
       dish: 0, probes: 0, scan: 0, tuning: 0,
       autopinger: 0, echo: 0, dark: 0, lattice: 0,
-      relicAmp: 0,
-      pattern: 0, semantic: 0, memory: 0, bleed: 0
+      relicAmp: 0
     },
 
-    decoder: {
-      seeded: false,
-      show: false,
-      clustering: false,
-      solved: false,
-      scrambledOrder: [],
-      revealed: {},
-      decodedLetters: 0,
-      structUsed: 0
+    // profile (username)
+    profile: { username:"" },
+
+    tutorial: {
+      welcomed: false,
+      firstPing: false,
+      dishHint: false,
+      scanHint: false,
+      probesHint: false,
+      autopingerHint: false
     },
 
     updatedAtMs: 0,
 
+    // AI comm settings
     aiEnabled: true,
     lastAiAtMs: 0
   };
   window.SYGN1L_STATE = state;
 
-  // ===== Message (Phase 5)
-  const TARGET_MSG = "GREETINGS. THIS IS A WARNING. PREPARE FOR INVASION. THEY ARE COMING.";
-  const LETTER_INDICES = (() => {
-    const idx = [];
-    for (let i=0;i<TARGET_MSG.length;i++){
-      const ch = TARGET_MSG[i];
-      if (/[A-Z]/.test(ch)) idx.push(i);
-    }
-    return idx;
-  })();
-  const TOTAL_LETTERS = LETTER_INDICES.length;
+  // ===== Conversational comms helper
+  function playerName(){
+    const u = (state.profile?.username || "").trim();
+    return u ? u : "Operator";
+  }
+  function say(who, msg, { popup=true, log=true } = {}){
+    const text = String(msg).replaceAll("{user}", playerName());
+    if (popup) popupComms(who, text);
+    if (log) pushLog("comms", who, escapeHtml(text));
+  }
 
   // ===== Upgrades
   const UPG = [
     { id:"dish", name:"DISH CALIBRATION", unlockAt:0, baseCost:10, costMult:1.18,
       desc:"+1 SIGNAL/SEC PER LEVEL.", buy(){ state.upgrades.dish++; } },
-
-    { id:"scan", name:"DEEP SCAN", unlockAt:100, baseCost:50, costMult:1.25,
-      desc:"+10% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.scan++; } },
-
     { id:"probes", name:"PROBE SWARM", unlockAt:120, baseCost:80, costMult:1.22,
       desc:"+1 CLICK POWER PER LEVEL.", buy(){ state.upgrades.probes++; } },
-
+    { id:"scan", name:"DEEP SCAN", unlockAt:100, baseCost:50, costMult:1.25,
+      desc:"+10% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.scan++; } },
     { id:"tuning", name:"HARMONIC TUNING", unlockAt:240, baseCost:140, costMult:1.27,
       desc:"+0.3 SIGNAL/SEC AND +1% BASE BANDWIDTH PER LEVEL.", buy(){ state.upgrades.tuning++; } },
-
     { id:"autopinger", name:"AUTO-PINGER ROUTINE", unlockAt:600, baseCost:520, costMult:1.30,
       desc:"ADDS AUTO-PINGS/SEC. SCALES WITH PROBES (SYNERGY).", buy(){ state.upgrades.autopinger++; } },
-
     { id:"echo", name:"ECHO INTEGRATOR", unlockAt:1800, baseCost:1400, costMult:1.35,
       desc:"BANDWIDTH BONUS: + (3%*LV) * LOG10(SIGNAL+1).", buy(){ state.upgrades.echo++; } },
-
     { id:"lattice", name:"HARMONIC LATTICE", unlockAt:3500, baseCost:3200, costMult:1.38,
       desc:"SPS MULT: (1 + 0.06*LV*SQRT(CORRUPTION*10)).", buy(){ state.upgrades.lattice++; } },
-
     { id:"dark", name:"DARK LISTENING", unlockAt:7000, baseCost:9000, costMult:1.45,
       desc:"IF CORRUPTION>30%: GAINS × (1 + 0.12*LV).", buy(){ state.upgrades.dark++; } },
-
     { id:"relicAmp", name:"RELIC AMPLIFIER", unlockAt:0, baseCost:3, costMult:1.65, currency:"relics",
-      desc:"SPEND RELICS. PER LV: GLOBAL MULT +8% (PERMANENT).", buy(){ state.upgrades.relicAmp++; } },
-
-    { id:"pattern", name:"PATTERN SAMPLER", unlockAt:25000, baseCost:4500, costMult:1.35, max:5, phase4:true,
-      desc:"PHASE IV. LOCK EFFECT +3%/LV. QUIETLY ACCUMULATES INTERPRETATION.", buy(){ state.upgrades.pattern++; } },
-
-    { id:"semantic", name:"SEMANTIC FILTER", unlockAt:25000, baseCost:7000, costMult:1.40, max:4, phase4:true,
-      desc:"PHASE IV. +4% STABILITY/LV. (CLARITY HAS A COST.)", buy(){ state.upgrades.semantic++; } },
-
-    { id:"memory", name:"STRUCTURAL MEMORY", unlockAt:9000, baseCost:2, costMult:0, currency:"relics", max:3, phase4:true,
-      desc:"PHASE IV. PRESERVE LOCK +6%/LV ON RITE RESET. PRESERVES INTERPRETATION.", buy(){ state.upgrades.memory++; } },
-
-    { id:"bleed", name:"SYMBOL BLEED", unlockAt:25000, baseCost:12000, costMult:1.0, max:1, phase4:true,
-      desc:"PHASE IV. RARE VERTICAL ALIGNMENT EVENTS (INTERPRETATION BURSTS).", buy(){ state.upgrades.bleed = 1; } }
+      desc:"SPEND RELICS. PER LV: GLOBAL MULT +8% (PERMANENT).", buy(){ state.upgrades.relicAmp++; } }
   ];
 
   function upgradeLevel(id){ return state.upgrades[id] || 0; }
   function upgradeCost(u){
     const lvl = upgradeLevel(u.id);
-    if (u.id === "memory"){
-      return 2 + (lvl * 2);
-    }
     return Math.floor(u.baseCost * Math.pow(u.costMult, lvl));
-  }
-  function atMax(u){
-    if (!u.max) return false;
-    return upgradeLevel(u.id) >= u.max;
   }
 
   // ===== Derived math
@@ -999,7 +884,7 @@ canvas#scope{
     return state.bandwidth * computeLatticeMultiplier() * computeDarkMultiplier();
   }
 
-  // ===== Corruption + Integrity + Stability
+  // ===== Corruption
   function updateCorruption(dt){
     const creep = 0.0000025 * Math.log10(state.total + 10);
     const tech = (upgradeLevel("echo") * 0.0000015) + (upgradeLevel("lattice") * 0.0000018) + (upgradeLevel("dark") * 0.0000022);
@@ -1014,26 +899,155 @@ canvas#scope{
     return "OVERRUN";
   }
 
-  function stabilityValue(){
-    const sem = upgradeLevel("semantic");
-    const base = 0.55 + 0.04*sem;
-    return clamp(base - 0.35*state.corruption, 0, 1);
+  // ===== Objectives & milestones
+  function setObjective(text){ $("objective").innerHTML = "OBJECTIVE: " + text; }
+
+  function milestoneCheck(){
+    if (!state.flags.sawPhase2 && state.total >= 500){
+      state.flags.sawPhase2 = true;
+      state.phase = Math.max(state.phase, 2);
+      $("phase").textContent = "PHASE II";
+      $("status").textContent = "ARRAY: DRIFT";
+      pushLog("log","SYS","PHASE II ENGAGED. THE ARRAY BEGINS RETURN TRANSMISSIONS.");
+      say("LT VANCE","If this thing talks back, we log it. If it begs, we mute it.", {popup:true, log:true});
+      setObjective("REACH 600 TOTAL SIGNAL TO UNLOCK AUTO-PINGER ROUTINE. INCREASE SIGNAL/SEC.");
+    }
+    if (!state.flags.sawPhase3 && state.total >= 1800){
+      state.flags.sawPhase3 = true;
+      state.phase = Math.max(state.phase, 3);
+      $("phase").textContent = "PHASE III";
+      $("status").textContent = "ARRAY: ACTIVE";
+      pushLog("log","SYS","PHASE III: RESPONSE PATTERNS DETECTED. NOT RANDOM. NOT FRIENDLY.");
+      say("DR KESS","It’s not a signal. It’s an instruction set pretending to be noise.", {popup:true, log:true});
+      setObjective("REACH 3500 TOTAL SIGNAL TO UNLOCK HARMONIC LATTICE. WATCH CORRUPTION.");
+    }
+    if (!state.flags.sawPrestigeHint && state.total >= 9000){
+      state.flags.sawPrestigeHint = true;
+      say("OPS","We can reset the Array and keep the residue. Call it a Rite. We’ll call it insurance.", {popup:true, log:true});
+      pushLog("log","SYS","RITE RESET PROTOCOL DISCOVERED. RELICS MAY PERSIST BETWEEN BUILDS.");
+      setObjective("REACH 12,000 TOTAL SIGNAL TO UNLOCK RITE RESET.");
+    }
   }
 
-  function updateIntegrity(dt){
-    const stab = stabilityValue();
-    const risk = 0.003 + 0.020*state.corruption + 0.004*upgradeLevel("dark");
-    const drain = risk * (1.10 - stab) * dt;
-    const rec = (isActivelyUsed() ? (0.008 * stab) : 0.003 * stab) * dt;
-    state.integrity = clamp(state.integrity - drain + rec, 0, 1);
+  function updateObjectiveFallback(){
+    if (!state.flags.sawPhase2){
+      setObjective("ACQUIRE DISH CALIBRATION. REACH 100 TOTAL SIGNAL TO UNLOCK DEEP SCAN.");
+    } else if (!state.flags.sawPhase3){
+      setObjective("UNLOCK AUTO-PINGER ROUTINE AT 600 TOTAL SIGNAL. PUSH SIGNAL/SEC UP.");
+    } else if (state.total < 12000){
+      setObjective("UNLOCK HARMONIC LATTICE AT 3500 TOTAL SIGNAL. PREPARE FOR RITE RESET AT 12,000.");
+    } else {
+      setObjective("RITE RESET AVAILABLE. CONSIDER RESETTING FOR RELICS (PERMANENT POWER).");
+    }
   }
 
-  function integrityLabel(i){
-    if (i > 0.82) return "CONTAINMENT OK";
-    if (i > 0.55) return "DRIFT";
-    if (i > 0.30) return "INSTABILITY";
-    if (i > 0.12) return "FAILURE";
-    return "BREACH";
+  // ===== Tutorial guidance
+  function tutorialCheck(){
+    if (!state.tutorial.welcomed){
+      state.tutorial.welcomed = true;
+      say("OPS","Alright {user}, you’re on Array duty. Tap PING to kick the receiver awake.", {popup:true, log:true});
+      say("DR KESS","We’re scanning for intention in the static. Start with a ping. Watch what changes.", {popup:false, log:true});
+      saveLocal();
+    }
+
+    // Dish hint
+    if (!state.tutorial.dishHint && state.total >= 10 && (state.upgrades.dish||0) === 0){
+      state.tutorial.dishHint = true;
+      say("TECH RIV","We need cleaner readings. Grab DISH CALIBRATION in BUFFS. It gives you Signal per second.", {popup:true, log:true});
+      saveLocal();
+    }
+
+    // Deep Scan hint
+    if (!state.tutorial.scanHint && state.total >= 100 && (state.upgrades.scan||0) === 0){
+      state.tutorial.scanHint = true;
+      say("DR KESS","Deep Scan is now available. It boosts bandwidth. Bandwidth multiplies everything you do.", {popup:true, log:true});
+      saveLocal();
+    }
+
+    // Probe hint
+    if (!state.tutorial.probesHint && state.total >= 120 && (state.upgrades.probes||0) === 0){
+      state.tutorial.probesHint = true;
+      say("LT VANCE","Want faster manual gain? Buy PROBE SWARM. More click power, less wrist suffering.", {popup:true, log:true});
+      saveLocal();
+    }
+
+    // Autopinger hint
+    if (!state.tutorial.autopingerHint && state.total >= 600 && (state.upgrades.autopinger||0) === 0){
+      state.tutorial.autopingerHint = true;
+      say("OPS","Auto-Pinger unlocked. This is where it stops being a job and starts being a machine.", {popup:true, log:true});
+      saveLocal();
+    }
+  }
+
+  // ===== Banter (human-ish chatter)
+  const banter = {
+    ping: [
+      "Pulse logged. The noise looks… opinionated today.",
+      "That one stung. Did you feel it, or am I projecting again?",
+      "Signal integrity nudged upward. Keep going, {user}.",
+      "I hate how quickly it learns your rhythm."
+    ],
+    upgrade: [
+      "Nice. Hardware likes certainty. Whatever is out there prefers ambiguity.",
+      "Budget approval denied by reality. Approved by curiosity.",
+      "That upgrade will increase throughput… and attention. Careful.",
+      "Every improvement makes the Array easier to hear… and harder to ignore."
+    ],
+    corruption: [
+      "Corruption is climbing. It’s not an error. It’s an invitation.",
+      "We should not be this proud of a system that’s quietly rotting.",
+      "If you hear your name in the static, do not answer."
+    ]
+  };
+
+  let lastBanterAt = 0;
+  function maybeBanter(type){
+    const now = Date.now();
+    if (now - lastBanterAt < 45000) return;
+    lastBanterAt = now;
+
+    const list = banter[type] || [];
+    if (!list.length) return;
+    const msg = list[Math.floor(Math.random()*list.length)];
+    const who = (type === "corruption") ? "DR KESS" : (type === "upgrade" ? "OPS" : "TECH RIV");
+    say(who, msg, {popup:true, log:true});
+  }
+
+  // ===== Prestige
+  function prestigeGain(){
+    const over = Math.max(0, state.total - 12000);
+    const base = 1;
+    const extra = Math.floor(Math.sqrt(over / 6000));
+    return base + extra;
+  }
+  function doPrestige(){
+    const gainRelics = prestigeGain();
+    state.relics += gainRelics;
+    state.build += 1;
+
+    pushLog("log","SYS",`RITE RESET EXECUTED. +${gainRelics} RELICS RECOVERED.`);
+    say("MOTHERLINE","THE ARRAY FORGETS. YOU DO NOT.", {popup:true, log:true});
+
+    const keepRelicAmp = state.upgrades.relicAmp || 0;
+    const keepUsername = (state.profile?.username || "");
+
+    state.signal = 0;
+    state.total = 0;
+    state.corruption = Math.max(0, state.corruption * 0.25);
+    state.phase = 1;
+    state.flags.sawPhase2 = false;
+    state.flags.sawPhase3 = false;
+    state.flags.sawPrestigeHint = false;
+    state.flags.warnedCorrupt30 = false;
+
+    for (const k in state.upgrades) state.upgrades[k] = 0;
+    state.upgrades.relicAmp = keepRelicAmp;
+
+    state.profile.username = keepUsername;
+
+    touchLocalUpdated();
+    recomputeDerived();
+    updateObjectiveFallback();
   }
 
   // ===== Gain
@@ -1043,29 +1057,17 @@ canvas#scope{
   }
 
   // ===== Save Manager (Local + Cloud)
-  const LOCAL_KEY = "sygn1l_cloudsave_v5_username";
+  const LOCAL_KEY = "sygn1l_cloudsave_v7_live_tutorial";
   let userId = null;
   let cloudReady = false;
   let lastCloudSaveAt = 0;
 
-  function touchLocalUpdated(){
-    state.updatedAtMs = Date.now();
-  }
+  function touchLocalUpdated(){ state.updatedAtMs = Date.now(); }
 
   function saveLocal(){
     touchLocalUpdated();
     localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
     $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
-  }
-
-  function loadLocal(){
-    const raw = localStorage.getItem(LOCAL_KEY);
-    if (!raw) return false;
-    try{
-      const data = JSON.parse(raw);
-      mergeIntoState(data);
-      return true;
-    }catch(_){ return false; }
   }
 
   function mergeIntoState(data){
@@ -1076,9 +1078,18 @@ canvas#scope{
         state[k] = data[k];
       }
     }
-    // Backfill profile if older save
     state.profile = state.profile || { username:"" };
     if (typeof state.profile.username !== "string") state.profile.username = "";
+    state.tutorial = state.tutorial || {};
+  }
+
+  function loadLocal(){
+    const raw = localStorage.getItem(LOCAL_KEY);
+    if (!raw) return false;
+    try{
+      mergeIntoState(JSON.parse(raw));
+      return true;
+    }catch(_){ return false; }
   }
 
   async function ensureSession(){
@@ -1091,11 +1102,9 @@ canvas#scope{
       }
       userId = session.user.id;
       cloudReady = true;
-      $("syncChip").textContent = "SYNC: CLOUD";
       return userId;
-    } catch(err){
+    } catch(_){
       cloudReady = false;
-      $("syncChip").textContent = "SYNC: OFFLINE";
       return null;
     }
   }
@@ -1108,15 +1117,13 @@ canvas#scope{
         .select("state, updated_at")
         .eq("player_id", userId)
         .maybeSingle();
-
       if (error) throw error;
       if (!data || !data.state) return null;
 
       const cloudState = data.state;
       const cloudUpdatedMs = cloudState.updatedAtMs || (data.updated_at ? Date.parse(data.updated_at) : 0);
       return { cloudState, cloudUpdatedMs };
-    } catch(err){
-      $("syncChip").textContent = "SYNC: OFFLINE";
+    } catch(_){
       cloudReady = false;
       return null;
     }
@@ -1136,29 +1143,33 @@ canvas#scope{
         updated_at: new Date().toISOString(),
         state: JSON.parse(JSON.stringify(state))
       };
-
       const { error } = await supabase.from("saves").upsert(payload);
       if (error) throw error;
-
-      $("syncChip").textContent = "SYNC: CLOUD+LOCAL";
       return true;
-    } catch(err){
-      $("syncChip").textContent = "SYNC: OFFLINE";
+    } catch(_){
       cloudReady = false;
       return false;
     }
   }
 
-  // ===== Offline progress (Signal only)
+  // Offline progress (signal only) capped 8 hours
   function applyOfflineProgress(){
+    offlineRecoveryFlag = true;
+
     const lastMs = Number(state.updatedAtMs) || 0;
-    if (!lastMs) return;
+    if (!lastMs){
+      offlineRecoveryFlag = false;
+      return;
+    }
 
     const now = Date.now();
     let elapsed = (now - lastMs) / 1000;
-    if (!isFinite(elapsed) || elapsed <= 2) return;
+    if (!isFinite(elapsed) || elapsed <= 2){
+      offlineRecoveryFlag = false;
+      return;
+    }
 
-    const CAP = 8 * 60 * 60; // 8 hours
+    const CAP = 8 * 60 * 60;
     const capped = Math.min(elapsed, CAP);
 
     recomputeDerived();
@@ -1172,11 +1183,13 @@ canvas#scope{
     if (totalGain > 0){
       state.signal += totalGain;
       state.total += totalGain;
-      const name = getUsernameOrAnon();
-      popupComms("OPS", `${name}, while you were away: +${fmt(totalGain)} signal.`);
       pushLog("log","SYS",`OFFLINE RECOVERY: +${fmt(totalGain)} SIGNAL.`);
+      popupComms("OPS", `While you were away: +${fmt(totalGain)} signal.`);
       touchLocalUpdated();
     }
+
+    offlineRecoveryFlag = false;
+    setLive("ACTIVE");
   }
 
   async function initSaves(){
@@ -1198,37 +1211,49 @@ canvas#scope{
         pushLog("log","SYS","LOCAL SAVE LOADED.");
       } else {
         pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
-        pushLog("comms","OPS","Start small. Ping it. If it answers, don’t answer back.");
-        pushLog("comms","DR KESS","We’re not mining a signal. We’re excavating intent.");
+        say("OPS","Start small, {user}. Ping it. If it answers, don’t answer back.", {popup:true, log:true});
+        say("DR KESS","We’re not mining a signal. We’re excavating intent.", {popup:false, log:true});
       }
     }
 
     applyOfflineProgress();
-    syncUserChip();
   }
+
+  // Heartbeat autosave to keep updatedAtMs fresh (helps iOS throttling)
+  let heartbeatTimer = null;
+  function startHeartbeat(){
+    stopHeartbeat();
+    heartbeatTimer = setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      touchLocalUpdated();
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
+    }, 25000);
+  }
+  function stopHeartbeat(){
+    if (heartbeatTimer){
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+  startHeartbeat();
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden"){
       saveLocal();
       saveCloud(true);
+      setLive("HIDDEN");
+    } else {
+      startHeartbeat();
+      setLive("ACTIVE");
     }
   });
 
-  // ===== Username UI
-  function getUsernameOrAnon(){
-    const u = (state.profile?.username || "").trim();
-    return u ? u : "Operator";
-  }
-
+  // ===== Username chip
   function syncUserChip(){
     const u = (state.profile?.username || "").trim();
-    if (u){
-      $("userChip").textContent = "USER: " + u;
-    } else if (userId){
-      $("userChip").textContent = "USER: " + userId.slice(0,4) + "…" + userId.slice(-4);
-    } else {
-      $("userChip").textContent = "USER: ----";
-    }
+    if (u) $("userChip").textContent = "USER: " + u;
+    else if (userId) $("userChip").textContent = "USER: " + userId.slice(0,4) + "…" + userId.slice(-4);
+    else $("userChip").textContent = "USER: ----";
   }
 
   $("userChip").onclick = async () => {
@@ -1241,7 +1266,7 @@ canvas#scope{
       label: "USERNAME",
       initialValue: current,
       placeholder: "corey_01",
-      hint: "This name is stored in your save and can appear in dynamic comms.",
+      hint: "This name is stored in your save and may appear in comms.",
       okText: "SAVE",
       cancelText: "CANCEL",
       danger: false,
@@ -1262,11 +1287,10 @@ canvas#scope{
     await saveCloud(true);
 
     syncUserChip();
-    popupComms("OPS", `Acknowledged, ${cleaned}.`);
-    pushLog("log","SYS",`USERNAME SET: <span class="tag">${escapeHtml(cleaned)}</span>`);
+    say("OPS", `Acknowledged, ${cleaned}.`, {popup:true, log:true});
   };
 
-  // ===== AI integration (via Supabase Edge Function)
+  // ===== AI integration (Supabase Edge Function)
   const AI_COOLDOWN_MS = 180000;
 
   function setAiChip(text){ $("aiChip").textContent = text; }
@@ -1296,70 +1320,129 @@ canvas#scope{
     state.lastAiAtMs = Date.now();
     touchLocalUpdated();
     saveLocal();
-
     setAiChip("AI: THINKING");
 
     try{
       const payload = {
         event: eventName,
         speaker_hint: speakerHint || "OPS",
-        username: (state.profile?.username || "").trim(),   // NEW
+        username: (state.profile?.username || "").trim(),
         phase: state.phase,
         build: state.build,
         signal: Math.floor(state.signal),
         total: Math.floor(state.total),
         sps: Math.floor(computeSPS()),
         bandwidth: Number(state.bandwidth.toFixed(2)),
-        corruption: Number(state.corruption.toFixed(3)),
-        integrity: Number(state.integrity.toFixed(3)),
-        interpretation: Number(state.interpretation.toFixed(3)),
-        decoded_letters: Number(state.decoder.decodedLetters || 0),
-        solved: !!state.decoder.solved
+        corruption: Number(state.corruption.toFixed(3))
       };
 
       const { data, error } = await supabase.functions.invoke("sygn1l-comms", { body: payload });
       if (error) throw error;
 
       const who = data?.who || speakerHint || "COMMS";
-      let msg = data?.text || "…";
-
-      // Optional: if your edge function doesn't yet use username, we can lightly weave it here.
-      const uname = (state.profile?.username || "").trim();
-      if (uname && typeof msg === "string" && Math.random() < 0.25){
-        // safe, subtle personalization
-        msg = msg.replace(/\bYOU\b/i, uname);
-      }
+      const msg = data?.text || "…";
 
       popupComms(who, msg);
-      pushLog("comms", who, msg);
+      pushLog("comms", who, escapeHtml(msg));
 
       setAiChip("AI: READY");
-    } catch(err){
+    } catch(_){
       setAiChip("AI: OFFLINE");
       pushLog("log","SYS","AI COMMS FAILED. (EDGE FUNCTION OR KEY NOT CONFIGURED)");
     }
   }
 
-  // ===== UI render
+  // ===== HUD
   function renderHUD(){
     $("signal").textContent = fmt(state.signal);
     $("sps").textContent = fmt(computeSPS());
     $("bw").textContent = state.bandwidth.toFixed(2) + "×";
-
-    const stab = stabilityValue();
-    $("stab").textContent = Math.round(stab*100) + "%";
+    $("buildChip").textContent = "BUILD: " + state.build;
+    $("relicChip").textContent = "RELICS: " + state.relics;
 
     const c = state.corruption;
-    const visualSmooth = clamp(1 - 0.10*upgradeLevel("semantic"), 0.55, 1.0);
-    const shown = clamp(c * visualSmooth, 0, 1);
-    $("corrFill").style.width = (shown*100).toFixed(1) + "%";
+    $("corrFill").style.width = (c*100).toFixed(1) + "%";
     $("corrText").textContent = (c*100).toFixed(1) + "% (" + corruptionLabel(c) + ")";
 
-    const i = state.integrity;
-    $("intFill").style.width = (i*100).toFixed(1) + "%";
-    $("intText").textContent = (i*100).toFixed(1) + "% (" + integrityLabel(i) + ")";
+    const canPrestige = state.total >= 12000;
+    const gainR = prestigeGain();
+    const btn = $("prestige");
+    btn.disabled = !canPrestige;
+    btn.textContent = canPrestige ? `RITE RESET (+${gainR} RELICS)` : "RITE RESET (LOCKED)";
 
+    $("syncChip").textContent = cloudReady ? "SYNC: CLOUD" : "SYNC: LOCAL";
     syncUserChip();
+    updateScopeLabel();
+  }
+
+  // ===== Locked buttons fix: periodic refresh + immediate refresh after spending
+  let upgradesRefreshAcc = 0;
+  const UPGRADES_REFRESH_EVERY = 0.25;
+
+  function renderUpgrades(){
+    const root = $("upgrades");
+    root.innerHTML = "";
+
+    for (const u of UPG){
+      if (u.id === "relicAmp" && (state.relics <= 0 && upgradeLevel("relicAmp") === 0)) continue;
+
+      const unlocked = state.total >= u.unlockAt;
+      const lvl = upgradeLevel(u.id);
+      const cost = upgradeCost(u);
+      const currency = u.currency || "signal";
+      const have = currency === "relics" ? state.relics : state.signal;
+      const affordable = unlocked && have >= cost;
+
+      const row = document.createElement("div");
+      row.className = "up" + (affordable ? " affordable" : "") + (!unlocked ? " locked" : "");
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = `${u.name} (LV ${lvl})`;
+
+      const desc = document.createElement("div");
+      desc.className = "desc";
+      desc.textContent = unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlockAt)} TOTAL SIGNAL.`;
+
+      const costEl = document.createElement("div");
+      costEl.className = "cost";
+      costEl.textContent = unlocked ? `COST: ${fmt(cost)} ${currency.toUpperCase()}` : "STATUS: LOCKED";
+
+      meta.appendChild(name);
+      meta.appendChild(desc);
+      meta.appendChild(costEl);
+
+      const btn = document.createElement("button");
+      btn.textContent = unlocked ? (affordable ? "ACQUIRE" : "LOCKED") : "CLASSIFIED";
+      btn.disabled = !affordable;
+
+      btn.onclick = async () => {
+        if (!affordable) return;
+        markActive("buy_upgrade");
+        feedback(btn, "light");
+
+        if (currency === "relics") state.relics -= cost;
+        else state.signal -= cost;
+
+        u.buy();
+        touchLocalUpdated();
+        recomputeDerived();
+        renderHUD();
+        renderUpgrades();
+        saveLocal();
+        await saveCloud(false);
+
+        if (Math.random() < 0.35) maybeBanter("upgrade");
+        await maybeAiComms("buy_upgrade:" + u.id, u.id === "dark" ? "MOTHERLINE" : "OPS");
+      };
+
+      row.appendChild(meta);
+      row.appendChild(btn);
+      root.appendChild(row);
+    }
   }
 
   // ===== Controls
@@ -1370,18 +1453,47 @@ canvas#scope{
     gain(state.clickPower * globalMultiplier());
     state.corruption = clamp(state.corruption + 0.0006, 0, 1);
 
-    const stab = stabilityValue();
-    state.integrity = clamp(state.integrity - (0.0008 * (1.1 - stab)), 0, 1);
+    if (!state.tutorial.firstPing){
+      state.tutorial.firstPing = true;
+      say("OPS","Good. That’s a baseline ping. Now watch SIGNAL/SEC. We need the Array running while you breathe.", {popup:true, log:true});
+      say("TECH RIV","Next step: DISH CALIBRATION. It’s the difference between noise and numbers.", {popup:true, log:false});
+    } else if (Math.random() < 0.18){
+      maybeBanter("ping");
+    }
 
     touchLocalUpdated();
     renderHUD();
+    renderUpgrades();
     saveLocal();
     await saveCloud(false);
 
-    if (Math.random() < 0.10) {
-      await maybeAiComms("ping_void", "OPS");
-    }
+    if (Math.random() < 0.10) await maybeAiComms("ping_void", "OPS");
   }, { passive:true });
+
+  $("prestige").onclick = async (e) => {
+    if (e.currentTarget.disabled) return;
+    markActive("prestige");
+    feedback(e.currentTarget, "strong");
+
+    const gainR = prestigeGain();
+    const ok = await confirmAction({
+      title: "RITE RESET",
+      body: `You will reset Signal, Upgrades, and Phases.<br><br>You will gain <span class="tag">+${gainR} RELICS</span> and keep any <span class="tag">RELIC AMPLIFIER</span> levels.`,
+      okText: "EXECUTE",
+      cancelText: "CANCEL",
+      danger: true,
+      tag: "RITE"
+    });
+    if (!ok) return;
+
+    doPrestige();
+    renderHUD();
+    renderUpgrades();
+    saveLocal();
+    await saveCloud(true);
+
+    await maybeAiComms("rite_reset", "MOTHERLINE");
+  };
 
   $("save").onclick = async (e) => {
     markActive("manual_save");
@@ -1392,9 +1504,9 @@ canvas#scope{
     await maybeAiComms("manual_save", "OPS");
   };
 
-  $("wipe").onclick = async (e) => {
+  $("wipe").onclick = async () => {
     markActive("wipe");
-    feedback(e.currentTarget, "strong");
+    feedback($("wipe"), "strong");
 
     const ok = await confirmAction({
       title: "WIPE",
@@ -1413,25 +1525,209 @@ canvas#scope{
     location.reload();
   };
 
-  // ===== Init narrative if empty
-  function bootNarrativeIfEmpty(){
+  // ===== Array Scope (Noise -> Signal lock)
+  const scope = $("scope");
+  const ctx = scope.getContext("2d", { alpha: false });
+  let sw = 0, sh = 0, dpr = 1;
+
+  const signature = { cols: [], vel: [], phase: 0 };
+
+  function resizeScope(){
+    dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
+    const cssW = scope.clientWidth || 300;
+    const cssH = 84;
+    scope.style.height = cssH + "px";
+    scope.width = Math.floor(cssW * dpr);
+    scope.height = Math.floor(cssH * dpr);
+    sw = scope.width;
+    sh = scope.height;
+
+    const cols = Math.max(120, Math.floor(sw / (2 * dpr)));
+    signature.cols = new Array(cols).fill(0);
+    signature.vel  = new Array(cols).fill(0);
+    signature.phase = 0;
+  }
+  window.addEventListener("resize", resizeScope);
+
+  function lockValue(){
+    const bw = state.bandwidth;
+    const sps = computeSPS();
+    const t = state.total;
+
+    const a = clamp(Math.log10(t + 1) / 5, 0, 1);
+    const b = clamp((bw - 1) / 4, 0, 1);
+    const c = clamp(Math.log10(sps + 1) / 4, 0, 1);
+    const raw = (0.45*a + 0.35*b + 0.20*c);
+    const corrupted = raw * (1 - 0.55*state.corruption);
+    return clamp(corrupted, 0, 1);
+  }
+  function updateScopeLabel(){
+    const lk = lockValue();
+    $("scopeLabel").textContent = "LOCK: " + Math.round(lk * 100) + "%";
+  }
+
+  function rand01(seed){
+    seed = (seed ^ 0x6D2B79F5) >>> 0;
+    seed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    seed ^= seed + Math.imul(seed ^ (seed >>> 7), 61 | seed);
+    return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
+  }
+
+  function drawScope(dt, timeMs){
+    if (!sw || !sh) return;
+
+    const lk = lockValue();
+    const corr = state.corruption;
+
+    ctx.fillStyle = "rgb(0,0,0)";
+    ctx.fillRect(0,0,sw,sh);
+
+    const noiseAmt = clamp(0.85 - 0.70*lk + 0.35*corr, 0.15, 0.95);
+    const spikeProb = clamp(0.04 + 0.36*lk + 0.10*(state.bandwidth-1)/4, 0.04, 0.70);
+
+    const cols = signature.cols.length;
+    signature.phase += dt * (0.6 + 1.8*lk) * (1 + 0.8*corr);
+
+    for (let i=0;i<cols;i++){
+      const base = Math.sin(signature.phase + i*0.07) * 0.25;
+      const chaos = (rand01((timeMs|0) + i*9973) - 0.5) * (0.45 + 0.9*corr);
+      const target = base + chaos;
+
+      const stiffness = 0.08 + 0.22*lk;
+      const damping = 0.82 - 0.35*corr;
+
+      signature.vel[i] = signature.vel[i]*damping + (target - signature.cols[i]) * stiffness;
+      signature.cols[i] += signature.vel[i];
+    }
+
+    const midY = Math.floor(sh * 0.60);
+    const px = Math.max(1, Math.floor(dpr));
+    const baseG = 190;
+
+    for (let y=0;y<sh;y+=px){
+      const lineFade = 0.72 + 0.28*Math.sin((y/sh)*Math.PI);
+      for (let x=0;x<sw;x+=px){
+        const n = rand01((x*131 + y*977 + (timeMs|0))|0);
+        if (n < noiseAmt){
+          const v = Math.floor((baseG + 55*n) * lineFade);
+          ctx.fillStyle = `rgb(0,${v},0)`;
+          ctx.fillRect(x,y,px,px);
+        }
+      }
+    }
+
+    ctx.lineWidth = Math.max(1, 1*dpr);
+    ctx.strokeStyle = "rgba(57,255,106,0.85)";
+    ctx.beginPath();
+
+    for (let i=0;i<cols;i++){
+      const x = Math.floor((i/(cols-1)) * (sw-1));
+      const s = signature.cols[i];
+
+      const focus = lk;
+      const spike = (rand01((timeMs|0) + i*71) < spikeProb) ? 1 : 0;
+
+      const spikeH = spike * (0.15 + 0.85*focus) * (0.75 + 0.25*Math.abs(s));
+      const noiseH = (s * (0.35 + 0.65*(1-focus))) * 0.35;
+
+      const echo = corr > 0.28 ? (0.10 + 0.35*corr) * Math.sin(signature.phase*2 + i*0.12) : 0;
+
+      const y = midY - (spikeH + noiseH + echo) * (sh * 0.70);
+      if (i===0) ctx.moveTo(x,y);
+      else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = "rgba(57,255,106,0.18)";
+    ctx.lineWidth = Math.max(2, 3*dpr);
+    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+
+    if (corr > 0.45){
+      const tears = Math.floor(2 + 8*corr);
+      for (let t=0;t<tears;t++){
+        const x = Math.floor(rand01((timeMs|0) + t*99991) * sw);
+        const w = Math.max(1, Math.floor(dpr));
+        ctx.fillStyle = `rgba(255,59,107,${0.04 + 0.08*corr})`;
+        ctx.fillRect(x, 0, w, sh);
+      }
+    }
+
+    ctx.strokeStyle = "rgba(57,255,106,0.18)";
+    ctx.lineWidth = Math.max(1, 1*dpr);
+    ctx.strokeRect(Math.floor(0.5*dpr), Math.floor(0.5*dpr), sw - Math.floor(1*dpr), sh - Math.floor(1*dpr));
+  }
+
+  // ===== AI + LIVE driven by loop
+  function loop(now){
+    const dt = Math.min(0.05, (now - lastFrameAt)/1000);
+    const gap = (now - lastFrameAt)/1000;
+    lastFrameAt = now;
+
+    if (document.visibilityState !== "visible") setLive("HIDDEN");
+    else if (offlineRecoveryFlag) setLive("OFFLINE");
+    else if (gap > 0.35) setLive("THROTTLED");
+    else setLive("ACTIVE");
+
+    recomputeDerived();
+
+    const sps = computeSPS();
+    if (sps > 0) gain(sps * dt);
+
+    if (state.autoPingsPerSec > 0){
+      const pings = state.autoPingsPerSec * dt;
+      gain(pings * (state.clickPower * globalMultiplier()));
+    }
+
+    updateCorruption(dt);
+    milestoneCheck();
+    tutorialCheck();
+
+    if (state.corruption > 0.30 && !state.flags.warnedCorrupt30){
+      state.flags.warnedCorrupt30 = true;
+      maybeBanter("corruption");
+    }
+
+    renderHUD();
+
+    upgradesRefreshAcc += dt;
+    if (upgradesRefreshAcc >= UPGRADES_REFRESH_EVERY){
+      upgradesRefreshAcc = 0;
+      renderUpgrades();
+    }
+
+    drawScope(dt, now|0);
+    requestAnimationFrame(loop);
+  }
+
+  function renderUpfront(){
+    $("aiBtn").textContent = state.aiEnabled ? "DYNAMIC COMMS: ON" : "DYNAMIC COMMS: OFF";
+    setAiChip(state.aiEnabled ? "AI: READY" : "AI: DISABLED");
+
+    recomputeDerived();
+    updateObjectiveFallback();
+    renderHUD();
+    renderUpgrades();
+
     if ($("log").children.length === 0){
       pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
-      pushLog("comms","OPS","Start small. Ping it. If it answers, don’t answer back.");
-      pushLog("comms","DR KESS","We’re not mining a signal. We’re excavating intent.");
     }
   }
 
   // ===== Start
-  renderHUD();
-  bootNarrativeIfEmpty();
+  resizeScope();
+  renderUpfront();
 
   initSaves().then(() => {
-    renderHUD();
+    recomputeDerived();
+    renderUpfront();
     pushLog("log","SYS","SAVE SYSTEM ONLINE: LOCAL + CLOUD (WHEN AVAILABLE).");
     setAiChip(cloudReady ? (state.aiEnabled ? "AI: READY" : "AI: DISABLED") : "AI: OFFLINE");
   }).catch(() => {
     setAiChip("AI: OFFLINE");
+  }).finally(() => {
+    requestAnimationFrame(loop);
   });
 
 })();
