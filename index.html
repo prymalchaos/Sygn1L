@@ -779,7 +779,21 @@ canvas{display:block;width:100%;height:84px;}
         renderHUD(); renderUpgrades(); renderDecoder();
       });
     }
-  }
+  }function prestigeGain(){
+  // Unlock threshold for Rite Reset
+  const THRESH = 12000;
+
+  // Extra relics scale gently after threshold
+  const over = Math.max(0, state.total - THRESH);
+
+  // Base relic always 1 once you can reset
+  const base = 1;
+
+  // +1 relic per ~6000 signal “over”, square-root softened
+  const extra = Math.floor(Math.sqrt(over / 6000));
+
+  return base + extra;
+}
 
   // ===== Rite Reset / Wipe
   function prestigeGain(){
