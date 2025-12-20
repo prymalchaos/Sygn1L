@@ -446,7 +446,50 @@ canvas#scope{
 
 <!-- Supabase lib -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+// ===== AUTH (Email + Password)
+async function signUpEmailPassword(email, password) {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+  return data;
+}
 
+async function signInEmailPassword(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data;
+}
+
+async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+// Call once during init:
+function wireAuthListener() {
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    // event examples: "SIGNED_IN", "SIGNED_OUT", "TOKEN_REFRESHED"
+    if (session?.user?.id) {
+      userId = session.user.id;
+      cloudReady = true;
+      $("userChip").textContent = "USER: " + userId.slice(0, 4) + "…" + userId.slice(-4);
+      $("syncChip").textContent = "SYNC: CLOUD";
+
+      // Pull cloud save immediately after sign-in
+      const cloud = await loadCloud();
+      if (cloud?.cloudState) {
+        const localUpdated = state.updatedAtMs || 0;
+        if (cloud.cloudUpdatedMs > localUpdated) mergeIntoState(cloud.cloudState);
+      }
+      saveLocal();
+      renderUpfront();
+    } else {
+      userId = null;
+      cloudReady = false;
+      $("syncChip").textContent = "SYNC: LOCAL";
+      $("userChip").textContent = "USER: ----";
+    }
+  });
+}
 <!-- Part B JS goes below -->
 (() => {
   const $ = (id) => document.getElementById(id);
