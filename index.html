@@ -448,7 +448,6 @@ canvas#scope{
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <!-- Part B JS goes below -->
-<script>
 (() => {
   const $ = (id) => document.getElementById(id);
 
@@ -457,10 +456,17 @@ canvas#scope{
     if (e.target && e.target.closest("button")) e.preventDefault();
   }, { passive:false });
 
-  // ===== Supabase config (yours)
+  // ===== Supabase config (your project)
   const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const supabase = window.supabase?.createClient
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+
+  // ===== Constants
+  const FINAL_MESSAGE = "Greetings! This is a warning. Prepare for invasion. They are coming";
+  const PHASE2 = 500, PHASE3 = 1800, PHASE4 = 9000, PHASE5 = 15000;
+  const RITE_RESET_THRESHOLD = 12000;
 
   // ===== Utils
   const clamp = (x,a,b)=>Math.max(a,Math.min(b,x));
@@ -481,7 +487,6 @@ canvas#scope{
       .replaceAll('"',"&quot;")
       .replaceAll("'","&#039;");
   }
-
   function corruptionLabel(c){
     if (c < 0.10) return "DORMANT";
     if (c < 0.30) return "WHISPERING";
@@ -490,9 +495,17 @@ canvas#scope{
     return "OVERRUN";
   }
 
+  // ===== Activity gating (for “LIVE” chip + future AI)
+  let lastUserActionAt = 0;
+  function markActive(){ lastUserActionAt = Date.now(); }
+  window.addEventListener("pointerdown", markActive, { passive:true });
+  window.addEventListener("keydown", markActive, { passive:true });
+  function isActivelyUsed(){ return (Date.now() - lastUserActionAt) <= 20000; }
+
   // ===== Popup comms (tap to close)
   function popupComms(who, msg){
     const host = $("popHost");
+    if (!host) return;
     const box = document.createElement("div");
     box.className = "pop";
     box.innerHTML = `<div class="who">${escapeHtml(who)}</div><div class="msg">${escapeHtml(msg)}</div>`;
@@ -501,12 +514,14 @@ canvas#scope{
   }
 
   function pushLog(elId, who, msg){
+    const root = $(elId);
+    if (!root) return;
     const p = document.createElement("p");
     p.innerHTML = `<span class="tag">${escapeHtml(who)}</span>${escapeHtml(msg)}`;
     p.style.cursor = "pointer";
     p.title = "Tap to dismiss";
     p.addEventListener("click", ()=>p.remove());
-    $(elId).prepend(p);
+    root.prepend(p);
   }
 
   // ===== Modal
@@ -517,12 +532,15 @@ canvas#scope{
   const modalCancel = $("modalCancel");
 
   function openModal(title, html, opts={}){
+    if (!modalHost) return Promise.resolve(false);
+
     modalTitle.textContent = title || "TRANSMISSION";
     modalBody.innerHTML = html || "";
     modalOk.textContent = opts.okText || "OK";
     modalCancel.textContent = opts.cancelText || "CLOSE";
     modalCancel.style.display = opts.hideCancel ? "none" : "";
     modalHost.style.display = "block";
+
     requestAnimationFrame(()=>{ modalBody.scrollTop = 0; });
 
     return new Promise((resolve)=>{
@@ -552,16 +570,7 @@ canvas#scope{
     );
   }
 
-  // ===== Activity gating (for “live” chip + future AI gating)
-  let lastUserActionAt = 0;
-  function markActive(){ lastUserActionAt = Date.now(); }
-  window.addEventListener("pointerdown", markActive, { passive:true });
-  window.addEventListener("keydown", markActive, { passive:true });
-  function isActivelyUsed(){ return (Date.now() - lastUserActionAt) <= 20000; }
-
   // ===== State
-  const FINAL_MESSAGE = "Greetings! This is a warning. Prepare for invasion. They are coming";
-
   const state = {
     username: "Operator",
     build: 1,
@@ -578,7 +587,8 @@ canvas#scope{
     corruption: 0,
     phase: 1,
 
-    updatedAtMs: Date.now(),
+    // IMPORTANT: start at 0 so blank boot can never “beat” cloud
+    updatedAtMs: 0,
     lastTickMs: Date.now(),
 
     upgrades: {
@@ -599,10 +609,11 @@ canvas#scope{
   };
   window.SYGN1L_STATE = state;
 
-  // ===== Prestige gain (✅ was missing)
+  function touchUpdated(){ state.updatedAtMs = Date.now(); }
+
+  // ===== Prestige gain (shows on button)
   function prestigeGain(){
-    const THRESH = 12000;
-    const over = Math.max(0, state.total - THRESH);
+    const over = Math.max(0, state.total - RITE_RESET_THRESHOLD);
     const base = 1;
     const extra = Math.floor(Math.sqrt(over / 6000));
     return base + extra;
@@ -610,9 +621,6 @@ canvas#scope{
 
   // ===== Upgrades
   const lv = (id)=>state.upgrades[id]||0;
-  function upgradeCost(u){
-    return Math.floor(u.baseCost * Math.pow(u.costMult, lv(u.id)));
-  }
 
   const UPG = [
     { id:"dish", name:"DISH CALIBRATION", unlockAt:0, baseCost:10, costMult:1.18,
@@ -652,6 +660,10 @@ canvas#scope{
       desc:"REDUCES ENGRAM COSTS BY 6% PER LEVEL.", buy(){ state.upgrades.decoderRig++; } }
   ];
 
+  function upgradeCost(u){
+    return Math.floor(u.baseCost * Math.pow(u.costMult, lv(u.id)));
+  }
+
   // ===== Derived math
   function computeBaseSPS(){ return lv("dish")*1.0 + lv("tuning")*0.35; }
   function computeClickPower(){ return 1 + lv("probes")*1.0; }
@@ -683,7 +695,6 @@ canvas#scope{
     const probeFactor = 1 + lv("probes")*0.15;
     return a * 0.65 * probeFactor;
   }
-
   function recompute(){
     state.baseSPS = computeBaseSPS();
     state.clickPower = computeClickPower();
@@ -711,8 +722,7 @@ canvas#scope{
     }
   }
 
-  // ===== Phases (simple)
-  const PHASE2 = 500, PHASE3 = 1800, PHASE4 = 9000, PHASE5 = 15000;
+  // ===== Phase logic
   function phaseCheck(){
     const p = state.total >= PHASE5 ? 5 :
               state.total >= PHASE4 ? 4 :
@@ -721,7 +731,7 @@ canvas#scope{
     state.phase = Math.max(state.phase, p);
   }
 
-  // ===== Decoder (Phase V)
+  // ===== Decoder
   function engramCost(){
     const n = state.archive.engramsSolved;
     const rigDiscount = Math.pow(0.94, lv("decoderRig"));
@@ -740,7 +750,6 @@ canvas#scope{
       s ^= s << 5;  s >>>= 0;
       return (s >>> 0) / 4294967296;
     };
-
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!?.,:;-' ";
     const out = [];
     for (let i=0;i<len;i++){
@@ -779,13 +788,15 @@ canvas#scope{
           ${done ? "DECRYPT COMPLETE" : (canBuy ? `DECRYPT ENGRAM (COST ${fmt(price)})` : `INSUFFICIENT SIGNAL (COST ${fmt(price)})`)}
         </button>
       </div>
+      ${state.archive.awaitingRiteReset && state.archive.hasCipherKey && !state.archive.finalMessageRevealed
+        ? `<div class="muted" style="margin-top:10px">CIPHER KEY READY. RITE RESET REQUIRED TO APPLY.</div>`
+        : ``}
     `;
 
     const btn = $("decryptBtn");
     if (btn){
       btn.onclick = () => {
         markActive();
-        // recompute at click time
         const priceNow = engramCost();
         if (state.signal < priceNow) return;
 
@@ -810,156 +821,13 @@ canvas#scope{
     }
   }
 
-  // ===== Saves (Local + Cloud)
-  const LOCAL_KEY = "sygn1l_save_vA";
-  let userId = null;
-  let cloudReady = false;
-  let lastCloudSaveAt = 0;
-
-  function touchUpdated(){ state.updatedAtMs = Date.now(); }
-
-  function saveLocal(){
-    touchUpdated();
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
-    $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
-  }
-
-  function loadLocal(){
-    const raw = localStorage.getItem(LOCAL_KEY);
-    if (!raw) return false;
-    try{
-      const data = JSON.parse(raw);
-      Object.assign(state, data);
-      // ensure nested objects exist
-      state.upgrades = Object.assign({
-        dish:0,scan:0,probes:0,tuning:0,autopinger:0,echo:0,lattice:0,dark:0,
-        firewall:0,purifier:0,deadband:0,decoderRig:0,relicAmp:0
-      }, state.upgrades||{});
-      state.archive = Object.assign({
-        engramsSolved:0,engramsTotal:FINAL_MESSAGE.length,hasCipherKey:false,awaitingRiteReset:false,finalMessageRevealed:false,
-        scrambleSeed:(Math.floor(Math.random()*1e9)>>>0)
-      }, state.archive||{});
-      return true;
-    }catch(_){ return false; }
-  }
-
-  async function ensureSession(){
-    try{
-      let { data: { session } } = await supabase.auth.getSession();
-      if (!session){
-        const { data, error } = await supabase.auth.signInAnonymously();
-        if (error) throw error;
-        session = data.session;
-      }
-      userId = session.user.id;
-      cloudReady = true;
-      $("syncChip").textContent = "SYNC: CLOUD";
-      return userId;
-    } catch {
-      cloudReady = false;
-      $("syncChip").textContent = "SYNC: OFFLINE";
-      return null;
-    }
-  }
-
-  async function loadCloud(){
-    if (!cloudReady || !userId) return null;
-    try{
-      const { data, error } = await supabase
-        .from("saves")
-        .select("state, updated_at")
-        .eq("player_id", userId)
-        .maybeSingle();
-      if (error) throw error;
-      if (!data?.state) return null;
-
-      const cloudState = data.state;
-      const cloudUpdatedMs = cloudState.updatedAtMs || (data.updated_at ? Date.parse(data.updated_at) : 0);
-      return { cloudState, cloudUpdatedMs };
-    } catch {
-      cloudReady = false;
-      $("syncChip").textContent = "SYNC: OFFLINE";
-      return null;
-    }
-  }
-
-  async function saveCloud(force=false){
-    if (!cloudReady || !userId) return false;
-    const now = Date.now();
-    if (!force && (now - lastCloudSaveAt) < 45000) return false;
-    lastCloudSaveAt = now;
-
-    try{
-      touchUpdated();
-      const payload = {
-        player_id: userId,
-        updated_at: new Date().toISOString(),
-        state: JSON.parse(JSON.stringify(state))
-      };
-      const { error } = await supabase.from("saves").upsert(payload);
-      if (error) throw error;
-      $("syncChip").textContent = "SYNC: CLOUD+LOCAL";
-      return true;
-    } catch {
-      cloudReady = false;
-      $("syncChip").textContent = "SYNC: OFFLINE";
-      return false;
-    }
-  }
-
-  async function initSaves(){
-    const hasLocal = loadLocal();
-    await ensureSession();
-    const cloud = await loadCloud();
-
-    if (cloud?.cloudState){
-      const localUpdated = state.updatedAtMs || 0;
-      if (cloud.cloudUpdatedMs > localUpdated){
-        Object.assign(state, cloud.cloudState);
-        pushLog("log","SYS","CLOUD SAVE LOADED (NEWER THAN LOCAL).");
-      } else if (cloudReady) {
-        await saveCloud(true);
-        pushLog("log","SYS","LOCAL SAVE PUSHED TO CLOUD (NEWER).");
-      }
-    } else {
-      if (hasLocal) pushLog("log","SYS","LOCAL SAVE LOADED.");
-      else {
-        pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
-        pushLog("comms","OPS","Ping the Void so we can establish signal integrity.");
-        pushLog("comms","DR KESS","We need you to calibrate the dishes. That’s how the snowball starts.");
-      }
-    }
-  }
-
-  // ===== Username edit (tap USER chip)
-  async function editUsername(){
-    const html = `
-      <div class="muted" style="margin:0 0 10px">Set a callsign. Used in comms.</div>
-      <input id="nameInput" maxlength="18"
-        value="${escapeHtml(state.username === "Operator" ? "" : state.username)}"
-        placeholder="e.g. Corey"
-        style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(57,255,106,.35);background:rgba(0,0,0,.35);color:var(--text);font:inherit" />`;
-    const ok = await openModal("SET USERNAME", html, { okText:"SAVE", cancelText:"CANCEL" });
-    if (!ok) return;
-
-    const v = ($("nameInput")?.value || "").trim().replace(/\s+/g," ");
-    state.username = v || "Operator";
-    $("userChip").textContent = "USER: " + state.username;
-
-    touchUpdated();
-    saveLocal();
-    saveCloud(true);
-
-    popupComms("OPS", `Alright, ${state.username}. Callsign confirmed.`);
-  }
-
   // ===== Rite Reset
   function doRiteReset(){
     const gainR = prestigeGain();
     state.relics += gainR;
     state.build += 1;
 
-    // Keep archive + username
+    // Keep archive + username always
     const keepArchive = JSON.parse(JSON.stringify(state.archive));
     const keepName = state.username;
 
@@ -973,7 +841,7 @@ canvas#scope{
     state.archive = keepArchive;
     state.username = keepName;
 
-    // If cipher key solved, Rite Reset reveals the real message
+    // Apply cipher key on Rite Reset (this is the “unscramble” moment)
     if (state.archive.awaitingRiteReset && state.archive.hasCipherKey && !state.archive.finalMessageRevealed){
       state.archive.awaitingRiteReset = false;
       state.archive.finalMessageRevealed = true;
@@ -991,27 +859,29 @@ canvas#scope{
     if (state.total < 100) o.textContent = "OBJECTIVE: BUY DISH CALIBRATION. REACH 100 TOTAL SIGNAL FOR DEEP SCAN.";
     else if (state.total < 600) o.textContent = "OBJECTIVE: UNLOCK AUTO-PINGER AT 600 TOTAL SIGNAL. PUSH SIGNAL/SEC.";
     else if (state.total < 3500) o.textContent = "OBJECTIVE: PREPARE HARMONIC LATTICE AT 3500 TOTAL SIGNAL. WATCH CORRUPTION.";
-    else if (state.total < 12000) o.textContent = "OBJECTIVE: RITE RESET UNLOCKS AT 12,000 TOTAL SIGNAL. RELICS PERSIST.";
-    else if (state.total < 15000) o.textContent = "OBJECTIVE: PHASE V AT 15,000 TOTAL SIGNAL UNLOCKS THE DECODER.";
+    else if (state.total < RITE_RESET_THRESHOLD) o.textContent = "OBJECTIVE: RITE RESET UNLOCKS AT 12,000 TOTAL SIGNAL. RELICS PERSIST.";
+    else if (state.total < PHASE5) o.textContent = "OBJECTIVE: PHASE V AT 15,000 TOTAL SIGNAL UNLOCKS THE DECODER.";
     else o.textContent = "OBJECTIVE: DECRYPT ENGRAMS. APPLY CIPHER KEY VIA RITE RESET.";
   }
 
-  // ===== HUD render (includes ✅ RITE RESET (+X RELICS))
+  // ===== HUD render (includes corruption + Rite Reset (+X relics))
   function renderHUD(){
-    $("signal").textContent = fmt(state.signal);
-    $("sps").textContent = fmt(sps());
-    $("bw").textContent = state.bandwidth.toFixed(2) + "×";
+    if ($("signal")) $("signal").textContent = fmt(state.signal);
+    if ($("sps")) $("sps").textContent = fmt(sps());
+    if ($("bw")) $("bw").textContent = state.bandwidth.toFixed(2) + "×";
 
-    $("buildChip").textContent = "BUILD: " + state.build;
-    $("relicChip").textContent = "RELICS: " + state.relics;
+    if ($("buildChip")) $("buildChip").textContent = "BUILD: " + state.build;
+    if ($("relicChip")) $("relicChip").textContent = "RELICS: " + state.relics;
 
-    $("phase").textContent =
-      state.phase===1 ? "PHASE I" :
-      state.phase===2 ? "PHASE II" :
-      state.phase===3 ? "PHASE III" :
-      state.phase===4 ? "PHASE IV" : "PHASE V";
+    if ($("phase")){
+      $("phase").textContent =
+        state.phase===1 ? "PHASE I" :
+        state.phase===2 ? "PHASE II" :
+        state.phase===3 ? "PHASE III" :
+        state.phase===4 ? "PHASE IV" : "PHASE V";
+    }
 
-    $("userChip").textContent = "USER: " + state.username;
+    if ($("userChip")) $("userChip").textContent = "USER: " + state.username;
 
     const live = $("liveChip");
     if (live){
@@ -1020,32 +890,40 @@ canvas#scope{
     }
 
     // Corruption bar
-    const c = clamp(state.corruption,0,1);
-    $("corrFill").style.width = (c*100).toFixed(1) + "%";
-    $("corrText").textContent = (c*100).toFixed(1) + "% (" + corruptionLabel(c) + ")";
+    const cf = $("corrFill");
+    const ct = $("corrText");
+    if (cf) cf.style.width = (clamp(state.corruption,0,1)*100).toFixed(1) + "%";
+    if (ct){
+      const c = clamp(state.corruption,0,1);
+      ct.textContent = (c*100).toFixed(1) + "% (" + corruptionLabel(c) + ")";
+    }
 
-    // Prestige button label
+    // Status chip (optional)
+    if ($("status")){
+      $("status").textContent =
+        state.phase<=1 ? "ARRAY: STABLE" :
+        state.phase===2 ? "ARRAY: DRIFT" :
+        state.phase===3 ? "ARRAY: ACTIVE" :
+        state.phase===4 ? "ARRAY: FRACTURE" : "ARRAY: OPEN";
+    }
+
+    // Rite Reset button label
     const btn = $("prestige");
-    const canReset = state.total >= 12000;
-    const gainR = prestigeGain();
-    btn.disabled = !canReset;
-    btn.textContent = canReset ? `RITE RESET (+${gainR} RELICS)` : "RITE RESET (LOCKED)";
-
-    $("status").textContent =
-      state.phase<=1 ? "ARRAY: STABLE" :
-      state.phase===2 ? "ARRAY: DRIFT" :
-      state.phase===3 ? "ARRAY: ACTIVE" :
-      state.phase===4 ? "ARRAY: FRACTURE" : "ARRAY: OPEN";
+    if (btn){
+      const canReset = state.total >= RITE_RESET_THRESHOLD;
+      const gainR = prestigeGain();
+      btn.disabled = !canReset;
+      btn.textContent = canReset ? `RITE RESET (+${gainR} RELICS)` : "RITE RESET (LOCKED)";
+    }
 
     updateObjective();
     updateScopeLabel();
   }
 
-  // ===== Locked buttons fix (critical)
-  // - Re-render upgrades periodically
-  // - Recompute affordability inside click handler (no stale closure)
+  // ===== Locked button fix: render upgrades often + recompute affordability on click
   function renderUpgrades(){
     const root = $("upgrades");
+    if (!root) return;
     root.innerHTML = "";
 
     for (const u of UPG){
@@ -1059,7 +937,6 @@ canvas#scope{
 
       const meta = document.createElement("div");
       meta.className = "meta";
-
       meta.innerHTML = `
         <div class="name">${escapeHtml(u.name)} (LV ${lvlNow})</div>
         <div class="desc">${escapeHtml(unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlockAt)} TOTAL SIGNAL.`)}</div>
@@ -1073,7 +950,7 @@ canvas#scope{
       btn.onclick = () => {
         markActive();
 
-        // ✅ recompute at click time
+        // IMPORTANT: re-evaluate now (prevents “stuck locked until refresh”)
         const unlockedNow = state.total >= u.unlockAt;
         const priceNow = upgradeCost(u);
         const canBuyNow = unlockedNow && state.signal >= priceNow;
@@ -1098,13 +975,15 @@ canvas#scope{
     }
   }
 
-  // ===== Scope / Noise visualiser
+  // ===== Scope visualiser
   const scope = $("scope");
-  const ctx = scope.getContext("2d", { alpha:false });
-  let sw=0, sh=0, dpr=1;
+  const scopeLabel = $("scopeLabel");
+  let ctx = null, sw=0, sh=0, dpr=1;
   let sigPhase = 0;
 
   function resizeScope(){
+    if (!scope) return;
+    ctx = scope.getContext("2d", { alpha:false });
     dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
     const cssW = scope.clientWidth || 320;
     const cssH = 84;
@@ -1124,12 +1003,12 @@ canvas#scope{
     return clamp(corrupted, 0, 1);
   }
   function updateScopeLabel(){
-    const lk = lockValue();
-    $("scopeLabel").textContent = "LOCK: " + Math.round(lk*100) + "%";
+    if (!scopeLabel) return;
+    scopeLabel.textContent = "LOCK: " + Math.round(lockValue()*100) + "%";
   }
 
-  function drawScope(dt, nowMs){
-    if (!sw || !sh) return;
+  function drawScope(dt){
+    if (!ctx || !sw || !sh) return;
 
     const lk = lockValue();
     const corr = state.corruption;
@@ -1139,7 +1018,6 @@ canvas#scope{
 
     const noiseAmt = clamp(0.85 - 0.70*lk + 0.35*corr, 0.15, 0.95);
     const spikeProb = clamp(0.04 + 0.36*lk, 0.04, 0.70);
-
     const px = Math.max(1, Math.floor(dpr));
 
     for (let y=0;y<sh;y+=px){
@@ -1179,6 +1057,8 @@ canvas#scope{
 
     recompute();
     const rate = sps();
+
+    // cap: 20min base + extra by phase and purifier
     const cap = 60*20 + (state.phase*60*10) + (lv("purifier")*60*10);
     const effective = Math.min(dt, cap);
 
@@ -1191,12 +1071,318 @@ canvas#scope{
     pushLog("log","SYS",`OFFLINE RECOVERY: +${fmt(gained)} SIGNAL (${Math.floor(effective)}s simulated)`);
   }
 
-  // ===== Main tick
+  // ===== Gains
   function gain(x){ state.signal += x; state.total += x; }
 
+  // ===== Saves (Local + Cloud) with wipe-proof merge
+  const LOCAL_KEYS = [
+    "sygn1l_save_vA",
+    "sygn1l_save_v3",
+    "sygn1l_cloudsave_v3",
+    "sygn1l_save",
+  ];
+
+  let userId = null;
+  let cloudReady = false;
+  let lastCloudSaveAt = 0;
+
+  function normalizeLoadedState(data){
+    for (const k in data){
+      if (data[k] && typeof data[k] === "object" && state[k] && typeof state[k] === "object"){
+        Object.assign(state[k], data[k]);
+      } else {
+        state[k] = data[k];
+      }
+    }
+
+    state.upgrades = Object.assign({
+      dish:0, scan:0, probes:0, tuning:0,
+      autopinger:0, echo:0, lattice:0, dark:0,
+      firewall:0, purifier:0, deadband:0, decoderRig:0,
+      relicAmp:0
+    }, state.upgrades || {});
+
+    state.archive = Object.assign({
+      engramsSolved:0,
+      engramsTotal: FINAL_MESSAGE.length,
+      hasCipherKey:false,
+      awaitingRiteReset:false,
+      finalMessageRevealed:false,
+      scrambleSeed:(Math.floor(Math.random()*1e9)>>>0)
+    }, state.archive || {});
+
+    // Make sure timestamps exist
+    state.updatedAtMs = Number(state.updatedAtMs || 0);
+    state.lastTickMs = Number(state.lastTickMs || Date.now());
+  }
+
+  function loadFromKey(key){
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+
+  function saveLocal(){
+    touchUpdated();
+    localStorage.setItem(LOCAL_KEYS[0], JSON.stringify(state));
+    if ($("syncChip")) $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
+  }
+
+  function loadLocal(){
+    let best = null;
+    let bestUpdated = -1;
+
+    for (const key of LOCAL_KEYS){
+      const data = loadFromKey(key);
+      if (!data) continue;
+      const t = Number(data.updatedAtMs || 0);
+      if (t > bestUpdated){
+        bestUpdated = t;
+        best = data;
+      }
+    }
+
+    if (!best) return false;
+
+    normalizeLoadedState(best);
+    // migrate forward
+    localStorage.setItem(LOCAL_KEYS[0], JSON.stringify(state));
+    return true;
+  }
+
+  async function ensureSession(){
+    if (!supabase) return null;
+    try{
+      let { data: { session } } = await supabase.auth.getSession();
+      if (!session){
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) throw error;
+        session = data.session;
+      }
+      userId = session.user.id;
+      cloudReady = true;
+      if ($("syncChip")) $("syncChip").textContent = "SYNC: CLOUD";
+      return userId;
+    } catch {
+      cloudReady = false;
+      if ($("syncChip")) $("syncChip").textContent = "SYNC: OFFLINE";
+      return null;
+    }
+  }
+
+  async function loadCloud(){
+    if (!supabase || !cloudReady || !userId) return null;
+    try{
+      const { data, error } = await supabase
+        .from("saves")
+        .select("state, updated_at")
+        .eq("player_id", userId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data?.state) return null;
+
+      const cloudState = data.state;
+      const cloudUpdatedMs = cloudState.updatedAtMs || (data.updated_at ? Date.parse(data.updated_at) : 0);
+      return { cloudState, cloudUpdatedMs };
+    } catch {
+      cloudReady = false;
+      if ($("syncChip")) $("syncChip").textContent = "SYNC: OFFLINE";
+      return null;
+    }
+  }
+
+  async function saveCloud(force=false){
+    if (!supabase || !cloudReady || !userId) return false;
+
+    const now = Date.now();
+    if (!force && (now - lastCloudSaveAt) < 45000) return false;
+    lastCloudSaveAt = now;
+
+    try{
+      touchUpdated();
+      const payload = {
+        player_id: userId,
+        updated_at: new Date().toISOString(),
+        state: JSON.parse(JSON.stringify(state))
+      };
+      const { error } = await supabase.from("saves").upsert(payload);
+      if (error) throw error;
+      if ($("syncChip")) $("syncChip").textContent = "SYNC: CLOUD+LOCAL";
+      return true;
+    } catch {
+      cloudReady = false;
+      if ($("syncChip")) $("syncChip").textContent = "SYNC: OFFLINE";
+      return false;
+    }
+  }
+
+  async function initSaves(){
+    const localLoaded = loadLocal();
+
+    // If local didn't load, ensure blank can't appear “newer” than cloud
+    if (!localLoaded) state.updatedAtMs = 0;
+
+    await ensureSession();
+    const cloud = await loadCloud();
+
+    if (cloud?.cloudState){
+      const localUpdated = Number(state.updatedAtMs || 0);
+      const cloudUpdated = Number(cloud.cloudUpdatedMs || 0);
+
+      if (cloudUpdated > localUpdated){
+        normalizeLoadedState(cloud.cloudState);
+        pushLog("log","SYS","CLOUD SAVE LOADED (NEWER THAN LOCAL).");
+        localStorage.setItem(LOCAL_KEYS[0], JSON.stringify(state));
+      } else {
+        // Only push local if it actually loaded (prevents blank overwrite)
+        if (localLoaded && cloudReady){
+          await saveCloud(true);
+          pushLog("log","SYS","LOCAL SAVE PUSHED TO CLOUD (NEWER).");
+        } else {
+          pushLog("log","SYS","CLOUD PRESENT; LOCAL NOT LOADED. SKIPPING CLOUD OVERWRITE.");
+        }
+      }
+    } else {
+      if (localLoaded) pushLog("log","SYS","LOCAL SAVE LOADED.");
+      else {
+        pushLog("log","SYS","SYGN1L INITIALIZED. SILENCE IS UNPROCESSED DATA.");
+        pushLog("comms","OPS","Ping the Void so we can establish signal integrity.");
+        pushLog("comms","DR KESS","We need you to calibrate the dishes. That’s how the snowball starts.");
+      }
+    }
+  }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden"){
+      saveLocal();
+      saveCloud(true);
+    }
+  });
+
+  // ===== Username edit
+  async function editUsername(){
+    const html = `
+      <div class="muted" style="margin:0 0 10px">Set a callsign. Used in comms.</div>
+      <input id="nameInput" maxlength="18"
+        value="${escapeHtml(state.username === "Operator" ? "" : state.username)}"
+        placeholder="e.g. Corey"
+        style="width:100%;box-sizing:border-box;padding:12px;border-radius:12px;border:1px solid rgba(57,255,106,.35);background:rgba(0,0,0,.35);color:var(--text);font:inherit" />`;
+    const ok = await openModal("SET USERNAME", html, { okText:"SAVE", cancelText:"CANCEL" });
+    if (!ok) return;
+
+    const v = ($("nameInput")?.value || "").trim().replace(/\s+/g," ");
+    state.username = v || "Operator";
+    touchUpdated();
+    saveLocal();
+    saveCloud(true);
+    popupComms("OPS", `Alright, ${state.username}. Callsign confirmed.`);
+  }
+
+  // ===== Controls
+  const pingBtn = $("ping");
+  const briefingBtn = $("briefing");
+  const saveBtn = $("save");
+  const wipeBtn = $("wipe");
+  const prestigeBtn = $("prestige");
+  const userChip = $("userChip");
+
+  if (pingBtn){
+    pingBtn.onclick = () => {
+      markActive();
+      gain(state.clickPower * globalMult());
+      state.corruption = clamp(state.corruption + 0.0006, 0, 1);
+
+      touchUpdated();
+      renderHUD();
+      renderUpgrades();
+      renderDecoder();
+
+      saveLocal();
+      saveCloud(false);
+
+      if (state.total < 40) popupComms("OPS", `Ping it a few times, ${state.username}. Then buy Dish Calibration.`);
+    };
+  }
+
+  if (briefingBtn){
+    briefingBtn.onclick = () => {
+      markActive();
+      openModal(
+        "HOME BASE COMMUNIQUE",
+        `<div style="white-space:pre-wrap">
+<b>SYGN1L BRIEFING</b>
+
+Operator ${escapeHtml(state.username)}:
+Ping the Void to generate Signal.
+Spend Signal on Buffs to increase Signal/sec and Bandwidth.
+As phases unlock, the Array begins to answer.
+
+When the Decoder unlocks in Phase V, each Engram reveals more of an intercepted warning.
+If it says to reset, do it. The Array forgets. You don’t.
+</div>`,
+        { okText:"ACKNOWLEDGED", cancelText:"CLOSE" }
+      );
+    };
+  }
+
+  if (saveBtn){
+    saveBtn.onclick = () => {
+      markActive();
+      saveLocal();
+      saveCloud(true);
+      pushLog("log","SYS","STATE SAVED.");
+    };
+  }
+
+  if (wipeBtn){
+    wipeBtn.onclick = async () => {
+      markActive();
+      const ok = await confirmAction("WIPE", "This will delete LOCAL and CLOUD saves.\n\nAre you sure?", "WIPE");
+      if (!ok) return;
+
+      localStorage.removeItem(LOCAL_KEYS[0]);
+      // Optional: remove legacy keys too
+      for (const k of LOCAL_KEYS.slice(1)) localStorage.removeItem(k);
+
+      if (supabase && cloudReady && userId){
+        try{ await supabase.from("saves").delete().eq("player_id", userId); } catch(_){}
+      }
+      location.reload();
+    };
+  }
+
+  if (prestigeBtn){
+    prestigeBtn.onclick = async () => {
+      markActive();
+      const g = prestigeGain();
+      const ok = await confirmAction("RITE RESET", `You will reset this build for +${g} relics.\nDecoder progress persists.\n\nProceed?`, "RITE RESET");
+      if (!ok) return;
+
+      doRiteReset();
+      touchUpdated();
+      saveLocal();
+      saveCloud(true);
+
+      renderHUD();
+      renderUpgrades();
+      renderDecoder();
+    };
+  }
+
+  if (userChip){
+    userChip.onclick = () => {
+      markActive();
+      editUsername();
+    };
+  }
+
+  // ===== Upgrade refresh timer
+  let upgradesRefreshAcc = 0;
+  const UPGRADES_REFRESH_EVERY = 0.25;
+
+  // ===== Main loop
   function tick(dt){
     recompute();
-
     const rate = sps();
     if (rate > 0) gain(rate * dt);
 
@@ -1209,88 +1395,7 @@ canvas#scope{
     phaseCheck();
   }
 
-  // ===== Controls
-  $("ping").onclick = () => {
-    markActive();
-    gain(state.clickPower * globalMult());
-    state.corruption = clamp(state.corruption + 0.0006, 0, 1);
-
-    touchUpdated();
-    renderHUD();
-    renderUpgrades();
-    renderDecoder();
-
-    saveLocal();
-    saveCloud(false);
-
-    // gentle early hints
-    if (state.total < 40) popupComms("OPS", `Ping it a few times, ${state.username}. Then buy Dish Calibration.`);
-  };
-
-  $("briefing").onclick = () => {
-    markActive();
-    openModal(
-      "HOME BASE COMMUNIQUE",
-      `<div style="white-space:pre-wrap">
-<b>SYGN1L BRIEFING</b>
-
-Operator ${escapeHtml(state.username)}:
-Ping the Void to generate Signal.
-Spend Signal on Buffs to increase Signal/sec and Bandwidth.
-As phases unlock, the Array begins to answer.
-
-When the Decoder unlocks in Phase V, each Engram reveals more of an intercepted warning.
-If it says to reset, do it. The Array forgets. You don’t.
-</div>`,
-      { okText:"ACKNOWLEDGED", cancelText:"CLOSE" }
-    );
-  };
-
-  $("save").onclick = () => {
-    markActive();
-    saveLocal();
-    saveCloud(true);
-    pushLog("log","SYS","STATE SAVED.");
-  };
-
-  $("wipe").onclick = async () => {
-    markActive();
-    const ok = await confirmAction("WIPE", "This will delete LOCAL and CLOUD saves.\n\nAre you sure?", "WIPE");
-    if (!ok) return;
-
-    localStorage.removeItem(LOCAL_KEY);
-    if (cloudReady && userId){
-      try{ await supabase.from("saves").delete().eq("player_id", userId); } catch(_){}
-    }
-    location.reload();
-  };
-
-  $("prestige").onclick = async () => {
-    markActive();
-    const g = prestigeGain();
-    const ok = await confirmAction("RITE RESET", `You will reset this build for +${g} relics.\nDecoder progress persists.\n\nProceed?`, "RITE RESET");
-    if (!ok) return;
-
-    doRiteReset();
-    touchUpdated();
-    saveLocal();
-    saveCloud(true);
-
-    renderHUD();
-    renderUpgrades();
-    renderDecoder();
-  };
-
-  $("userChip").onclick = () => {
-    markActive();
-    editUsername();
-  };
-
-  // ===== Upgrades refresh timer (Fix for “stays locked until refresh”)
-  let upgradesRefreshAcc = 0;
-  const UPGRADES_REFRESH_EVERY = 0.25; // seconds
-
-  // ===== Boot
+  // ===== Boot render
   function renderUpfront(){
     recompute();
     renderHUD();
@@ -1298,7 +1403,7 @@ If it says to reset, do it. The Array forgets. You don’t.
     renderDecoder();
   }
 
-  // ===== Loop
+  // ===== Start loop
   let last = performance.now();
   function loop(now){
     const dt = Math.min(0.05, (now-last)/1000);
@@ -1313,22 +1418,17 @@ If it says to reset, do it. The Array forgets. You don’t.
       renderDecoder();
     }
 
-    drawScope(dt, now|0);
+    drawScope(dt);
     renderHUD();
 
     state.lastTickMs = Date.now();
     requestAnimationFrame(loop);
   }
 
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden"){
-      saveLocal();
-      saveCloud(true);
-    }
-  });
-
   // ===== Start
   resizeScope();
+  renderUpfront();
+
   initSaves().then(() => {
     applyOfflineProgress();
     renderUpfront();
@@ -1339,6 +1439,6 @@ If it says to reset, do it. The Array forgets. You don’t.
   });
 
 })();
-</script>
+
 </body>
 </html>
