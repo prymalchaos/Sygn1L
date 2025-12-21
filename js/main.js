@@ -499,8 +499,12 @@ import { createSaves } from "./saves.js";
         markActive();
         feedback(false);
 
-        const ph = Number(btn.getAttribute("data-ph")) || 1;
-        state.phase = clamp(ph, 1, 6);
+        // PATCH: align TOTAL to phase threshold so phaseCheck() doesn't snap back to P6
+        const ph = clamp(Number(btn.getAttribute("data-ph")) || 1, 1, 6);
+        state.total = (PHASES[ph - 1]?.at ?? 0) + 1; // +1 keeps it firmly inside the phase
+        state.signal = Math.max(state.signal, state.total); // optional but makes HUD feel consistent
+
+        state.phase = ph;
         setPhase(state.phase);
 
         touch();
