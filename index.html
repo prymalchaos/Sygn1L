@@ -6,84 +6,85 @@
   <title>SYGN1L</title>
 
   <style>
-    /* ===== Phase palette (recommended) ===== */
-/* ===== Dark CRT / Industrial Terminal Palette ===== */
-:root{
-  --bg0:#040707;
-  --bg1:#020404;
+    :root{
+      --bg0:#040707;
+      --bg1:#020404;
 
-  --text:#DFFFE8;
-  --muted:rgba(223,255,232,.72);
+      --text:#DFFFE8;
+      --muted:rgba(223,255,232,.72);
 
-  /* Phase accents (JS swaps --accent to these) */
-  --p0:#39FF6A; /* P1 green */
-  --p1:#58FFAE; /* P2 mint */
-  --p2:#7EF7FF; /* P3 cyan */
-  --p3:#A6FFF1; /* P4 icy */
-  --p4:#FF6BE5; /* P5 magenta */
-  --p5:#FF3B6B; /* P6 red */
+      --p0:#39FF6A; /* P1 green */
+      --p1:#58FFAE; /* P2 mint */
+      --p2:#7EF7FF; /* P3 cyan */
+      --p3:#A6FFF1; /* P4 icy */
+      --p4:#FF6BE5; /* P5 magenta */
+      --p5:#FF3B6B; /* P6 red */
 
-  --accent: var(--p0);
+      --accent: var(--p0);
 
-  /* Structural */
-  --radius:16px;
-  --shadow:0 14px 34px rgba(0,0,0,.72);
-  --border: rgba(160,255,210,.14);
-  --glass: rgba(0,0,0,.44);
-  --panel: rgba(6,14,10,.62);
+      --radius:16px;
+      --shadow:0 14px 34px rgba(0,0,0,.72);
+      --border: rgba(160,255,210,.14);
 
-  /* Glow */
-  --glowSoft: 0 0 14px color-mix(in srgb, var(--accent) 22%, transparent);
-  --glowHard: 0 0 24px color-mix(in srgb, var(--accent) 35%, transparent);
-}
+      --glowSoft: 0 0 14px rgba(57,255,106,.18);
+      --glowHard: 0 0 24px rgba(57,255,106,.28);
 
+      --danger:#FF3B6B;
+    }
 
-
-
-
-    html{ background:var(--bg); -webkit-text-size-adjust:100%; }
+    html{ background:var(--bg0); -webkit-text-size-adjust:100%; }
     body{
       margin:0;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       color:var(--text);
       background:
-        radial-gradient(900px 600px at 60% 10%, rgba(60,255,120,.12), transparent 60%),
-        linear-gradient(180deg, #010701, var(--bg));
+        radial-gradient(900px 600px at 60% 10%, rgba(57,255,106,.10), transparent 60%),
+        radial-gradient(700px 520px at 15% 30%, rgba(0,0,0,.35), transparent 60%),
+        linear-gradient(180deg, var(--bg1), var(--bg0));
       overflow-y:auto;
       -webkit-overflow-scrolling:touch;
       touch-action:manipulation;
-      padding: 12px 12px calc(24px + env(safe-area-inset-bottom));
+      padding:14px 12px calc(24px + env(safe-area-inset-bottom));
     }
 
-    /* CRT vignette + scanlines */
+    /* vignette */
     body::before{
       content:"";
       position:fixed; inset:0;
       pointer-events:none;
-      background: radial-gradient(1200px 900px at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.68) 100%);
+      background: radial-gradient(1200px 900px at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,0,0,.72) 100%);
       z-index:0;
     }
-    .scan{
-      position:fixed; inset:0;
-      pointer-events:none;
-      background: repeating-linear-gradient(
+
+    /* scanlines */
+    .fx{ position:fixed; inset:0; pointer-events:none; z-index:0; }
+    .fx.scanlines{
+      background:repeating-linear-gradient(
         to bottom,
-        rgba(60,255,120,.06),
-        rgba(60,255,120,.06) 1px,
+        rgba(255,255,255,.05),
+        rgba(255,255,255,.05) 1px,
         rgba(0,0,0,0) 4px,
         rgba(0,0,0,0) 8px
       );
-      opacity:.22;
-      z-index:0;
+      opacity:.14;
+      mix-blend-mode:screen;
     }
 
-    .wrap{ position:relative; z-index:1; max-width:860px; margin:0 auto; display:grid; gap:14px; }
+    .wrap{
+      position:relative; z-index:1;
+      max-width:860px;
+      margin:0 auto;
+      display:grid;
+      gap:18px;
+    }
 
     .card{
       border:1px solid var(--border);
-      border-radius:var(--r);
+      border-radius:var(--radius);
       box-shadow:var(--shadow);
-      background: linear-gradient(180deg, rgba(6,28,12,.62), rgba(3,14,7,.40));
+      background:
+        linear-gradient(180deg, rgba(0,0,0,.58), rgba(0,0,0,.36)),
+        radial-gradient(1200px 800px at 50% 0%, rgba(255,255,255,.06), transparent 55%);
       overflow:hidden;
       position:relative;
     }
@@ -91,397 +92,327 @@
       content:"";
       position:absolute; inset:-2px;
       pointer-events:none;
-      box-shadow: inset 0 0 0 1px rgba(60,255,120,.08), inset 0 0 22px rgba(60,255,120,.06);
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,.05),
+        inset 0 0 26px rgba(0,0,0,.55);
+    }
+
+    .pad{ padding:14px; position:relative; }
+
+    h1{
+      margin:0;
+      letter-spacing:.25em;
+      font-size:18px;
+    }
+    .subtitle{
+      margin-top:6px;
+      font-size:12px;
+      color:var(--muted);
+      letter-spacing:.06em;
+    }
+
+    .stats{
+      margin-top:12px;
+      display:grid;
+      grid-template-columns:1fr;
+      gap:10px;
+    }
+    @media(min-width:420px){ .stats{ grid-template-columns:repeat(3,1fr); } }
+
+    .stat{
+      border:1px solid rgba(255,255,255,.06);
+      border-radius:12px;
+      padding:10px;
+      background:rgba(0,0,0,.38);
+    }
+    .stat .k{
+      font-size:11px;
+      color:rgba(223,255,232,.60);
+      letter-spacing:.10em;
+      text-transform:uppercase;
+    }
+    .stat .v{
+      margin-top:6px;
+      font-size:18px;
+      overflow-wrap:anywhere;
+      color:rgba(223,255,232,.96);
+      text-shadow:0 0 10px rgba(0,0,0,.55);
     }
 
     .hd{
-      display:flex; justify-content:space-between; align-items:center;
-      flex-wrap:wrap; gap:10px;
-      padding:10px 12px;
-      border-bottom:1px solid rgba(60,255,120,.2);
-      background: linear-gradient(180deg, rgba(0,0,0,.22), rgba(0,0,0,0));
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:10px;
+      padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      background:linear-gradient(180deg, rgba(0,0,0,.30), rgba(0,0,0,0));
+      position:relative;
     }
-    .pad{ padding:12px; position:relative; }
-
-    h1{ margin:0; letter-spacing:.22em; font-size:18px; }
-    .sub{ margin-top:6px; font-size:12px; color:var(--muted); letter-spacing:.06em; }
 
     .chip{
-      border:1px solid rgba(60,255,120,.25);
+      border:1px solid rgba(255,255,255,.08);
       border-radius:999px;
       padding:6px 10px;
       font-size:10px;
       letter-spacing:.14em;
-      display:inline-flex; align-items:center; gap:8px;
-      background: rgba(0,0,0,.22);
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      background:rgba(0,0,0,.38);
       white-space:nowrap;
       user-select:none;
+      -webkit-tap-highlight-color:transparent;
     }
+    .chip.clickable{ cursor:pointer; }
     .dot{
       width:8px;height:8px;border-radius:50%;
-      background: var(--accent);
-      box-shadow: 0 0 14px rgba(60,255,120,.25);
+      background:var(--accent);
+      box-shadow:0 0 20px rgba(57,255,106,.30);
     }
-    .chip.clicky{ cursor:pointer; }
-    .chip.clicky:active{ transform: translateY(1px); }
 
-    .stats{ display:grid; grid-template-columns:1fr; gap:10px; margin-top:10px; }
-    @media(min-width:420px){ .stats{ grid-template-columns:repeat(3,1fr); } }
-
-    .stat{
-      border:1px solid rgba(60,255,120,.2);
-      border-radius:12px;
-      padding:10px;
-      background: rgba(0,0,0,.30);
+    .muted{
+      margin-top:10px;
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.45;
     }
-    .k{ font-size:11px; color:var(--muted); letter-spacing:.10em; text-transform:uppercase; }
-    .v{ margin-top:6px; font-size:18px; text-shadow:0 0 10px rgba(60,255,120,.10); overflow-wrap:anywhere; }
-
-    .bar{
-      height:10px; border-radius:999px;
-      border:1px solid rgba(60,255,120,.22);
-      background: rgba(0,0,0,.28);
-      overflow:hidden;
-    }
-    .fill{ height:100%; width:0%; background: linear-gradient(90deg, rgba(60,255,120,.55), rgba(60,255,120,.18)); }
-    .fill.danger{ background: linear-gradient(90deg, rgba(255,59,107,.55), rgba(255,59,107,.18)); }
 
     button{
       font:inherit;
       border-radius:14px;
-      border:1px solid rgba(60,255,120,.32);
-      background: rgba(60,255,120,.08);
-      color:var(--text);
-      padding:14px 12px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.32);
+      color:rgba(223,255,232,.94);
+      padding:14px;
       cursor:pointer;
       user-select:none;
       -webkit-tap-highlight-color:transparent;
-      transition: .12s;
-      letter-spacing:.10em;
-      text-transform:uppercase;
+      transition:.15s;
     }
-    button:active{ transform: translateY(1px); }
-    button:disabled{ opacity:.55; cursor:not-allowed; box-shadow:none; }
+    button:hover{ box-shadow:0 0 14px rgba(57,255,106,.15); }
+    button:active{ transform:translateY(1px); }
+    button:disabled{ opacity:.45; cursor:not-allowed; box-shadow:none; filter:saturate(.85); }
 
     .big{
       width:100%;
       font-weight:900;
+      letter-spacing:.14em;
       font-size:18px;
       padding:18px 14px;
-      background: linear-gradient(180deg, rgba(60,255,120,.18), rgba(60,255,120,.06));
-      box-shadow: inset 0 0 0 1px rgba(60,255,120,.10);
+      background:linear-gradient(180deg, rgba(57,255,106,.14), rgba(0,0,0,.34));
+      box-shadow: inset 0 0 0 1px rgba(57,255,106,.14), 0 10px 26px rgba(0,0,0,.45);
     }
 
-    /* 2 buttons per row */
-    .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
-    .grid2 > * { min-width: 0; }
+    .grid2{ display:grid; gap:10px; margin-top:12px; }
+    @media(min-width:420px){ .grid2{ grid-template-columns:1fr 1fr; } }
 
-    .muted{ margin-top:10px; font-size:12px; color:var(--muted); line-height:1.45; }
+    .bar{
+      height:10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);
+      background:rgba(0,0,0,.28);
+      overflow:hidden;
+    }
+    .fill{
+      height:100%;
+      width:0%;
+      background:linear-gradient(90deg, rgba(57,255,106,.55), rgba(57,255,106,.18));
+      box-shadow:0 0 16px rgba(57,255,106,.18);
+    }
+    .fill.danger{
+      background:linear-gradient(90deg, rgba(255,59,107,.62), rgba(255,59,107,.18));
+      box-shadow:0 0 16px rgba(255,59,107,.20);
+    }
 
-    /* Scope */
+    /* scope panel */
     .scopeWrap{
       margin-top:10px;
-      border:1px solid rgba(60,255,120,.22);
+      border:1px solid rgba(255,255,255,.08);
       border-radius:12px;
-      background: rgba(0,0,0,.35);
+      background:rgba(0,0,0,.40);
       overflow:hidden;
     }
     .scopeTop{
-      display:flex; justify-content:space-between; gap:10px;
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
       padding:8px 10px;
-      border-bottom:1px solid rgba(60,255,120,.14);
-      font-size:10px; letter-spacing:.12em;
-      color: rgba(207,255,214,.92);
+      border-bottom:1px solid rgba(255,255,255,.06);
+      font-size:10px;
+      letter-spacing:.12em;
+      color:rgba(223,255,232,.90);
     }
-    .scopeMeta{ color:var(--muted); letter-spacing:.10em; text-transform:uppercase; }
-    canvas#scope{ display:block; width:100%; height:84px; background: rgba(0,0,0,.25); }
+    .scopeMeta{
+      color:var(--muted);
+      letter-spacing:.10em;
+      text-transform:uppercase;
+    }
+    canvas#scope{
+      display:block;
+      width:100%;
+      height:84px;
+      background:rgba(0,0,0,.25);
+    }
 
-    /* Upgrades */
-    .upgrades{ display:flex; flex-direction:column; gap:10px; }
+    /* upgrades list */
+    .upgrades{ display:flex; flex-direction:column; gap:12px; }
     .up{
-      border:1px solid rgba(60,255,120,.2);
+      border:1px solid rgba(255,255,255,.08);
       border-radius:14px;
       padding:12px;
-      background: rgba(0,0,0,.30);
-      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      background:rgba(0,0,0,.38);
+      display:flex;
+      flex-wrap:wrap;
+      gap:12px;
+      align-items:center;
+      position:relative;
     }
-    .up.afford{ box-shadow: var(--glow); border-color: rgba(60,255,120,.36); }
-    .up.locked{ opacity:.62; border-style:dashed; }
-    .meta{ flex:1; min-width:200px; }
-    .name{ font-weight:900; letter-spacing:.04em; }
-    .desc,.cost{ font-size:12px; margin-top:6px; color:var(--muted); }
-    .cost{ color: rgba(207,255,214,.92); }
+    .up.afford{
+      border-color: rgba(57,255,106,.26);
+      box-shadow:0 0 14px rgba(57,255,106,.14);
+    }
+    .up.locked{ opacity:.60; border-style:dashed; }
 
-    /* Logs */
-    .log{ max-height:300px; overflow:auto; -webkit-overflow-scrolling:touch; }
-    .log p{ margin:0 0 10px; font-size:12px; line-height:1.55; color: rgba(207,255,214,.90); }
+    .up .meta{ flex:1; min-width:220px; }
+    .up .name{ font-weight:900; letter-spacing:.04em; }
+    .up .desc,.up .cost{ font-size:12px; margin-top:6px; color:var(--muted); }
+    .up .cost{ color:rgba(223,255,232,.88); }
+
+    /* logs */
+    .log{
+      max-height:320px;
+      overflow:auto;
+      -webkit-overflow-scrolling:touch;
+    }
+    .log p{
+      margin:0 0 10px;
+      font-size:12px;
+      line-height:1.55;
+      color:rgba(223,255,232,.90);
+    }
     .tag{
       display:inline-block;
       padding:2px 8px;
-      border:1px solid rgba(60,255,120,.22);
+      border:1px solid rgba(255,255,255,.10);
       border-radius:999px;
       font-size:10px;
       letter-spacing:.10em;
+      color:rgba(223,255,232,.92);
       margin-right:8px;
-      color: rgba(207,255,214,.95);
     }
 
-    /* Popup comms */
+    /* popups */
     .popHost{
-      position:fixed; top:12px; left:12px; right:12px;
+      position:fixed;
+      top:12px;
+      left:12px;
+      right:12px;
       z-index:999;
-      display:flex; flex-direction:column; gap:10px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
       pointer-events:none;
     }
     .pop{
       pointer-events:auto;
       max-width:860px;
       margin:0 auto;
-      border:1px solid rgba(60,255,120,.25);
+      border:1px solid rgba(57,255,106,.26);
       border-radius:14px;
-      background: rgba(0,0,0,.76);
-      box-shadow: 0 10px 26px rgba(0,0,0,.55), 0 0 20px rgba(60,255,120,.12);
+      background:rgba(0,0,0,.80);
+      box-shadow:0 14px 34px rgba(0,0,0,.62), 0 0 20px rgba(57,255,106,.12);
       padding:10px 12px;
+      animation: popin .14s ease-out;
+      cursor:pointer;
+      user-select:none;
     }
-    .pop .who{ font-size:10px; letter-spacing:.14em; color: var(--muted); text-transform:uppercase; margin-bottom:6px; }
-    .pop .msg{ font-size:12px; line-height:1.5; }
-    .pop .hint{ font-size:10px; color: rgba(207,255,214,.7); margin-top:6px; letter-spacing:.08em; }
+    @keyframes popin{ from{ transform:translateY(-6px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+    .pop .who{
+      font-size:10px;
+      letter-spacing:.14em;
+      color:rgba(126,219,146,.95);
+      margin-bottom:6px;
+      text-transform:uppercase;
+    }
+    .pop .msg{
+      font-size:12px;
+      line-height:1.5;
+      color:rgba(223,255,232,.94);
+    }
+    .pop .hint{
+      margin-top:6px;
+      font-size:10px;
+      color:rgba(223,255,232,.58);
+      letter-spacing:.12em;
+      text-transform:uppercase;
+    }
 
-    /* Modal */
+    /* modal */
     .modalBack{
       position:fixed; inset:0;
       display:none;
-      background: rgba(0,0,0,.72);
-      z-index:1000;
       align-items:center;
       justify-content:center;
-      padding: 14px;
+      padding:14px;
+      z-index:1000;
+      background:rgba(0,0,0,.66);
     }
     .modal{
       width:min(860px, 100%);
-      max-height: min(80vh, 640px);
+      max-height:min(78vh, 720px);
       overflow:auto;
       -webkit-overflow-scrolling:touch;
-      border:1px solid rgba(60,255,120,.25);
-      border-radius: 16px;
-      background: rgba(0,0,0,.82);
-      box-shadow: 0 16px 40px rgba(0,0,0,.65), 0 0 18px rgba(60,255,120,.14);
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(0,0,0,.82);
+      box-shadow:0 18px 50px rgba(0,0,0,.70);
     }
     .modalHd{
-      position:sticky; top:0;
-      padding:10px 12px;
-      border-bottom:1px solid rgba(60,255,120,.18);
-      background: rgba(0,0,0,.90);
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,.08);
     }
-    .modalTitle{ font-size:12px; letter-spacing:.14em; text-transform:uppercase; color: rgba(207,255,214,.95); }
-    .modalBody{ padding:12px; color: rgba(207,255,214,.92); font-size:12px; line-height:1.55; }
+    .modalTitle{
+      font-weight:900;
+      letter-spacing:.14em;
+      font-size:12px;
+      color:rgba(223,255,232,.92);
+      text-transform:uppercase;
+    }
+    .modalBody{
+      padding:14px;
+      font-size:13px;
+      line-height:1.55;
+      color:rgba(223,255,232,.92);
+    }
     .texty{
       width:100%;
       box-sizing:border-box;
       border-radius:12px;
-      border:1px solid rgba(60,255,120,.25);
-      background: rgba(0,0,0,.35);
-      color: var(--text);
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.40);
+      color:rgba(223,255,232,.95);
       padding:12px;
       font:inherit;
       outline:none;
     }
-    
-    /* ===== Make the whole UI obey --accent ===== */
-.card,
-.stat,
-.up,
-.chip,
-button,
-.scopeWrap{
-  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
-}
-
-.card::after{
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent),
-    inset 0 0 22px color-mix(in srgb, var(--accent) 10%, transparent);
-}
-
-.dot{
-  background: var(--accent);
-  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 55%, transparent);
-}
-
-button:hover{
-  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent);
-}
-
-.big{
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent) 18%, transparent),
-    color-mix(in srgb, var(--accent) 6%, transparent)
-  );
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
-}
-
-.fill{
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--accent) 60%, transparent),
-    color-mix(in srgb, var(--accent) 18%, transparent)
-  );
-  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 20%, transparent);
-}
-
-/* Scanlines subtly shift with phase */
-.fx.scanlines{
-  background: repeating-linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--accent) 18%, transparent),
-    color-mix(in srgb, var(--accent) 18%, transparent) 1px,
-    rgba(0,0,0,0) 4px,
-    rgba(0,0,0,0) 8px
-  );
-  opacity:.22;
-}
-
-/* Popup comms tint */
-.pop{
-  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
-  box-shadow:
-    0 10px 26px rgba(0,0,0,.55),
-    0 0 20px color-mix(in srgb, var(--accent) 18%, transparent);
-}
-.pop .who{ color: color-mix(in srgb, var(--accent) 60%, #9CFFB2); }
-
-/* Keep corruption visually dangerous */
-.fill.danger{
-  background: linear-gradient(90deg, rgba(255,59,107,.55), rgba(255,59,107,.18));
-  box-shadow: 0 0 18px rgba(255,59,107,.18);
-}
-/* ===== Dark CRT / Industrial Terminal Palette ===== */
-
-
-/* ===== Keep the page dark (prevents “washed card” effect) ===== */
-body{
-  background:
-    radial-gradient(900px 600px at 60% 10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%),
-    radial-gradient(700px 520px at 15% 30%, rgba(0,0,0,.35), transparent 60%),
-    linear-gradient(180deg, var(--bg1), var(--bg0));
-  color:var(--text);
-}
-
-/* ===== Cards: darker glass + subtle inner CRT edge ===== */
-.card{
-  background:
-    linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.35)),
-    radial-gradient(1200px 800px at 50% 0%, rgba(255,255,255,.06), transparent 55%);
-  border:1px solid var(--border);
-  box-shadow: var(--shadow);
-}
-.card::after{
-  box-shadow:
-    inset 0 0 0 1px rgba(255,255,255,.05),
-    inset 0 0 26px rgba(0,0,0,.55);
-}
-
-/* ===== Chips + stat boxes: keep dark, only edges glow ===== */
-.chip,
-.stat,
-.up,
-.scopeWrap{
-  background: rgba(0,0,0,.38);
-  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
-}
-
-/* Dot stays bright */
-.dot{
-  background: var(--accent);
-  box-shadow: var(--glowHard);
-}
-
-/* ===== Text contrast ===== */
-.subtitle{ color: var(--muted); }
-.stat .k{ color: rgba(223,255,232,.60); }
-.stat .v{
-  color: rgba(223,255,232,.96);
-  text-shadow: 0 0 10px rgba(0,0,0,.55);
-}
-
-/* ===== Buttons: darker base, bright rim when available ===== */
-button{
-  background: rgba(0,0,0,.32);
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
-  color: rgba(223,255,232,.94);
-}
-button:hover{ box-shadow: var(--glowSoft); }
-button:disabled{
-  opacity:.45;
-  box-shadow:none;
-  filter:saturate(.85);
-}
-
-/* Primary button */
-.big{
-  background:
-    linear-gradient(180deg,
-      color-mix(in srgb, var(--accent) 14%, transparent),
-      rgba(0,0,0,.34)
-    );
-  box-shadow:
-    inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent),
-    0 10px 26px rgba(0,0,0,.45);
-}
-
-/* Affordable upgrade rows glow, without brightening the whole card */
-.up.afford{
-  box-shadow: var(--glowSoft);
-  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-}
-
-/* ===== Fill bar uses accent but stays readable ===== */
-.fill{
-  background: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--accent) 55%, transparent),
-    color-mix(in srgb, var(--accent) 18%, transparent)
-  );
-  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 18%, transparent);
-}
-
-/* Corruption stays red */
-.fill.danger{
-  background: linear-gradient(90deg, rgba(255,59,107,.62), rgba(255,59,107,.18));
-  box-shadow: 0 0 16px rgba(255,59,107,.20);
-}
-
-/* ===== Scanlines toned down (too much = wash) ===== */
-.fx.scanlines{
-  opacity:.16;
-}
-
-/* ===== Popups: darker, sharper, readable ===== */
-.pop{
-  background: rgba(0,0,0,.78);
-  border:1px solid color-mix(in srgb, var(--accent) 26%, transparent);
-  box-shadow:
-    0 14px 34px rgba(0,0,0,.62),
-    0 0 20px color-mix(in srgb, var(--accent) 14%, transparent);
-}
-.pop .who{ color: color-mix(in srgb, var(--accent) 55%, rgba(223,255,232,.85)); }
-.pop .msg{ color: rgba(223,255,232,.94); }
-
-
   </style>
 </head>
 
 <body>
-  <div class="scan"></div>
-  <div class="popHost" id="popHost"></div>
+  <div class="fx scanlines"></div>
+  <div class="popHost" id="popHost" aria-live="polite"></div>
 
   <!-- Modal -->
   <div class="modalBack" id="modalBack" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal">
       <div class="modalHd">
-        <div class="modalTitle" id="modalTitle">TRANSMISSION</div>
+        <div class="modalTitle" id="modalTitle">DIALOG</div>
         <button id="modalClose" style="padding:10px 12px">CLOSE</button>
       </div>
       <div class="modalBody" id="modalBody"></div>
@@ -489,16 +420,16 @@ button:disabled{
   </div>
 
   <div class="wrap">
-
+    <!-- Header / HUD -->
     <header class="card">
       <div class="pad">
         <h1>SYGN1L</h1>
-        <div class="sub" id="subtitle">THE ARRAY LISTENS. THE VOID REPLIES IN ARITHMETIC.</div>
+        <div class="subtitle" id="subtitle">THE ARRAY LISTENS. THE VOID REPLIES IN ARITHMETIC.</div>
 
         <div class="stats">
           <div class="stat"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
           <div class="stat"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
-          <div class="stat"><div class="k">PHASE TINT</div><div class="v" id="phaseTint">P1</div></div>
+          <div class="stat"><div class="k">PHASE</div><div class="v" id="phaseTint">P1</div></div>
         </div>
 
         <div class="scopeWrap">
@@ -510,6 +441,7 @@ button:disabled{
         </div>
 
         <div style="height:10px"></div>
+
         <div class="stat">
           <div class="k">CORRUPTION</div>
           <div class="bar"><div class="fill danger" id="corrFill"></div></div>
@@ -518,6 +450,7 @@ button:disabled{
       </div>
     </header>
 
+    <!-- Control Panel -->
     <section class="card">
       <div class="hd">
         <div>
@@ -527,9 +460,8 @@ button:disabled{
           <span class="chip" id="relicChip">RELICS: 0</span>
         </div>
         <div>
-          <span class="chip clicky" id="userChip" title="Tap to set username">USER: GUEST</span>
           <span class="chip" id="syncChip">SYNC: LOCAL</span>
-          <span class="chip" id="aiChip">AI: OFF</span>
+          <span class="chip clickable" id="userChip" title="Tap to edit username">USER: GUEST</span>
         </div>
       </div>
 
@@ -538,82 +470,89 @@ button:disabled{
 
         <div class="grid2">
           <button id="saveBtn">SAVE</button>
-          <button id="helpBtn">MANUAL</button>
-        </div>
-
-        <div class="grid2">
-          <button id="riteBtn" disabled>RITE</button>
           <button id="wipeBtn">WIPE</button>
         </div>
 
         <div class="grid2">
-          <button id="aiBtn">AI COMMS</button>
+          <button id="riteBtn" disabled>RITE</button>
           <button id="fbBtn">FEEDBACK</button>
         </div>
 
-        <div class="muted" id="objective">OBJECTIVE: Tap PING VOID, then buy DISH.</div>
+        <div class="grid2">
+          <button id="aiBtn">AI COMMS</button>
+          <span class="chip" id="aiChip">AI: OFF</span>
+        </div>
+
+        <div class="grid2">
+          <button id="helpBtn">MANUAL</button>
+          <span class="chip" id="authStatus">STATUS: NOT SIGNED IN</span>
+        </div>
+
+        <div class="muted" id="objective">
+          OBJECTIVE: Tap PING VOID, then buy DISH to start passive Signal/sec.
+        </div>
       </div>
     </section>
 
-   
-
+    <!-- Upgrades -->
     <section class="card">
       <div class="hd">
         <div>BUFFS</div>
-        <div class="muted">AVAILABLE BUFFS GLOW</div>
+        <div class="muted">Available buffs glow. Locked buffs show requirements.</div>
       </div>
       <div class="pad">
         <div class="upgrades" id="upgrades"></div>
       </div>
     </section>
 
+    <!-- Comms -->
     <section class="card">
       <div class="hd">
-        <div>COMMS</div>
-        <div class="muted">TAP POPUPS TO CLOSE</div>
+        <div>COMMUNICATIONS</div>
+        <div class="muted">Tap popups to close.</div>
       </div>
       <div class="pad">
         <div class="log" id="comms"></div>
       </div>
     </section>
 
+    <!-- Log -->
     <section class="card">
       <div class="hd">
-        <div>LOG</div>
-        <div class="muted">MILESTONES REVEAL CONTEXT</div>
+        <div>TRANSMISSION LOG</div>
+        <div class="muted">Milestones reveal context.</div>
       </div>
       <div class="pad">
         <div class="log" id="log"></div>
       </div>
     </section>
-    
-     <section class="card">
+
+    <!-- Auth -->
+    <section class="card">
       <div class="hd">
         <div>ACCOUNT</div>
-        <div class="muted">EMAIL/PASS TO SYNC SAVES</div>
+        <div class="muted">Email/password for cross-device cloud saves.</div>
       </div>
       <div class="pad">
-        <input class="texty" id="email" placeholder="email" autocomplete="email" inputmode="email" />
+        <input class="texty" id="email" placeholder="EMAIL" inputmode="email" autocomplete="email" />
         <div style="height:10px"></div>
-        <input class="texty" id="pass" placeholder="password" autocomplete="current-password" type="password" />
+        <input class="texty" id="pass" placeholder="PASSWORD" type="password" autocomplete="current-password" />
         <div class="grid2">
-          <button id="signUpBtn">SIGNUP</button>
-          <button id="signInBtn">SIGNIN</button>
+          <button id="signUpBtn">SIGN UP</button>
+          <button id="signInBtn">SIGN IN</button>
         </div>
         <div class="grid2">
-          <button id="signOutBtn" disabled>SIGNOUT</button>
+          <button id="signOutBtn" disabled>SIGN OUT</button>
           <button id="whoBtn">WHOAMI</button>
         </div>
-        <div class="muted" id="authStatus">STATUS: NOT SIGNED IN</div>
       </div>
     </section>
-
   </div>
 
-  <!-- Supabase JS (required for auth + db + functions.invoke) -->
+  <!-- Supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Your game logic -->
-  <script src="./sygn1l.js"></script>
+  <!-- Game entry point (ES module) -->
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>
