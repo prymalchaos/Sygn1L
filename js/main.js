@@ -557,45 +557,47 @@ import { createSaves } from "./saves.js";
   }
 
   async function applyPhaseSnapshot(ph) {
-    const snap = PHASE_SNAPSHOTS[clamp(Number(ph) || 1, 1, 6)];
-    if (!snap) return;
+  const snap = PHASE_SNAPSHOTS[clamp(Number(ph) || 1, 1, 6)];
+  if (!snap) return;
 
-    const keepName = (state.profile?.name || "GUEST").toUpperCase().slice(0, 18);
+  const keepName = (state.profile?.name || "GUEST").toUpperCase().slice(0, 18);
 
-    state.build = snap.build;
-    state.relics = snap.relics;
-    state.signal = snap.signal;
-    state.total = snap.total;
-    state.corruption = snap.corruption;
-    state.phase = snap.phase;
+  state.build = snap.build;
+  state.relics = snap.relics;
+  state.signal = snap.signal;
+  state.total = snap.total;
+  state.corruption = snap.corruption;
+  state.phase = snap.phase;
 
-    state.up = {
-      dish: snap.up.dish || 0,
-      scan: snap.up.scan || 0,
-      probes: snap.up.probes || 0,
-      auto: snap.up.auto || 0,
-      stabil: snap.up.stabil || 0,
-      relicAmp: snap.up.relicAmp || 0
-    };
+  state.up = {
+    dish: snap.up.dish || 0,
+    scan: snap.up.scan || 0,
+    probes: snap.up.probes || 0,
+    auto: snap.up.auto || 0,
+    stabil: snap.up.stabil || 0,
+    relicAmp: snap.up.relicAmp || 0
+  };
 
-    state.lastAmbientAt = 0;
-    state.lastAiAt = 0;
+  state.lastAmbientAt = 0;
+  state.lastAiAt = 0;
 
-    state.profile.name = keepName;
+  state.profile.name = keepName;
 
-    touch();
-    recompute();
+  touch();
+  recompute();
 
-    // IMPORTANT: do NOT call setPhase(state.phase) here.
-    // Phase is derived from total via phaseCheck() inside renderAll().
-    renderAll();
+  // ✅ PATCH: force immediate phase UI sync (tint/status/subtitle/objective)
+  setPhase(state.phase);
 
-    saves.saveLocal(state);
-    if (saves.isSignedIn()) {
-      try { await saves.saveCloud(state, { force: true }); } catch {}
-    }
+  // Then render everything else
+  renderAll();
+
+  // Persist
+  saves.saveLocal(state);
+  if (saves.isSignedIn()) {
+    try { await saves.saveCloud(state, { force: true }); } catch {}
   }
-
+}
   function injectDevPanel() {
     if (document.getElementById("devPanel")) return;
 
