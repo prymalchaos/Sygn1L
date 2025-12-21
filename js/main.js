@@ -494,27 +494,38 @@ import { createSaves } from "./saves.js";
     wrap.prepend(card);
 
     // Phase jump
-    card.querySelectorAll("button[data-ph]").forEach((btn) => {
-      btn.onclick = async () => {
-        markActive();
-        feedback(false);
+// Phase jump
+card.querySelectorAll("button[data-ph]").forEach((btn) => {
+  btn.onclick = async () => {
+    markActive();
+    feedback(false);
 
-        // PATCH: align TOTAL to phase threshold so phaseCheck() doesn't snap back to P6
-        const ph = clamp(Number(btn.getAttribute("data-ph")) || 1, 1, 6);
-        state.total = (PHASES[ph - 1]?.at ?? 0) + 1; // +1 keeps it firmly inside the phase
-        state.signal = Math.max(state.signal, state.total); // optional but makes HUD feel consistent
+    // Use dataset + parseInt to avoid any weird attribute parsing
+    const phRaw = parseInt(btn.dataset.ph, 10);
+    const ph = (Number.isFinite(phRaw) ? phRaw : 1);
 
-        state.phase = ph;
-        setPhase(state.phase);
+    // Clamp safely without relying on clamp() handling NaN
+    const target = Math.max(1, Math.min(6, ph));
 
-        touch();
-        saves.saveLocal(state);
-        if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(() => {});
-        renderAll();
+    // CRITICAL: align TOTAL to the chosen phase so phaseCheck() doesn't snap back to P6
+    const at = PHASES[target - 1]?.at ?? 0;
+    const nextAt = (target < 6) ? (PHASES[target]?.at ?? (at + 1)) : (at + 1);
 
-        popup("SYS", `DEV: PHASE ${state.phase}`);
-      };
-    });
+    // Put total inside the band for that phase:
+    // [at, nextAt) so reverse-scan phaseCheck lands exactly on `target`
+    state.total = at + Math.max(1, Math.floor((nextAt - at) * 0.25));
+    state.signal = Math.max(state.signal, state.total); // keeps HUD feeling sane
+
+    setPhase(target);
+
+    touch();
+    saves.saveLocal(state);
+    if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(() => {});
+    renderAll();
+
+    popup("SYS", `DEV: PHASE ${state.phase}`);
+  };
+});
 
     // Cheats
     $("devAddSignal").onclick = async () => {
