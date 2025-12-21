@@ -37,8 +37,8 @@ import { createSaves } from "./saves.js";
   // - Set ONE of these to your own account.
   // - Leave both as-is to disable dev mode entirely.
   // ----------------------------
-  const DEV_MASTER_UID = "";     // e.g. "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-  const DEV_MASTER_EMAIL = "";   // e.g. "you@domain.com"
+  const DEV_MASTER_UID = "7ac61fd5-1d8a-4c27-95b9-a491f2121380";     // e.g. "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  const DEV_MASTER_EMAIL = "cursingstone@gmail.com";   // e.g. "you@domain.com"
 
   // ----------------------------
   // Activity gating
