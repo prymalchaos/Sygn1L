@@ -5,17 +5,21 @@ import { createSaves } from "./saves.js";
   const $ = (id) => document.getElementById(id);
 
   // Prevent iOS double-tap zoom on buttons
-  document.addEventListener("dblclick", (e) => {
-    if (e.target && e.target.closest("button")) e.preventDefault();
-  }, { passive: false });
+  document.addEventListener(
+    "dblclick",
+    (e) => {
+      if (e.target && e.target.closest("button")) e.preventDefault();
+    },
+    { passive: false }
+  );
 
   // ----------------------------
   // Tunables
   // ----------------------------
-  const OFFLINE_CAP_SEC = 6 * 60 * 60;     // 6 hours max offline gain
-  const ACTIVE_WINDOW_MS = 20_000;         // “active” if interacted in last 20s
-  const AMBIENT_EVERY_MS = 300_000;        // ~3 minutes
-  const EDGE_FUNCTION = "sygn1l-comms";    // Supabase Edge Function name
+  const OFFLINE_CAP_SEC = 6 * 60 * 60; // 6 hours max offline gain
+  const ACTIVE_WINDOW_MS = 20_000; // “active” if interacted in last 20s
+  const AMBIENT_EVERY_MS = 300_000; // ✅ 5 minutes
+  const EDGE_FUNCTION = "sygn1l-comms"; // Supabase Edge Function name
 
   // ----------------------------
   // Activity gating
@@ -24,7 +28,7 @@ import { createSaves } from "./saves.js";
   const markActive = () => (lastActionAt = Date.now());
   window.addEventListener("pointerdown", markActive, { passive: true });
   window.addEventListener("keydown", markActive, { passive: true });
-  const isActive = () => (Date.now() - lastActionAt) <= ACTIVE_WINDOW_MS;
+  const isActive = () => Date.now() - lastActionAt <= ACTIVE_WINDOW_MS;
 
   // ----------------------------
   // Feedback (haptic/click)
@@ -34,7 +38,10 @@ import { createSaves } from "./saves.js";
 
   function haptic(ms = 10) {
     if (!feedbackOn) return false;
-    if (navigator.vibrate) { navigator.vibrate([ms]); return true; }
+    if (navigator.vibrate) {
+      navigator.vibrate([ms]);
+      return true;
+    }
     return false;
   }
 
@@ -48,12 +55,13 @@ import { createSaves } from "./saves.js";
       o.type = "square";
       o.frequency.value = 820;
       g.gain.value = 0.00001;
-      o.connect(g); g.connect(ctx.destination);
+      o.connect(g);
+      g.connect(ctx.destination);
       o.start();
       const t = ctx.currentTime;
       g.gain.setValueAtTime(0.00001, t);
       g.gain.exponentialRampToValueAtTime(0.022, t + 0.006);
-      g.gain.exponentialRampToValueAtTime(0.00001, t + 0.050);
+      g.gain.exponentialRampToValueAtTime(0.00001, t + 0.05);
       o.stop(t + 0.055);
     } catch {}
   }
@@ -68,16 +76,23 @@ import { createSaves } from "./saves.js";
   // ----------------------------
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   const nowMs = () => Date.now();
-  const esc = (s) => String(s)
-    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+  const esc = (s) =>
+    String(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
 
   function fmt(n) {
     n = Number(n) || 0;
     if (n < 1000) return n.toFixed(0);
-    const u = ["K","M","B","T"];
+    const u = ["K", "M", "B", "T"];
     let i = -1;
-    while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+    while (n >= 1000 && i < u.length - 1) {
+      n /= 1000;
+      i++;
+    }
     return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + u[i];
   }
 
@@ -94,7 +109,9 @@ import { createSaves } from "./saves.js";
     if (!host) return;
     const box = document.createElement("div");
     box.className = "pop";
-    box.innerHTML = `<div class="who">${esc(who)}</div><div class="msg">${esc(msg)}</div><div class="hint">TAP TO CLOSE</div>`;
+    box.innerHTML = `<div class="who">${esc(who)}</div><div class="msg">${esc(
+      msg
+    )}</div><div class="hint">TAP TO CLOSE</div>`;
     box.addEventListener("click", () => box.remove());
     host.prepend(box);
   }
@@ -106,101 +123,17 @@ import { createSaves } from "./saves.js";
     $("modalTitle").textContent = title;
     $("modalBody").innerHTML = html;
     $("modalBack").style.display = "flex";
-    $("modalBack").setAttribute("aria-hidden","false");
+    $("modalBack").setAttribute("aria-hidden", "false");
   }
   function closeModal() {
     $("modalBack").style.display = "none";
-    $("modalBack").setAttribute("aria-hidden","true");
+    $("modalBack").setAttribute("aria-hidden", "true");
     $("modalBody").innerHTML = "";
   }
   $("modalClose").onclick = closeModal;
   $("modalBack").addEventListener("click", (e) => {
     if (e.target === $("modalBack")) closeModal();
   });
-
-// ----------------------------
-// Phase 0 Onboarding (Transmission)
-// ----------------------------
-const ONBOARD_KEY = "sygn1l_onboarded_v1";
-
-function shouldShowOnboard() {
-  // Show only for brand-new operatives:
-  // - not signed in
-  // - no local guest save yet (or very fresh)
-  // - and not previously dismissed/completed
-  if (localStorage.getItem(ONBOARD_KEY)) return false;
-  if (saves.isSignedIn && saves.isSignedIn()) return false;
-
-  const local = saves.loadLocal?.();
-  const hasMeaningfulProgress = local && (Number(local.total) > 50 || Number(local.signal) > 50);
-  return !hasMeaningfulProgress;
-}
-
-function showOnboard() {
-  const card = $("onboardCard");
-  if (!card) return;
-
-  const script = [
-    `CONTROL: Ice Station Relay is live. Welcome, Operative <b>${esc(state.profile.name || "GUEST")}</b>.<br><br>
-     Before we let you touch the Array, we need your credentials on file.`,
-    `Step one: enter your <b>EMAIL</b> in the ACCOUNT panel below.<br>
-     This binds your work to the cloud archive so it doesn’t vanish into the snow.`,
-    `Step two: set a <b>PASSWORD</b>.<br>
-     No hero stuff. Just something you won’t forget when the lights flicker.`,
-    `Final step: tap <b>USER: …</b> at the top and set your <b>USERNAME</b>.<br>
-     Control prefers callsigns. The void prefers patterns.`
-  ];
-
-  let i = 0;
-
-  const setStep = () => {
-    $("onboardStep").textContent = `STEP ${i + 1}/${script.length}`;
-    $("onboardText").innerHTML = script[i];
-
-    // helpful nudges (scroll/focus)
-    if (i === 1) $("email")?.focus?.();
-    if (i === 2) $("pass")?.focus?.();
-  };
-
-  card.style.display = "";
-  setStep();
-
-  $("onboardNext").onclick = () => {
-    feedback(false);
-    i++;
-    if (i >= script.length) {
-      card.style.display = "none";
-      localStorage.setItem(ONBOARD_KEY, "1");
-      popup("CONTROL", "Good. You’re cleared for Array contact. Proceed carefully.");
-      return;
-    }
-    setStep();
-
-    // gentle scroll to account panel on steps 2/3
-    if (i === 1 || i === 2) $("email")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-  };
-
-  $("onboardSkip").onclick = () => {
-    feedback(false);
-    card.style.display = "none";
-    localStorage.setItem(ONBOARD_KEY, "1");
-  };
-}
-
-// Call when we know current auth state:
-function updateOnboardVisibility() {
-  const card = $("onboardCard");
-  if (!card) return;
-
-  if (saves.isSignedIn && saves.isSignedIn()) {
-    card.style.display = "none";
-    localStorage.setItem(ONBOARD_KEY, "1");
-    return;
-  }
-
-  if (shouldShowOnboard()) showOnboard();
-}
-
 
   // ----------------------------
   // State
@@ -222,23 +155,22 @@ function updateOnboardVisibility() {
 
     up: { dish: 0, scan: 0, probes: 0, auto: 0, stabil: 0, relicAmp: 0 },
 
-    updatedAtMs: 0
+    updatedAtMs: 0,
   };
 
   const derived = { sps: 0, click: 1, bw: 1, autoRate: 0 };
-
-  function touch() { state.updatedAtMs = nowMs(); }
+  const touch = () => (state.updatedAtMs = nowMs());
 
   // ----------------------------
   // 6 Phases with tint
   // ----------------------------
   const PHASES = [
-    { n:1, at:0,     tint:"--p0", status:"ARRAY: STABLE", sub:"THE ARRAY LISTENS. YOU PING.", obj:"Tap PING VOID. Buy DISH." },
-    { n:2, at:500,   tint:"--p1", status:"ARRAY: DRIFT",  sub:"Structure forming. Keep it clean.", obj:"Buy SCAN. Reach 120 total for PROBES." },
-    { n:3, at:1800,  tint:"--p2", status:"ARRAY: ACTIVE", sub:"It’s answering. Don’t answer back.", obj:"Unlock AUTO. Boost Signal/sec." },
-    { n:4, at:9000,  tint:"--p3", status:"ARRAY: GLITCH", sub:"Containment stutters. Stabilize.", obj:"Buy STABIL. Keep corruption down." },
-    { n:5, at:12000, tint:"--p4", status:"ARRAY: RITUAL", sub:"We can reset the Array and keep residue.", obj:"RITE available. Time it." },
-    { n:6, at:35000, tint:"--p5", status:"ARRAY: BREACH", sub:"Something is using our signal to arrive.", obj:"Push relic scaling. Corruption bites back." },
+    { n: 1, at: 0, tint: "--p0", status: "ARRAY: STABLE", sub: "THE ARRAY LISTENS. YOU PING.", obj: "Tap PING VOID. Buy DISH." },
+    { n: 2, at: 500, tint: "--p1", status: "ARRAY: DRIFT", sub: "Structure forming. Keep it clean.", obj: "Buy SCAN. Reach 120 total for PROBES." },
+    { n: 3, at: 1800, tint: "--p2", status: "ARRAY: ACTIVE", sub: "It’s answering. Don’t answer back.", obj: "Unlock AUTO. Boost Signal/sec." },
+    { n: 4, at: 9000, tint: "--p3", status: "ARRAY: GLITCH", sub: "Containment stutters. Stabilize.", obj: "Buy STABIL. Keep corruption down." },
+    { n: 5, at: 12000, tint: "--p4", status: "ARRAY: RITUAL", sub: "We can reset the Array and keep residue.", obj: "RITE available. Time it." },
+    { n: 6, at: 35000, tint: "--p5", status: "ARRAY: BREACH", sub: "Something is using our signal to arrive.", obj: "Push relic scaling. Corruption bites back." },
   ];
 
   function setPhase(n) {
@@ -268,13 +200,21 @@ function updateOnboardVisibility() {
   // Upgrades
   // ----------------------------
   const UPG = [
-    { id:"dish",   name:"DISH CALIBRATION", unlock:0,    base:10,   mult:1.18, desc:"+1 Signal/sec.",     buy(){ state.up.dish++; } },
-    { id:"scan",   name:"DEEP SCAN",        unlock:100,  base:50,   mult:1.25, desc:"+10% bandwidth.",    buy(){ state.up.scan++; } },
-    { id:"probes", name:"PROBE SWARM",      unlock:120,  base:80,   mult:1.22, desc:"+1 click power.",    buy(){ state.up.probes++; } },
-    { id:"auto",   name:"AUTO ROUTINE",     unlock:600,  base:520,  mult:1.30, desc:"Auto pings/sec.",    buy(){ state.up.auto++; } },
-    { id:"stabil", name:"STABILIZER",       unlock:9500, base:7200, mult:1.33, desc:"Slows corruption.",  buy(){ state.up.stabil++; } },
-    { id:"relicAmp", name:"RELIC AMP", unlock:0, base:3, mult:1.65, currency:"relics",
-      desc:"Spend relics: +8% mult.", buy(){ state.up.relicAmp++; } },
+    { id: "dish", name: "DISH CALIBRATION", unlock: 0, base: 10, mult: 1.18, desc: "+1 Signal/sec.", buy() { state.up.dish++; } },
+    { id: "scan", name: "DEEP SCAN", unlock: 100, base: 50, mult: 1.25, desc: "+10% bandwidth.", buy() { state.up.scan++; } },
+    { id: "probes", name: "PROBE SWARM", unlock: 120, base: 80, mult: 1.22, desc: "+1 click power.", buy() { state.up.probes++; } },
+    { id: "auto", name: "AUTO ROUTINE", unlock: 600, base: 520, mult: 1.3, desc: "Auto pings/sec.", buy() { state.up.auto++; } },
+    { id: "stabil", name: "STABILIZER", unlock: 9500, base: 7200, mult: 1.33, desc: "Slows corruption.", buy() { state.up.stabil++; } },
+    {
+      id: "relicAmp",
+      name: "RELIC AMP",
+      unlock: 0,
+      base: 3,
+      mult: 1.65,
+      currency: "relics",
+      desc: "Spend relics: +8% mult.",
+      buy() { state.up.relicAmp++; },
+    },
   ];
 
   const lvl = (id) => state.up[id] || 0;
@@ -282,15 +222,15 @@ function updateOnboardVisibility() {
 
   function recompute() {
     derived.click = 1 + lvl("probes");
-    derived.bw = Math.pow(1.10, lvl("scan")) * (1 + 0.08 * lvl("relicAmp"));
-    derived.sps = (lvl("dish") * 1.0) * derived.bw;
-    derived.autoRate = lvl("auto") > 0 ? (lvl("auto") * 0.65 * (1 + 0.15 * lvl("probes"))) : 0;
+    derived.bw = Math.pow(1.1, lvl("scan")) * (1 + 0.08 * lvl("relicAmp"));
+    derived.sps = lvl("dish") * 1.0 * derived.bw;
+    derived.autoRate = lvl("auto") > 0 ? lvl("auto") * 0.65 * (1 + 0.15 * lvl("probes")) : 0;
   }
 
   function corruptionLabel(c) {
-    if (c < 0.10) return "DORMANT";
-    if (c < 0.30) return "WHISPER";
-    if (c < 0.60) return "INCIDENT";
+    if (c < 0.1) return "DORMANT";
+    if (c < 0.3) return "WHISPER";
+    if (c < 0.6) return "INCIDENT";
     if (c < 0.85) return "BREACH";
     return "OVERRUN";
   }
@@ -303,21 +243,21 @@ function updateOnboardVisibility() {
   }
 
   // ----------------------------
-  // Rite
+  // Rite (Prestige)
   // ----------------------------
   function prestigeGain() {
     const over = Math.max(0, state.total - 12000);
     return 1 + Math.floor(Math.sqrt(over / 6000));
   }
-  function canRite() { return state.total >= 12000; }
+  const canRite = () => state.total >= 12000;
 
   function doRite() {
     const gain = prestigeGain();
     state.relics += gain;
     state.build += 1;
 
-    pushLog("log","SYS",`RITE COMPLETE. +${gain} RELICS.`);
-    pushLog("comms","OPS",`We keep the residue. We pretend it’s control.`);
+    pushLog("log", "SYS", `RITE COMPLETE. +${gain} RELICS.`);
+    pushLog("comms", "OPS", `We keep the residue. We pretend it’s control.`);
 
     state.signal = 0;
     state.total = 0;
@@ -338,20 +278,47 @@ function updateOnboardVisibility() {
   // ----------------------------
   const saves = createSaves();
 
-  // IMPORTANT: merge helper used only for loading state blobs
   function loadIntoState(blob) {
     if (!blob || typeof blob !== "object") return;
 
-    // deep-ish merge only for known keys
     state.profile = Object.assign(state.profile, blob.profile || {});
     state.up = Object.assign(state.up, blob.up || {});
-    for (const k of ["build","relics","signal","total","corruption","phase","aiOn","lastAmbientAt","lastAiAt","updatedAtMs"]) {
+    for (const k of [
+      "build",
+      "relics",
+      "signal",
+      "total",
+      "corruption",
+      "phase",
+      "aiOn",
+      "lastAmbientAt",
+      "lastAiAt",
+      "updatedAtMs",
+    ]) {
       if (k in blob) state[k] = blob[k];
     }
-    // normalize
     state.profile.name = (state.profile.name || "GUEST").toUpperCase().slice(0, 18);
   }
 
+  async function saveNow(forceCloud = false) {
+    touch();
+    saves.saveLocal(state);
+
+    if (saves.isSignedIn()) {
+      try {
+        await saves.saveCloud(state, { force: forceCloud });
+        $("syncChip").textContent = "SYNC: CLOUD";
+      } catch {
+        $("syncChip").textContent = "SYNC: CLOUD (ERR)";
+      }
+    } else {
+      $("syncChip").textContent = "SYNC: GUEST";
+    }
+  }
+
+  // ----------------------------
+  // Offline earnings (AFK / closed browser)
+  // ----------------------------
   function applyOfflineProgress() {
     const last = state.updatedAtMs || 0;
     if (!last) return;
@@ -366,28 +333,119 @@ function updateOnboardVisibility() {
     if (gain > 0) {
       state.signal += gain;
       state.total += gain;
-      pushLog("log","SYS",`OFFLINE: +${fmt(gain)} SIGNAL (${Math.floor(dt/60)}m).`);
+
+      const mins = Math.max(1, Math.floor(dt / 60));
+      popup("CONTROL", `While you were gone: +${fmt(gain)} Signal recovered (${mins}m).`);
+      pushLog("log", "SYS", `OFFLINE RECOVERY: +${fmt(gain)} SIGNAL (${mins}m).`);
+
       touch();
     }
   }
 
-  async function saveNow(forceCloud = false) {
-    touch();
+  // ----------------------------
+  // Phase 0 Onboarding (Transmission)
+  // Auto-injects UI card so you don’t have to edit HTML
+  // ----------------------------
+  const ONBOARD_KEY = "sygn1l_onboarded_v1";
 
-    // Guest local always
-    saves.saveLocal(state);
+  function ensureOnboardCardExists() {
+    if ($("onboardCard")) return;
 
-    // Cloud only if signed in
-    if (saves.isSignedIn()) {
-      try {
-        await saves.saveCloud(state, { force: forceCloud });
-        $("syncChip").textContent = "SYNC: CLOUD";
-      } catch {
-        $("syncChip").textContent = "SYNC: CLOUD (ERR)";
+    const wrap = document.querySelector(".wrap");
+    if (!wrap) return;
+
+    const card = document.createElement("section");
+    card.className = "card";
+    card.id = "onboardCard";
+    card.style.display = "none";
+    card.innerHTML = `
+      <div class="hd">
+        <div>CONTROL TRANSMISSION</div>
+        <div class="muted" id="onboardStep">STEP 1/4</div>
+      </div>
+      <div class="pad">
+        <div class="muted" id="onboardText" style="font-size:13px"></div>
+        <div class="grid2" style="margin-top:12px">
+          <button id="onboardNext">NEXT</button>
+          <button id="onboardSkip">SKIP</button>
+        </div>
+      </div>
+    `;
+
+    // Insert at top of wrap (Phase 0 “card at the top”)
+    wrap.insertBefore(card, wrap.firstChild);
+  }
+
+  function shouldShowOnboard() {
+    if (localStorage.getItem(ONBOARD_KEY)) return false;
+    if (saves.isSignedIn && saves.isSignedIn()) return false;
+
+    const local = saves.loadLocal?.();
+    const hasMeaningfulProgress = local && (Number(local.total) > 50 || Number(local.signal) > 50);
+    return !hasMeaningfulProgress;
+  }
+
+  function showOnboard() {
+    ensureOnboardCardExists();
+
+    const card = $("onboardCard");
+    if (!card) return;
+
+    const script = [
+      `CONTROL: Ice Station Relay is live. Welcome, Operative <b>${esc(state.profile.name || "GUEST")}</b>.<br><br>
+       Before you touch the Array, we need your credentials on file.`,
+      `Step one: enter your <b>EMAIL</b> in the ACCOUNT panel below.<br>
+       This binds your work to the cloud archive so it doesn’t vanish into the snow.`,
+      `Step two: set a <b>PASSWORD</b>.<br>
+       Keep it simple. Keep it yours.`,
+      `Final step: tap <b>USER: …</b> and set your <b>USERNAME</b>.<br>
+       Control prefers callsigns. The void prefers patterns.`,
+    ];
+
+    let i = 0;
+
+    const setStep = () => {
+      $("onboardStep").textContent = `STEP ${i + 1}/${script.length}`;
+      $("onboardText").innerHTML = script[i];
+      if (i === 1) $("email")?.focus?.();
+      if (i === 2) $("pass")?.focus?.();
+    };
+
+    card.style.display = "";
+    setStep();
+
+    $("onboardNext").onclick = () => {
+      feedback(false);
+      i++;
+      if (i >= script.length) {
+        card.style.display = "none";
+        localStorage.setItem(ONBOARD_KEY, "1");
+        popup("CONTROL", "Clearance granted. Proceed carefully.");
+        return;
       }
-    } else {
-      $("syncChip").textContent = "SYNC: GUEST";
+      setStep();
+
+      if (i === 1 || i === 2) $("email")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    };
+
+    $("onboardSkip").onclick = () => {
+      feedback(false);
+      card.style.display = "none";
+      localStorage.setItem(ONBOARD_KEY, "1");
+    };
+  }
+
+  function updateOnboardVisibility() {
+    ensureOnboardCardExists();
+    const card = $("onboardCard");
+    if (!card) return;
+
+    if (saves.isSignedIn && saves.isSignedIn()) {
+      card.style.display = "none";
+      localStorage.setItem(ONBOARD_KEY, "1");
+      return;
     }
+    if (shouldShowOnboard()) showOnboard();
   }
 
   // ----------------------------
@@ -398,17 +456,17 @@ function updateOnboardVisibility() {
     if (!saves.isSignedIn()) return false;
     if (!isActive()) return false;
     const cooldown = 180_000;
-    if ((nowMs() - (state.lastAiAt || 0)) < cooldown) return false;
+    if (nowMs() - (state.lastAiAt || 0) < cooldown) return false;
     return true;
   }
 
-  async function aiComms(eventName, speakerHint="OPS") {
+  async function aiComms(eventName, speakerHint = "OPS") {
     if (!aiReady()) return false;
 
     state.lastAiAt = nowMs();
     saves.saveLocal(state);
-
     $("aiChip").textContent = "AI: ...";
+
     try {
       const payload = {
         event: eventName,
@@ -419,7 +477,7 @@ function updateOnboardVisibility() {
         signal: Math.floor(state.signal),
         total: Math.floor(state.total),
         sps: Math.floor(derived.sps),
-        corruption: Number(state.corruption.toFixed(3))
+        corruption: Number(state.corruption.toFixed(3)),
       };
 
       const { data, error } = await saves.supabase.functions.invoke(EDGE_FUNCTION, { body: payload });
@@ -434,34 +492,33 @@ function updateOnboardVisibility() {
       return true;
     } catch (err) {
       $("aiChip").textContent = "AI: OFF";
-      pushLog("log","SYS","AI FAILED: " + esc(err?.message || String(err)));
+      pushLog("log", "SYS", "AI FAILED: " + esc(err?.message || String(err)));
       return false;
     }
   }
 
   const HUMAN_POOL = [
-    (n)=>`Hey ${n}, you still with us?`,
-    (n)=>`Hold up, ${n}. That spike looked… deliberate.`,
-    (n)=>`You’re doing fine, ${n}. Keep the pings steady.`,
-    (n)=>`If it starts feeling personal, tell me, ${n}.`,
-    (n)=>`Take a breath, ${n}. Then keep scanning.`,
-    (n)=>`I hate this part, ${n}. But we need the data.`
+    (n) => `Hey ${n}, you still with us?`,
+    (n) => `Hold up, ${n}. That spike looked… deliberate.`,
+    (n) => `You’re doing fine, ${n}. Keep the pings steady.`,
+    (n) => `If it starts feeling personal, tell me, ${n}.`,
+    (n) => `Take a breath, ${n}. Then keep scanning.`,
+    (n) => `I hate this part, ${n}. But we need the data.`,
   ];
 
   function maybeAmbient() {
     if (!state.aiOn) return;
     if (!saves.isSignedIn()) return;
     if (!isActive()) return;
-    if ((nowMs() - (state.lastAmbientAt || 0)) < AMBIENT_EVERY_MS) return;
+    if (nowMs() - (state.lastAmbientAt || 0) < AMBIENT_EVERY_MS) return;
 
     state.lastAmbientAt = nowMs();
     saves.saveLocal(state);
 
-    const msg = HUMAN_POOL[Math.floor(Math.random()*HUMAN_POOL.length)](state.profile.name);
+    const msg = HUMAN_POOL[Math.floor(Math.random() * HUMAN_POOL.length)](state.profile.name);
     popup("OPS", msg);
     pushLog("comms", "OPS", esc(msg));
 
-    // small chance to also call GPT (still 1 line, still gated)
     if (Math.random() < 0.35) aiComms("ambient", "OPS");
   }
 
@@ -486,10 +543,12 @@ function updateOnboardVisibility() {
     rite.textContent = can ? `RITE +${prestigeGain()}` : "RITE";
 
     $("aiChip").textContent = saves.isSignedIn()
-      ? (state.aiOn ? "AI: READY" : "AI: OFF")
+      ? state.aiOn
+        ? "AI: READY"
+        : "AI: OFF"
       : "AI: OFF";
   }
-updateOnboardVisibility();
+
   function renderUpgrades() {
     const root = $("upgrades");
     root.innerHTML = "";
@@ -515,7 +574,7 @@ updateOnboardVisibility();
       `;
 
       const btn = document.createElement("button");
-      btn.textContent = afford ? "ACQUIRE" : (unlocked ? "LOCKED" : "CLASSIF");
+      btn.textContent = afford ? "ACQUIRE" : unlocked ? "LOCKED" : "CLASSIF";
       btn.disabled = !afford;
 
       btn.onclick = async () => {
@@ -554,8 +613,9 @@ updateOnboardVisibility();
   // ----------------------------
   const scope = $("scope");
   const ctx = scope.getContext("2d", { alpha: false });
-
-  let sw = 0, sh = 0, dpr = 1;
+  let sw = 0,
+    sh = 0,
+    dpr = 1;
   const sig = { cols: [], vel: [], phase: 0 };
 
   function resizeScope() {
@@ -565,7 +625,8 @@ updateOnboardVisibility();
     scope.style.height = cssH + "px";
     scope.width = Math.floor(cssW * dpr);
     scope.height = Math.floor(cssH * dpr);
-    sw = scope.width; sh = scope.height;
+    sw = scope.width;
+    sh = scope.height;
 
     const cols = Math.max(120, Math.floor(sw / (2 * dpr)));
     sig.cols = new Array(cols).fill(0);
@@ -586,7 +647,7 @@ updateOnboardVisibility();
   }
 
   function rand01(seed) {
-    seed = (seed ^ 0x6D2B79F5) >>> 0;
+    seed = (seed ^ 0x6d2b79f5) >>> 0;
     seed = Math.imul(seed ^ (seed >>> 15), 1 | seed);
     seed ^= seed + Math.imul(seed ^ (seed >>> 7), 61 | seed);
     return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
@@ -601,8 +662,8 @@ updateOnboardVisibility();
     ctx.fillStyle = "rgb(0,0,0)";
     ctx.fillRect(0, 0, sw, sh);
 
-    const noiseAmt = clamp(0.85 - 0.70 * lk + 0.35 * corr, 0.15, 0.95);
-    const spikeProb = clamp(0.05 + 0.35 * lk, 0.05, 0.70);
+    const noiseAmt = clamp(0.85 - 0.7 * lk + 0.35 * corr, 0.15, 0.95);
+    const spikeProb = clamp(0.05 + 0.35 * lk, 0.05, 0.7);
 
     const cols = sig.cols.length;
     sig.phase += dt * (0.6 + 1.8 * lk) * (1 + 0.8 * corr);
@@ -619,7 +680,7 @@ updateOnboardVisibility();
       sig.cols[i] += sig.vel[i];
     }
 
-    const midY = Math.floor(sh * 0.60);
+    const midY = Math.floor(sh * 0.6);
     const px = Math.max(1, Math.floor(dpr));
     const baseG = 190;
 
@@ -642,13 +703,13 @@ updateOnboardVisibility();
     for (let i = 0; i < cols; i++) {
       const x = Math.floor((i / (cols - 1)) * (sw - 1));
       const s = sig.cols[i];
-      const spike = (rand01((t | 0) + i * 71) < spikeProb) ? 1 : 0;
+      const spike = rand01((t | 0) + i * 71) < spikeProb ? 1 : 0;
 
       const spikeH = spike * (0.15 + 0.85 * lk) * (0.75 + 0.25 * Math.abs(s));
-      const noiseH = (s * (0.35 + 0.65 * (1 - lk))) * 0.35;
+      const noiseH = s * (0.35 + 0.65 * (1 - lk)) * 0.35;
       const echo = corr > 0.28 ? (0.10 + 0.35 * corr) * Math.sin(sig.phase * 2 + i * 0.12) : 0;
 
-      const y = midY - (spikeH + noiseH + echo) * (sh * 0.70);
+      const y = midY - (spikeH + noiseH + echo) * (sh * 0.7);
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
@@ -672,14 +733,14 @@ updateOnboardVisibility();
     renderAll();
     await saveNow(false);
 
-    if (Math.random() < 0.10) aiComms("ping", "OPS");
+    if (Math.random() < 0.1) aiComms("ping", "OPS");
   };
 
   $("saveBtn").onclick = async () => {
     markActive();
     feedback(false);
     await saveNow(true);
-    pushLog("log","SYS", saves.isSignedIn() ? "SAVED (CLOUD)." : "SAVED (GUEST).");
+    pushLog("log", "SYS", saves.isSignedIn() ? "SAVED (CLOUD)." : "SAVED (GUEST).");
   };
 
   $("wipeBtn").onclick = async () => {
@@ -695,7 +756,9 @@ updateOnboardVisibility();
 
     saves.wipeLocal();
     if (saves.isSignedIn()) {
-      try { await saves.wipeCloud(); } catch {}
+      try {
+        await saves.wipeCloud();
+      } catch {}
     }
     location.reload();
   };
@@ -720,12 +783,10 @@ updateOnboardVisibility();
     feedback(false);
     state.aiOn = !state.aiOn;
     $("aiBtn").textContent = state.aiOn ? "AI COMMS" : "AI OFF";
-    $("aiChip").textContent = saves.isSignedIn()
-      ? (state.aiOn ? "AI: READY" : "AI: OFF")
-      : "AI: OFF";
+    $("aiChip").textContent = saves.isSignedIn() ? (state.aiOn ? "AI: READY" : "AI: OFF") : "AI: OFF";
     touch();
     saves.saveLocal(state);
-    if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(()=>{});
+    if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(() => {});
   };
 
   $("fbBtn").onclick = () => {
@@ -737,7 +798,8 @@ updateOnboardVisibility();
 
   $("helpBtn").onclick = () => {
     markActive();
-    openModal("HOME BASE COMMUNIQUE",
+    openModal(
+      "HOME BASE COMMUNIQUE",
       `<p><span class="tag">HB</span>Operator, we’re receiving structured noise. Build Signal, unlock buffs, and keep Corruption from spiraling while we decode intent.</p>
        <p><span class="tag">HOW</span>Tap <b>PING VOID</b> for Signal. Buy <b>DISH</b> for passive gain. New buffs unlock at Total milestones.</p>
        <p><span class="tag">TIP</span>Sign in to sync across devices. (Cloud save loads on sign-in.)</p>`
@@ -746,7 +808,8 @@ updateOnboardVisibility();
 
   $("userChip").onclick = () => {
     markActive();
-    openModal("IDENTITY OVERRIDE",
+    openModal(
+      "IDENTITY OVERRIDE",
       `<p><span class="tag">OPS</span>A callsign makes the logs readable.</p>
        <input class="texty" id="nameInput" maxlength="18" placeholder="USERNAME" value="${esc(state.profile.name)}" />
        <div style="height:10px"></div>
@@ -760,12 +823,14 @@ updateOnboardVisibility();
       closeModal();
 
       popup("OPS", `Copy that, ${state.profile.name}.`);
-      pushLog("comms","OPS", `Alright ${esc(state.profile.name)}. Keep it steady.`);
+      pushLog("comms", "OPS", `Alright ${esc(state.profile.name)}. Keep it steady.`);
 
       touch();
       saves.saveLocal(state);
       if (saves.isSignedIn()) {
-        try { await saves.saveCloud(state, { force: true }); } catch {}
+        try {
+          await saves.saveCloud(state, { force: true });
+        } catch {}
       }
       renderAll();
     };
@@ -799,7 +864,7 @@ updateOnboardVisibility();
     if (!email || !pass) return alert("Enter email + password.");
     try {
       await saves.signIn(email, pass);
-      // onAuthChange handler will do the cloud-load swap
+      // onAuthChange handles replacement load
     } catch (e) {
       alert(e.message || String(e));
     }
@@ -832,28 +897,34 @@ updateOnboardVisibility();
     $("signOutBtn").disabled = !signedIn;
     $("syncChip").textContent = signedIn ? "SYNC: CLOUD" : "SYNC: GUEST";
     $("aiChip").textContent = signedIn ? (state.aiOn ? "AI: READY" : "AI: OFF") : "AI: OFF";
-    if (signedIn && userId) pushLog("log","SYS", `SIGNED IN (${userId.slice(0,4)}…${userId.slice(-4)}).`);
+    if (signedIn && userId) pushLog("log", "SYS", `SIGNED IN (${userId.slice(0, 4)}…${userId.slice(-4)}).`);
   }
 
-  // CRITICAL FIX: on sign-in, cloud load replaces current state.
   async function onAuthChange(info) {
     setAuthUI(info);
+
+    // ✅ CALL #2A: auth state changed (sign-in OR sign-out)
+    updateOnboardVisibility();
 
     if (info.signedIn) {
       try {
         const res = await saves.syncOnSignIn(state);
+
         if (res.cloudLoaded) {
           loadIntoState(res.cloudLoaded);
-          pushLog("log","SYS","CLOUD SAVE LOADED (REPLACING GUEST RUN).");
-          popup("SYS","Cloud state loaded. Welcome back.");
+          pushLog("log", "SYS", "CLOUD SAVE LOADED (REPLACING GUEST RUN).");
+          popup("SYS", "Cloud state loaded. Welcome back.");
         } else {
-          pushLog("log","SYS","NO CLOUD SAVE FOUND. CREATED ONE FROM CURRENT RUN.");
+          pushLog("log", "SYS", "NO CLOUD SAVE FOUND. CREATED ONE FROM CURRENT RUN.");
         }
-        // always do an immediate cloud save after sync to capture any normalization
+
         await saveNow(true);
         renderAll();
+
+        // ✅ CALL #2B: after cloud replace + render
+        updateOnboardVisibility();
       } catch (e) {
-        pushLog("log","SYS","CLOUD SYNC FAILED: " + esc(e?.message || String(e)));
+        pushLog("log", "SYS", "CLOUD SYNC FAILED: " + esc(e?.message || String(e)));
         $("syncChip").textContent = "SYNC: CLOUD (ERR)";
       }
     }
@@ -864,9 +935,9 @@ updateOnboardVisibility();
   // ----------------------------
   function bootNarrative() {
     if ($("log").children.length) return;
-    pushLog("log","SYS","SYGN1L ONLINE. SILENCE IS UNPROCESSED DATA.");
-    pushLog("comms","OPS","Ping the void so we can get a baseline.");
-    popup("OPS","Tap PING VOID, then buy DISH to start passive gain.");
+    pushLog("log", "SYS", "SYGN1L ONLINE. SILENCE IS UNPROCESSED DATA.");
+    pushLog("comms", "OPS", "Ping the void so we can get a baseline.");
+    popup("OPS", "Tap PING VOID, then buy DISH to start passive gain.");
   }
 
   // ----------------------------
@@ -914,7 +985,7 @@ updateOnboardVisibility();
     if ((t | 0) % 2500 < 16) {
       touch();
       saves.saveLocal(state);
-      if (saves.isSignedIn()) saves.saveCloud(state, { force: false }).catch(()=>{});
+      if (saves.isSignedIn()) saves.saveCloud(state, { force: false }).catch(() => {});
     }
 
     requestAnimationFrame(loop);
@@ -922,7 +993,7 @@ updateOnboardVisibility();
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
-      saveNow(true).catch(()=>{});
+      saveNow(true).catch(() => {});
     }
   });
 
@@ -931,34 +1002,21 @@ updateOnboardVisibility();
   // ----------------------------
   resizeScope();
 
-  // Load guest local first (so there is *something* for new users)
+  // Load guest local first
   const local = saves.loadLocal();
   if (local) loadIntoState(local);
 
-  // Apply offline progress (works for guest + signed-in; cloud replaces if sign-in loads)
-  function applyOfflineProgress() {
-  const last = state.updatedAtMs || 0;
-  if (!last) return;
+  // ✅ Offline recovery (AFK / closed browser)
+  applyOfflineProgress();
 
-  let dt = (nowMs() - last) / 1000;
-  if (!isFinite(dt) || dt < 3) return;
-  dt = Math.min(dt, OFFLINE_CAP_SEC);
-
+  // First paint
   recompute();
+  setPhase(state.phase || 1);
+  bootNarrative();
+  renderAll();
 
-  const gain = derived.sps * dt;
-  if (gain > 0) {
-    state.signal += gain;
-    state.total += gain;
-
-    const mins = Math.max(1, Math.floor(dt / 60));
-    // Transmission style update
-    popup("CONTROL", `While you were gone: +${fmt(gain)} Signal recovered (${mins}m).`);
-    pushLog("log", "SYS", `OFFLINE RECOVERY: +${fmt(gain)} SIGNAL (${mins}m).`);
-
-    touch();
-  }
-}
+  // ✅ CALL #1: after initial boot render
+  updateOnboardVisibility();
 
   // Auth init (will replace state from cloud on sign-in)
   saves.initAuth(onAuthChange).finally(() => requestAnimationFrame(loop));
