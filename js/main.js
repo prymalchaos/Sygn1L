@@ -118,6 +118,90 @@ import { createSaves } from "./saves.js";
     if (e.target === $("modalBack")) closeModal();
   });
 
+// ----------------------------
+// Phase 0 Onboarding (Transmission)
+// ----------------------------
+const ONBOARD_KEY = "sygn1l_onboarded_v1";
+
+function shouldShowOnboard() {
+  // Show only for brand-new operatives:
+  // - not signed in
+  // - no local guest save yet (or very fresh)
+  // - and not previously dismissed/completed
+  if (localStorage.getItem(ONBOARD_KEY)) return false;
+  if (saves.isSignedIn && saves.isSignedIn()) return false;
+
+  const local = saves.loadLocal?.();
+  const hasMeaningfulProgress = local && (Number(local.total) > 50 || Number(local.signal) > 50);
+  return !hasMeaningfulProgress;
+}
+
+function showOnboard() {
+  const card = $("onboardCard");
+  if (!card) return;
+
+  const script = [
+    `CONTROL: Ice Station Relay is live. Welcome, Operative <b>${esc(state.profile.name || "GUEST")}</b>.<br><br>
+     Before we let you touch the Array, we need your credentials on file.`,
+    `Step one: enter your <b>EMAIL</b> in the ACCOUNT panel below.<br>
+     This binds your work to the cloud archive so it doesn’t vanish into the snow.`,
+    `Step two: set a <b>PASSWORD</b>.<br>
+     No hero stuff. Just something you won’t forget when the lights flicker.`,
+    `Final step: tap <b>USER: …</b> at the top and set your <b>USERNAME</b>.<br>
+     Control prefers callsigns. The void prefers patterns.`
+  ];
+
+  let i = 0;
+
+  const setStep = () => {
+    $("onboardStep").textContent = `STEP ${i + 1}/${script.length}`;
+    $("onboardText").innerHTML = script[i];
+
+    // helpful nudges (scroll/focus)
+    if (i === 1) $("email")?.focus?.();
+    if (i === 2) $("pass")?.focus?.();
+  };
+
+  card.style.display = "";
+  setStep();
+
+  $("onboardNext").onclick = () => {
+    feedback(false);
+    i++;
+    if (i >= script.length) {
+      card.style.display = "none";
+      localStorage.setItem(ONBOARD_KEY, "1");
+      popup("CONTROL", "Good. You’re cleared for Array contact. Proceed carefully.");
+      return;
+    }
+    setStep();
+
+    // gentle scroll to account panel on steps 2/3
+    if (i === 1 || i === 2) $("email")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+  };
+
+  $("onboardSkip").onclick = () => {
+    feedback(false);
+    card.style.display = "none";
+    localStorage.setItem(ONBOARD_KEY, "1");
+  };
+}
+
+// Call when we know current auth state:
+function updateOnboardVisibility() {
+  const card = $("onboardCard");
+  if (!card) return;
+
+  if (saves.isSignedIn && saves.isSignedIn()) {
+    card.style.display = "none";
+    localStorage.setItem(ONBOARD_KEY, "1");
+    return;
+  }
+
+  if (shouldShowOnboard()) showOnboard();
+}
+
+
   // ----------------------------
   // State
   // ----------------------------
