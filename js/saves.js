@@ -1,60 +1,46 @@
 // ./js/saves.js
 // Supabase auth + cloud save manager for SYGN1L
 // - Guest mode uses localStorage only
-// - Signed-in mode uses cloud (and can optionally mirror local for offline fallback)
-// - On sign-in: cloud save ALWAYS loads (replaces current in-memory state) if it exists
-// - If no cloud save exists yet: creates one from current state
+// - Signed-in mode uses cloud
+// - On sign-in: cloud save ALWAYS loads (replaces in-memory state) if it exists
+// - If no cloud save exists: creates one from current state
 
 const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
 
 const LOCAL_KEY = "sygn1l_guest_save_v1";
-const TABLE = "saves"; // columns: player_id (text/uuid), updated_at (timestamptz), state (jsonb)
+const TABLE = "saves"; // columns: player_id, updated_at, state(jsonb)
 
 const CLOUD_SAVE_THROTTLE_MS = 45_000;
 
 export function createSaves() {
   const supabase = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_ANON_KEY);
-  if (!supabase) {
-    console.warn("[SYGN1L] Supabase client missing. Cloud disabled.");
-  }
+  if (!supabase) console.warn("[SYGN1L] Supabase client missing. Cloud disabled.");
 
   let _userId = null;
   let _cloudReady = false;
   let _lastCloudSaveAt = 0;
 
   // ---- Local (guest) ----
-  function hasLocal() {
-    return !!localStorage.getItem(LOCAL_KEY);
-  }
+  function hasLocal() { return !!localStorage.getItem(LOCAL_KEY); }
 
   function loadLocal() {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (!raw) return null;
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
+    try { return JSON.parse(raw); } catch { return null; }
   }
 
   function saveLocal(state) {
     try {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
       return true;
-    } catch {
-      return false;
-    }
+    } catch { return false; }
   }
 
-  function wipeLocal() {
-    localStorage.removeItem(LOCAL_KEY);
-  }
+  function wipeLocal() { localStorage.removeItem(LOCAL_KEY); }
 
   // ---- Auth state ----
-  function isSignedIn() {
-    return !!_userId && _cloudReady;
-  }
+  function isSignedIn() { return !!_userId && _cloudReady; }
 
   async function getUserId() {
     if (!supabase) return null;
@@ -70,14 +56,11 @@ export function createSaves() {
       return;
     }
 
-    // initial
     const uid = await getUserId();
     _userId = uid;
     _cloudReady = !!uid;
-
     onChange?.({ signedIn: isSignedIn(), userId: _userId });
 
-    // listener
     supabase.auth.onAuthStateChange(async (_evt, session) => {
       _userId = session?.user?.id || null;
       _cloudReady = !!_userId;
@@ -140,9 +123,7 @@ export function createSaves() {
       state: JSON.parse(JSON.stringify(state))
     };
 
-    const { error } = const { error } = await supabase
-  .from(TABLE)
-  .upsert(payload, { onConflict: "player_id" });
+    const { error } = await supabase.from(TABLE).upsert(payload);
     if (error) throw error;
     return true;
   }
@@ -154,13 +135,6 @@ export function createSaves() {
     return true;
   }
 
-  /**
-   * On sign-in:
-   * - If cloud exists: RETURN cloud state (caller should replace in-memory state)
-   * - If cloud doesn't exist: create from current state and return null
-   *
-   * This prevents the “guest run keeps going after sign-in” issue.
-   */
   async function syncOnSignIn(currentState) {
     if (!supabase || !isSignedIn()) return { mode: "guest", cloudLoaded: null };
 
@@ -169,21 +143,18 @@ export function createSaves() {
       return { mode: "cloud", cloudLoaded: cloud.cloudState };
     }
 
-    // No cloud yet: create it from current state (guest progress becomes account seed)
     await saveCloud(currentState, { force: true });
     return { mode: "cloud", cloudLoaded: null };
   }
 
   return {
     supabase,
-    // local
     LOCAL_KEY,
     hasLocal,
     loadLocal,
     saveLocal,
     wipeLocal,
 
-    // auth
     initAuth,
     signUp,
     signIn,
@@ -191,7 +162,6 @@ export function createSaves() {
     isSignedIn,
     getUserId,
 
-    // cloud
     loadCloud,
     saveCloud,
     wipeCloud,
