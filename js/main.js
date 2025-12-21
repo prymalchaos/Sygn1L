@@ -11,7 +11,11 @@ import { createSaves } from "./saves.js";
     if (host) {
       const box = document.createElement("div");
       box.className = "pop";
-      box.innerHTML = <div class="who">SYS</div><div class="msg">JS ERROR: ${String(msg).replaceAll("<","&lt;")}</div><div class="hint">Tap to close</div>;
+      box.innerHTML = `
+        <div class="who">SYS</div>
+        <div class="msg">JS ERROR: ${String(msg).replaceAll("<", "&lt;")}</div>
+        <div class="hint">Tap to close</div>
+      `;
       box.addEventListener("click", () => box.remove());
       host.prepend(box);
     }
@@ -20,22 +24,24 @@ import { createSaves } from "./saves.js";
   window.addEventListener("unhandledrejection", (e) => showFatal(e?.reason?.message || e?.reason || e));
 
   // Prevent iOS double-tap zoom on buttons
-  document.addEventListener("dblclick", (e) => {
-    if (e.target && e.target.closest("button")) e.preventDefault();
-  }, { passive: false });
+  document.addEventListener(
+    "dblclick",
+    (e) => {
+      if (e.target && e.target.closest("button")) e.preventDefault();
+    },
+    { passive: false }
+  );
 
   // ----------------------------
   // Tunables
   // ----------------------------
-  const OFFLINE_CAP_SEC = 6 * 60 * 60;      // 6 hours max offline gain
-  const ACTIVE_WINDOW_MS = 20_000;          // active if interacted in last 20s
-  const AMBIENT_EVERY_MS = 300_000;         // 5 minutes
-  const EDGE_FUNCTION = "sygn1l-comms";     // Supabase Edge Function name
+  const OFFLINE_CAP_SEC = 6 * 60 * 60; // 6 hours max offline gain
+  const ACTIVE_WINDOW_MS = 20_000; // active if interacted in last 20s
+  const AMBIENT_EVERY_MS = 300_000; // 5 minutes
+  const EDGE_FUNCTION = "sygn1l-comms"; // Supabase Edge Function name
 
   // ----------------------------
   // DEV MODE (Master Admin)
-  // - Set ONE of these to your own account.
-  // - Leave both as-is to disable dev mode entirely.
   // ----------------------------
   const DEV_MASTER_UID = "7ac61fd5-1d8a-4c27-95b9-a491f2121380";
   const DEV_MASTER_EMAIL = "cursingstone@gmail.com";
@@ -47,7 +53,7 @@ import { createSaves } from "./saves.js";
   const markActive = () => (lastActionAt = Date.now());
   window.addEventListener("pointerdown", markActive, { passive: true });
   window.addEventListener("keydown", markActive, { passive: true });
-  const isActive = () => (Date.now() - lastActionAt) <= ACTIVE_WINDOW_MS;
+  const isActive = () => Date.now() - lastActionAt <= ACTIVE_WINDOW_MS;
 
   // ----------------------------
   // Feedback (haptic/click)
@@ -57,7 +63,10 @@ import { createSaves } from "./saves.js";
 
   function haptic(ms = 10) {
     if (!feedbackOn) return false;
-    if (navigator.vibrate) { navigator.vibrate([ms]); return true; }
+    if (navigator.vibrate) {
+      navigator.vibrate([ms]);
+      return true;
+    }
     return false;
   }
   function clickSound() {
@@ -70,12 +79,13 @@ import { createSaves } from "./saves.js";
       o.type = "square";
       o.frequency.value = 820;
       g.gain.value = 0.00001;
-      o.connect(g); g.connect(ctx.destination);
+      o.connect(g);
+      g.connect(ctx.destination);
       o.start();
       const t = ctx.currentTime;
       g.gain.setValueAtTime(0.00001, t);
       g.gain.exponentialRampToValueAtTime(0.022, t + 0.006);
-      g.gain.exponentialRampToValueAtTime(0.00001, t + 0.050);
+      g.gain.exponentialRampToValueAtTime(0.00001, t + 0.05);
       o.stop(t + 0.055);
     } catch {}
   }
@@ -89,16 +99,23 @@ import { createSaves } from "./saves.js";
   // ----------------------------
   const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
   const nowMs = () => Date.now();
-  const esc = (s) => String(s)
-    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+  const esc = (s) =>
+    String(s ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
 
   function fmt(n) {
     n = Number(n) || 0;
     if (n < 1000) return n.toFixed(0);
-    const u = ["K","M","B","T"];
+    const u = ["K", "M", "B", "T"];
     let i = -1;
-    while (n >= 1000 && i < u.length - 1) { n /= 1000; i++; }
+    while (n >= 1000 && i < u.length - 1) {
+      n /= 1000;
+      i++;
+    }
     return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + u[i];
   }
 
@@ -106,7 +123,7 @@ import { createSaves } from "./saves.js";
     const host = $(elId);
     if (!host) return;
     const p = document.createElement("p");
-    p.innerHTML = <span class="tag">${String(tag).replaceAll("<","&lt;")}</span>${msg};
+    p.innerHTML = `<span class="tag">${String(tag).replaceAll("<", "&lt;")}</span>${msg}`;
     host.prepend(p);
   }
 
@@ -115,7 +132,11 @@ import { createSaves } from "./saves.js";
     if (!host) return;
     const box = document.createElement("div");
     box.className = "pop";
-    box.innerHTML = <div class="who">${String(who).replaceAll("<","&lt;")}</div><div class="msg">${String(msg).replaceAll("<","&lt;")}</div><div class="hint">TAP TO CLOSE</div>;
+    box.innerHTML = `
+      <div class="who">${String(who).replaceAll("<", "&lt;")}</div>
+      <div class="msg">${String(msg).replaceAll("<", "&lt;")}</div>
+      <div class="hint">TAP TO CLOSE</div>
+    `;
     box.addEventListener("click", () => box.remove());
     host.prepend(box);
   }
@@ -127,17 +148,19 @@ import { createSaves } from "./saves.js";
     $("modalTitle").textContent = title;
     $("modalBody").innerHTML = html;
     $("modalBack").style.display = "flex";
-    $("modalBack").setAttribute("aria-hidden","false");
+    $("modalBack").setAttribute("aria-hidden", "false");
   }
   function closeModal() {
     $("modalBack").style.display = "none";
-    $("modalBack").setAttribute("aria-hidden","true");
+    $("modalBack").setAttribute("aria-hidden", "true");
     $("modalBody").innerHTML = "";
   }
-  $("modalClose").onclick = closeModal;
-  $("modalBack").addEventListener("click", (e) => {
-    if (e.target === $("modalBack")) closeModal();
-  });
+  if ($("modalClose")) $("modalClose").onclick = closeModal;
+  if ($("modalBack")) {
+    $("modalBack").addEventListener("click", (e) => {
+      if (e.target === $("modalBack")) closeModal();
+    });
+  }
 
   // ----------------------------
   // State
@@ -164,23 +187,23 @@ import { createSaves } from "./saves.js";
   // 6 Phases with tint
   // ----------------------------
   const PHASES = [
-    { n:1, at:0,     tint:"--p0", status:"ARRAY: STABLE", sub:"THE ARRAY LISTENS. YOU PING.", obj:"Tap PING VOID. Buy DISH." },
-    { n:2, at:500,   tint:"--p1", status:"ARRAY: DRIFT",  sub:"Structure forming. Keep it clean.", obj:"Buy SCAN. Reach 120 total for PROBES." },
-    { n:3, at:1800,  tint:"--p2", status:"ARRAY: ACTIVE", sub:"It’s answering. Don’t answer back.", obj:"Unlock AUTO. Boost Signal/sec." },
-    { n:4, at:9000,  tint:"--p3", status:"ARRAY: GLITCH", sub:"Containment stutters. Stabilize.", obj:"Buy STABIL. Keep corruption down." },
-    { n:5, at:12000, tint:"--p4", status:"ARRAY: RITUAL", sub:"We can reset the Array and keep residue.", obj:"RITE available. Time it." },
-    { n:6, at:35000, tint:"--p5", status:"ARRAY: BREACH", sub:"Something is using our signal to arrive.", obj:"Push relic scaling. Corruption bites back." },
+    { n: 1, at: 0, tint: "--p0", status: "ARRAY: STABLE", sub: "THE ARRAY LISTENS. YOU PING.", obj: "Tap PING VOID. Buy DISH." },
+    { n: 2, at: 500, tint: "--p1", status: "ARRAY: DRIFT", sub: "Structure forming. Keep it clean.", obj: "Buy SCAN. Reach 120 total for PROBES." },
+    { n: 3, at: 1800, tint: "--p2", status: "ARRAY: ACTIVE", sub: "It’s answering. Don’t answer back.", obj: "Unlock AUTO. Boost Signal/sec." },
+    { n: 4, at: 9000, tint: "--p3", status: "ARRAY: GLITCH", sub: "Containment stutters. Stabilize.", obj: "Buy STABIL. Keep corruption down." },
+    { n: 5, at: 12000, tint: "--p4", status: "ARRAY: RITUAL", sub: "We can reset the Array and keep residue.", obj: "RITE available. Time it." },
+    { n: 6, at: 35000, tint: "--p5", status: "ARRAY: BREACH", sub: "Something is using our signal to arrive.", obj: "Push relic scaling. Corruption bites back." }
   ];
 
   function setPhase(n) {
     state.phase = clamp(n, 1, 6);
     const ph = PHASES[state.phase - 1];
-    document.documentElement.style.setProperty("--accent", var(${ph.tint}));
-    $("phase").textContent = PHASE ${state.phase};
-    $("status").textContent = ph.status;
-    $("subtitle").textContent = ph.sub;
-    $("objective").textContent = "OBJECTIVE: " + ph.obj;
-    $("phaseTint").textContent = "P" + state.phase;
+    document.documentElement.style.setProperty("--accent", `var(${ph.tint})`);
+    if ($("phase")) $("phase").textContent = `PHASE ${state.phase}`;
+    if ($("status")) $("status").textContent = ph.status;
+    if ($("subtitle")) $("subtitle").textContent = ph.sub;
+    if ($("objective")) $("objective").textContent = "OBJECTIVE: " + ph.obj;
+    if ($("phaseTint")) $("phaseTint").textContent = "P" + state.phase;
   }
 
   function phaseCheck() {
@@ -188,7 +211,7 @@ import { createSaves } from "./saves.js";
       if (state.total >= PHASES[i].at) {
         if (state.phase !== PHASES[i].n) {
           setPhase(PHASES[i].n);
-          pushLog("log", "SYS", PHASE ${state.phase} ENGAGED.);
+          pushLog("log", "SYS", `PHASE ${state.phase} ENGAGED.`);
         }
         break;
       }
@@ -199,13 +222,21 @@ import { createSaves } from "./saves.js";
   // Upgrades
   // ----------------------------
   const UPG = [
-    { id:"dish",   name:"DISH CALIBRATION", unlock:0,    base:10,   mult:1.18, desc:"+1 Signal/sec.",     buy(){ state.up.dish++; } },
-    { id:"scan",   name:"DEEP SCAN",        unlock:100,  base:50,   mult:1.25, desc:"+10% bandwidth.",    buy(){ state.up.scan++; } },
-    { id:"probes", name:"PROBE SWARM",      unlock:120,  base:80,   mult:1.22, desc:"+1 click power.",    buy(){ state.up.probes++; } },
-    { id:"auto",   name:"AUTO ROUTINE",     unlock:600,  base:520,  mult:1.30, desc:"Auto pings/sec.",    buy(){ state.up.auto++; } },
-    { id:"stabil", name:"STABILIZER",       unlock:9500, base:7200, mult:1.33, desc:"Slows corruption.",  buy(){ state.up.stabil++; } },
-    { id:"relicAmp", name:"RELIC AMP", unlock:0, base:3, mult:1.65, currency:"relics",
-      desc:"Spend relics: +8% mult.", buy(){ state.up.relicAmp++; } },
+    { id: "dish", name: "DISH CALIBRATION", unlock: 0, base: 10, mult: 1.18, desc: "+1 Signal/sec.", buy() { state.up.dish++; } },
+    { id: "scan", name: "DEEP SCAN", unlock: 100, base: 50, mult: 1.25, desc: "+10% bandwidth.", buy() { state.up.scan++; } },
+    { id: "probes", name: "PROBE SWARM", unlock: 120, base: 80, mult: 1.22, desc: "+1 click power.", buy() { state.up.probes++; } },
+    { id: "auto", name: "AUTO ROUTINE", unlock: 600, base: 520, mult: 1.30, desc: "Auto pings/sec.", buy() { state.up.auto++; } },
+    { id: "stabil", name: "STABILIZER", unlock: 9500, base: 7200, mult: 1.33, desc: "Slows corruption.", buy() { state.up.stabil++; } },
+    {
+      id: "relicAmp",
+      name: "RELIC AMP",
+      unlock: 0,
+      base: 3,
+      mult: 1.65,
+      currency: "relics",
+      desc: "Spend relics: +8% mult.",
+      buy() { state.up.relicAmp++; }
+    }
   ];
 
   const lvl = (id) => state.up[id] || 0;
@@ -214,20 +245,20 @@ import { createSaves } from "./saves.js";
   function recompute() {
     derived.click = 1 + lvl("probes");
     derived.bw = Math.pow(1.10, lvl("scan")) * (1 + 0.08 * lvl("relicAmp"));
-    derived.sps = (lvl("dish") * 1.0) * derived.bw;
-    derived.autoRate = lvl("auto") > 0 ? (lvl("auto") * 0.65 * (1 + 0.15 * lvl("probes"))) : 0;
+    derived.sps = lvl("dish") * derived.bw;
+    derived.autoRate = lvl("auto") > 0 ? lvl("auto") * 0.65 * (1 + 0.15 * lvl("probes")) : 0;
   }
 
   function corruptionLabel(c) {
-    if (c < 0.10) return "DORMANT";
-    if (c < 0.30) return "WHISPER";
-    if (c < 0.60) return "INCIDENT";
+    if (c < 0.1) return "DORMANT";
+    if (c < 0.3) return "WHISPER";
+    if (c < 0.6) return "INCIDENT";
     if (c < 0.85) return "BREACH";
     return "OVERRUN";
   }
 
   function corruptionCreep(dt) {
-    const creep = 0.0000025 * Math.log10(state.total + 10);
+    const creep = 0.0000025 * Math.log10((state.total || 0) + 10);
     const tech = (lvl("scan") + lvl("auto")) * 0.0000012;
     const stabil = clamp(1 - 0.06 * lvl("stabil"), 0.25, 1.0);
     state.corruption = clamp(state.corruption + (creep + tech) * stabil * dt, 0, 1);
@@ -247,8 +278,8 @@ import { createSaves } from "./saves.js";
     state.relics += gain;
     state.build += 1;
 
-    pushLog("log","SYS",RITE COMPLETE. +${gain} RELICS.);
-    pushLog("comms","OPS",We keep the residue. We pretend it’s control.);
+    pushLog("log", "SYS", `RITE COMPLETE. +${gain} RELICS.`);
+    pushLog("comms", "OPS", "We keep the residue. We pretend it’s control.");
 
     state.signal = 0;
     state.total = 0;
@@ -273,7 +304,7 @@ import { createSaves } from "./saves.js";
     if (!blob || typeof blob !== "object") return;
     state.profile = Object.assign(state.profile, blob.profile || {});
     state.up = Object.assign(state.up, blob.up || {});
-    for (const k of ["build","relics","signal","total","corruption","phase","aiOn","lastAmbientAt","lastAiAt","updatedAtMs"]) {
+    for (const k of ["build", "relics", "signal", "total", "corruption", "phase", "aiOn", "lastAmbientAt", "lastAiAt", "updatedAtMs"]) {
       if (k in blob) state[k] = blob[k];
     }
     state.profile.name = (state.profile.name || "GUEST").toUpperCase().slice(0, 18);
@@ -284,14 +315,14 @@ import { createSaves } from "./saves.js";
     saves.saveLocal(state);
     if (saves.isSignedIn()) {
       await saves.saveCloud(state, { force: forceCloud });
-      $("syncChip").textContent = "SYNC: CLOUD";
+      if ($("syncChip")) $("syncChip").textContent = "SYNC: CLOUD";
     } else {
-      $("syncChip").textContent = "SYNC: GUEST";
+      if ($("syncChip")) $("syncChip").textContent = "SYNC: GUEST";
     }
   }
 
   // ----------------------------
-  // OFFLINE EARNINGS (one-time report on boot)
+  // OFFLINE EARNINGS
   // ----------------------------
   function applyOfflineEarnings() {
     const last = state.updatedAtMs || 0;
@@ -309,14 +340,14 @@ import { createSaves } from "./saves.js";
     state.total += gain;
 
     const mins = Math.max(1, Math.floor(dt / 60));
-    popup("CONTROL", While you were gone: +${fmt(gain)} Signal recovered (${mins}m).);
-    pushLog("log", "SYS", OFFLINE RECOVERY: +${fmt(gain)} SIGNAL (${mins}m).);
+    popup("CONTROL", `While you were gone: +${fmt(gain)} Signal recovered (${mins}m).`);
+    pushLog("log", "SYS", `OFFLINE RECOVERY: +${fmt(gain)} SIGNAL (${mins}m).`);
 
     touch();
   }
 
   // ----------------------------
-  // Phase 0 Onboarding (auto-injected card)
+  // Phase 0 Onboarding
   // ----------------------------
   const ONBOARD_KEY = "sygn1l_onboarded_v1";
 
@@ -328,7 +359,7 @@ import { createSaves } from "./saves.js";
     const card = document.createElement("section");
     card.className = "card";
     card.id = "onboardCard";
-    card.innerHTML = 
+    card.innerHTML = `
       <div class="hd">
         <div>CONTROL TRANSMISSION</div>
         <div class="muted" id="onboardStep">STEP 1/4</div>
@@ -341,7 +372,7 @@ import { createSaves } from "./saves.js";
           <button id="onboardSkip">SKIP</button>
         </div>
       </div>
-    ;
+    `;
     wrap.prepend(card);
   }
 
@@ -356,7 +387,9 @@ import { createSaves } from "./saves.js";
 
   function forceUsernamePrompt(from = "CONTROL") {
     popup(from, "Callsign required. Tap USER to register.");
-    try { $("userChip")?.click?.(); } catch {}
+    try {
+      $("userChip")?.click?.();
+    } catch {}
   }
 
   function showOnboard() {
@@ -365,15 +398,15 @@ import { createSaves } from "./saves.js";
     if (!card) return;
 
     const script = [
-      CONTROL: Ice Station Relay is live. Welcome, Operative <b>${esc(state.profile.name || "GUEST")}</b>.<br><br>Before Array contact, we need your credentials.,
-      Enter your <b>EMAIL</b> in the ACCOUNT panel.<br>It binds your work to the cloud archive.,
-      Set a <b>PASSWORD</b>.<br>Short is fine. Forgotten is fatal.,
-      Tap <b>USER: …</b> and set your <b>USERNAME</b>.<br>Control prefers callsigns. The void prefers patterns.
+      `CONTROL: Ice Station Relay is live. Welcome, Operative <b>${esc(state.profile.name || "GUEST")}</b>.<br><br>Before Array contact, we need your credentials.`,
+      `Enter your <b>EMAIL</b> in the ACCOUNT panel.<br>It binds your work to the cloud archive.`,
+      `Set a <b>PASSWORD</b>.<br>Short is fine. Forgotten is fatal.`,
+      `Tap <b>USER: …</b> and set your <b>USERNAME</b>.<br>Control prefers callsigns. The void prefers patterns.`
     ];
 
     let i = 0;
     const setStep = () => {
-      $("onboardStep").textContent = STEP ${i + 1}/${script.length};
+      $("onboardStep").textContent = `STEP ${i + 1}/${script.length}`;
       $("onboardText").innerHTML = script[i];
       if (i === 1) $("email")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
       if (i === 2) $("pass")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
@@ -418,13 +451,12 @@ import { createSaves } from "./saves.js";
   }
 
   // ----------------------------
-  // DEV MODE (Master Admin) - inject phase jumper panel
+  // DEV MODE (Master Admin)
   // ----------------------------
   async function checkDevAndMaybeInject() {
     try {
       const hasConfig = (DEV_MASTER_UID && DEV_MASTER_UID.trim()) || (DEV_MASTER_EMAIL && DEV_MASTER_EMAIL.trim());
       if (!hasConfig) return;
-
       if (!saves?.supabase || !saves.isSignedIn()) return;
 
       const { data } = await saves.supabase.auth.getUser();
@@ -432,7 +464,9 @@ import { createSaves } from "./saves.js";
       if (!u) return;
 
       const okUid = DEV_MASTER_UID && DEV_MASTER_UID.trim() && u.id === DEV_MASTER_UID.trim();
-      const okEmail = DEV_MASTER_EMAIL && DEV_MASTER_EMAIL.trim() &&
+      const okEmail =
+        DEV_MASTER_EMAIL &&
+        DEV_MASTER_EMAIL.trim() &&
         String(u.email || "").toLowerCase() === DEV_MASTER_EMAIL.trim().toLowerCase();
 
       if (!okUid && !okEmail) return;
@@ -446,73 +480,27 @@ import { createSaves } from "./saves.js";
     if (el) el.remove();
   }
 
-  // DEV: phase snapshots for realistic playtesting (fixed baselines)
   const PHASE_SNAPSHOTS = {
-    1: {
-      phase: 1,
-      total: 80,
-      signal: 40,
-      corruption: 0.02,
-      build: 1,
-      relics: 0,
-      up: { dish: 2, scan: 0, probes: 0, auto: 0, stabil: 0, relicAmp: 0 }
-    },
-    2: {
-      phase: 2,
-      total: 720,
-      signal: 220,
-      corruption: 0.08,
-      build: 1,
-      relics: 0,
-      up: { dish: 7, scan: 2, probes: 1, auto: 0, stabil: 0, relicAmp: 0 }
-    },
-    3: {
-      phase: 3,
-      total: 2400,
-      signal: 650,
-      corruption: 0.18,
-      build: 1,
-      relics: 0,
-      up: { dish: 13, scan: 4, probes: 2, auto: 2, stabil: 0, relicAmp: 0 }
-    },
-    4: {
-      phase: 4,
-      total: 10_200,
-      signal: 1500,
-      corruption: 0.42,
-      build: 1,
-      relics: 0,
-      up: { dish: 26, scan: 8, probes: 4, auto: 5, stabil: 1, relicAmp: 0 }
-    },
-    5: {
-      phase: 5,
-      total: 13_400,
-      signal: 2800,
-      corruption: 0.55,
-      build: 1,
-      relics: 3,
-      up: { dish: 32, scan: 10, probes: 5, auto: 7, stabil: 2, relicAmp: 1 }
-    },
-    6: {
-      phase: 6,
-      total: 42_000,
-      signal: 8200,
-      corruption: 0.78,
-      build: 2,
-      relics: 12,
-      up: { dish: 60, scan: 14, probes: 8, auto: 14, stabil: 4, relicAmp: 3 }
-    }
+    1: { phase: 1, total: 80, signal: 40, corruption: 0.02, build: 1, relics: 0, up: { dish: 2, scan: 0, probes: 0, auto: 0, stabil: 0, relicAmp: 0 } },
+    2: { phase: 2, total: 720, signal: 220, corruption: 0.08, build: 1, relics: 0, up: { dish: 7, scan: 2, probes: 1, auto: 0, stabil: 0, relicAmp: 0 } },
+    3: { phase: 3, total: 2400, signal: 650, corruption: 0.18, build: 1, relics: 0, up: { dish: 13, scan: 4, probes: 2, auto: 2, stabil: 0, relicAmp: 0 } },
+    4: { phase: 4, total: 10200, signal: 1500, corruption: 0.42, build: 1, relics: 0, up: { dish: 26, scan: 8, probes: 4, auto: 5, stabil: 1, relicAmp: 0 } },
+    5: { phase: 5, total: 13400, signal: 2800, corruption: 0.55, build: 1, relics: 3, up: { dish: 32, scan: 10, probes: 5, auto: 7, stabil: 2, relicAmp: 1 } },
+    6: { phase: 6, total: 42000, signal: 8200, corruption: 0.78, build: 2, relics: 12, up: { dish: 60, scan: 14, probes: 8, auto: 14, stabil: 4, relicAmp: 3 } }
   };
 
-  // DEV: user-captured snapshots (local only)
   const DEV_SNAP_KEY = "sygn1l_dev_snaps_v1";
-
   function loadDevSnaps() {
-    try { return JSON.parse(localStorage.getItem(DEV_SNAP_KEY) || "{}"); }
-    catch { return {}; }
+    try {
+      return JSON.parse(localStorage.getItem(DEV_SNAP_KEY) || "{}");
+    } catch {
+      return {};
+    }
   }
   function saveDevSnaps(snaps) {
-    try { localStorage.setItem(DEV_SNAP_KEY, JSON.stringify(snaps)); } catch {}
+    try {
+      localStorage.setItem(DEV_SNAP_KEY, JSON.stringify(snaps));
+    } catch {}
   }
 
   function captureDevSnapshot(slot = 1) {
@@ -531,80 +519,79 @@ import { createSaves } from "./saves.js";
     return s;
   }
 
-  async function applyCapturedSnapshot(slot = 1) {
-  const snaps = loadDevSnaps();
-  const snap = snaps[String(slot)];
-  if (!snap) return false;
-
-  // Apply a baseline first (keeps rules consistent), then overwrite to exact captured values
-  await applyPhaseSnapshot(clamp(Number(snap.phase) || 1, 1, 6));
-
-  state.build = snap.build;
-  state.relics = snap.relics;
-  state.signal = snap.signal;
-  state.total = snap.total;
-  state.corruption = snap.corruption;
-
-  // Keep upgrades exactly as captured
-  state.up = { ...state.up, ...snap.up };
-
-  touch();
-  recompute();
-
-  // ✅ PATCH: ensure phase UI updates immediately even if phase number didn't “change”
-  setPhase(state.phase);
-
-  renderAll();
-
-  saves.saveLocal(state);
-  if (saves.isSignedIn()) {
-    try { await saves.saveCloud(state, { force: true }); } catch {}
-  }
-  return true;
-}
-
   async function applyPhaseSnapshot(ph) {
-  const snap = PHASE_SNAPSHOTS[clamp(Number(ph) || 1, 1, 6)];
-  if (!snap) return;
+    const snap = PHASE_SNAPSHOTS[clamp(Number(ph) || 1, 1, 6)];
+    if (!snap) return;
 
-  const keepName = (state.profile?.name || "GUEST").toUpperCase().slice(0, 18);
+    const keepName = (state.profile?.name || "GUEST").toUpperCase().slice(0, 18);
 
-  state.build = snap.build;
-  state.relics = snap.relics;
-  state.signal = snap.signal;
-  state.total = snap.total;
-  state.corruption = snap.corruption;
-  state.phase = snap.phase;
+    state.build = snap.build;
+    state.relics = snap.relics;
+    state.signal = snap.signal;
+    state.total = snap.total;
+    state.corruption = snap.corruption;
+    state.phase = snap.phase;
 
-  state.up = {
-    dish: snap.up.dish || 0,
-    scan: snap.up.scan || 0,
-    probes: snap.up.probes || 0,
-    auto: snap.up.auto || 0,
-    stabil: snap.up.stabil || 0,
-    relicAmp: snap.up.relicAmp || 0
-  };
+    state.up = {
+      dish: snap.up.dish || 0,
+      scan: snap.up.scan || 0,
+      probes: snap.up.probes || 0,
+      auto: snap.up.auto || 0,
+      stabil: snap.up.stabil || 0,
+      relicAmp: snap.up.relicAmp || 0
+    };
 
-  state.lastAmbientAt = 0;
-  state.lastAiAt = 0;
+    state.lastAmbientAt = 0;
+    state.lastAiAt = 0;
+    state.profile.name = keepName;
 
-  state.profile.name = keepName;
+    touch();
+    recompute();
 
-  touch();
-  recompute();
+    // PATCH: force immediate phase UI sync
+    setPhase(state.phase);
 
-  // ✅ PATCH: force immediate phase UI sync (tint/status/subtitle/objective)
-  setPhase(state.phase);
+    renderAll();
 
-  // Then render everything else
-  renderAll();
-
-  // Persist
-  saves.saveLocal(state);
-  if (saves.isSignedIn()) {
-    try { await saves.saveCloud(state, { force: true }); } catch {}
+    saves.saveLocal(state);
+    if (saves.isSignedIn()) {
+      try {
+        await saves.saveCloud(state, { force: true });
+      } catch {}
+    }
   }
-}
+
+  async function applyCapturedSnapshot(slot = 1) {
+    const snaps = loadDevSnaps();
+    const snap = snaps[String(slot)];
+    if (!snap) return false;
+
+    await applyPhaseSnapshot(clamp(Number(snap.phase) || 1, 1, 6));
+
+    state.build = snap.build;
+    state.relics = snap.relics;
+    state.signal = snap.signal;
+    state.total = snap.total;
+    state.corruption = snap.corruption;
+    state.up = { ...state.up, ...snap.up };
+
+    touch();
+    recompute();
+
+    // PATCH: force phase UI even if phase number didn't change
+    setPhase(state.phase);
+
+    renderAll();
+
+    saves.saveLocal(state);
+    if (saves.isSignedIn()) {
+      try {
+        await saves.saveCloud(state, { force: true });
+      } catch {}
+    }
+    return true;
+  }
+
   function injectDevPanel() {
     if (document.getElementById("devPanel")) return;
 
@@ -661,21 +648,17 @@ import { createSaves } from "./saves.js";
     `;
     wrap.prepend(card);
 
-    // Phase snapshot load
     card.querySelectorAll("button[data-ph]").forEach((btn) => {
       btn.onclick = async () => {
         markActive();
         feedback(false);
-
         const ph = Number(btn.getAttribute("data-ph")) || 1;
         await applyPhaseSnapshot(ph);
-
-        popup("SYS", DEV: PHASE ${clamp(ph,1,6)} SNAPSHOT LOADED);
-        pushLog("log", "SYS", DEV SNAPSHOT: PHASE ${clamp(ph,1,6)} LOADED.);
+        popup("SYS", `DEV: PHASE ${clamp(ph, 1, 6)} SNAPSHOT LOADED`);
+        pushLog("log", "SYS", `DEV SNAPSHOT: PHASE ${clamp(ph, 1, 6)} LOADED.`);
       };
     });
 
-    // Cheats
     $("devAddSignal").onclick = async () => {
       markActive();
       feedback(false);
@@ -705,7 +688,7 @@ import { createSaves } from "./saves.js";
       feedback(false);
       captureDevSnapshot(1);
       popup("SYS", "DEV: SNAPSHOT CAPTURED (SLOT 1)");
-      pushLog("log","SYS","DEV SNAPSHOT: CAPTURED SLOT 1.");
+      pushLog("log", "SYS", "DEV SNAPSHOT: CAPTURED SLOT 1.");
     };
 
     $("devLoad1").onclick = async () => {
@@ -713,7 +696,7 @@ import { createSaves } from "./saves.js";
       feedback(false);
       const ok = await applyCapturedSnapshot(1);
       popup("SYS", ok ? "DEV: SNAPSHOT LOADED (SLOT 1)" : "DEV: SLOT 1 EMPTY");
-      if (ok) pushLog("log","SYS","DEV SNAPSHOT: LOADED SLOT 1.");
+      if (ok) pushLog("log", "SYS", "DEV SNAPSHOT: LOADED SLOT 1.");
     };
 
     $("devCap2").onclick = () => {
@@ -721,7 +704,7 @@ import { createSaves } from "./saves.js";
       feedback(false);
       captureDevSnapshot(2);
       popup("SYS", "DEV: SNAPSHOT CAPTURED (SLOT 2)");
-      pushLog("log","SYS","DEV SNAPSHOT: CAPTURED SLOT 2.");
+      pushLog("log", "SYS", "DEV SNAPSHOT: CAPTURED SLOT 2.");
     };
 
     $("devLoad2").onclick = async () => {
@@ -729,7 +712,7 @@ import { createSaves } from "./saves.js";
       feedback(false);
       const ok = await applyCapturedSnapshot(2);
       popup("SYS", ok ? "DEV: SNAPSHOT LOADED (SLOT 2)" : "DEV: SLOT 2 EMPTY");
-      if (ok) pushLog("log","SYS","DEV SNAPSHOT: LOADED SLOT 2.");
+      if (ok) pushLog("log", "SYS", "DEV SNAPSHOT: LOADED SLOT 2.");
     };
 
     $("devAddRelics").onclick = async () => {
@@ -758,16 +741,16 @@ import { createSaves } from "./saves.js";
     if (!saves.isSignedIn()) return false;
     if (!isActive()) return false;
     const cooldown = 180_000;
-    if ((nowMs() - (state.lastAiAt || 0)) < cooldown) return false;
+    if (nowMs() - (state.lastAiAt || 0) < cooldown) return false;
     return true;
   }
 
-  async function aiComms(eventName, speakerHint="OPS") {
+  async function aiComms(eventName, speakerHint = "OPS") {
     if (!aiReady()) return false;
 
     state.lastAiAt = nowMs();
     saves.saveLocal(state);
-    $("aiChip").textContent = "AI: ...";
+    if ($("aiChip")) $("aiChip").textContent = "AI: ...";
 
     try {
       const payload = {
@@ -789,37 +772,37 @@ import { createSaves } from "./saves.js";
       const text = (data?.text || "").trim() || "…";
 
       popup(who, text);
-      pushLog("comms", who, String(text).replaceAll("<","&lt;"));
-      $("aiChip").textContent = "AI: READY";
+      pushLog("comms", who, String(text).replaceAll("<", "&lt;"));
+      if ($("aiChip")) $("aiChip").textContent = "AI: READY";
       return true;
     } catch (err) {
-      $("aiChip").textContent = "AI: OFF";
-      pushLog("log","SYS","AI FAILED: " + String(err?.message || err).replaceAll("<","&lt;"));
+      if ($("aiChip")) $("aiChip").textContent = "AI: OFF";
+      pushLog("log", "SYS", "AI FAILED: " + String(err?.message || err).replaceAll("<", "&lt;"));
       return false;
     }
   }
 
   const HUMAN_POOL = [
-    (n)=>Hey ${n}, you still with us?,
-    (n)=>Hold up, ${n}. That spike looked… deliberate.,
-    (n)=>You’re doing fine, ${n}. Keep the pings steady.,
-    (n)=>If it starts feeling personal, tell me, ${n}.,
-    (n)=>Take a breath, ${n}. Then keep scanning.,
-    (n)=>I hate this part, ${n}. But we need the data.
+    (n) => `Hey ${n}, you still with us?`,
+    (n) => `Hold up, ${n}. That spike looked… deliberate.`,
+    (n) => `You’re doing fine, ${n}. Keep the pings steady.`,
+    (n) => `If it starts feeling personal, tell me, ${n}.`,
+    (n) => `Take a breath, ${n}. Then keep scanning.`,
+    (n) => `I hate this part, ${n}. But we need the data.`
   ];
 
   function maybeAmbient() {
     if (!state.aiOn) return;
     if (!saves.isSignedIn()) return;
     if (!isActive()) return;
-    if ((nowMs() - (state.lastAmbientAt || 0)) < AMBIENT_EVERY_MS) return;
+    if (nowMs() - (state.lastAmbientAt || 0) < AMBIENT_EVERY_MS) return;
 
     state.lastAmbientAt = nowMs();
     saves.saveLocal(state);
 
-    const msg = HUMAN_POOL[Math.floor(Math.random()*HUMAN_POOL.length)](state.profile.name);
+    const msg = HUMAN_POOL[Math.floor(Math.random() * HUMAN_POOL.length)](state.profile.name);
     popup("OPS", msg);
-    pushLog("comms", "OPS", String(msg).replaceAll("<","&lt;"));
+    pushLog("comms", "OPS", String(msg).replaceAll("<", "&lt;"));
 
     if (Math.random() < 0.25) aiComms("ambient", "OPS");
   }
@@ -828,28 +811,31 @@ import { createSaves } from "./saves.js";
   // UI Render
   // ----------------------------
   function renderHUD() {
-    $("signal").textContent = fmt(state.signal);
-    $("sps").textContent = fmt(derived.sps);
+    if ($("signal")) $("signal").textContent = fmt(state.signal);
+    if ($("sps")) $("sps").textContent = fmt(derived.sps);
 
-    $("buildChip").textContent = "BUILD: " + state.build;
-    $("relicChip").textContent = "RELICS: " + state.relics;
-    $("userChip").textContent = "USER: " + state.profile.name;
+    if ($("buildChip")) $("buildChip").textContent = "BUILD: " + state.build;
+    if ($("relicChip")) $("relicChip").textContent = "RELICS: " + state.relics;
+    if ($("userChip")) $("userChip").textContent = "USER: " + state.profile.name;
 
-    $("corrFill").style.width = (state.corruption * 100).toFixed(1) + "%";
-    $("corrText").textContent = (state.corruption * 100).toFixed(1) + "% (" + corruptionLabel(state.corruption) + ")";
+    if ($("corrFill")) $("corrFill").style.width = (state.corruption * 100).toFixed(1) + "%";
+    if ($("corrText")) $("corrText").textContent = (state.corruption * 100).toFixed(1) + "% (" + corruptionLabel(state.corruption) + ")";
 
     const rite = $("riteBtn");
-    const can = canRite();
-    rite.disabled = !can;
-    rite.textContent = can ? RITE +${prestigeGain()} : "RITE";
+    if (rite) {
+      const can = canRite();
+      rite.disabled = !can;
+      rite.textContent = can ? `RITE +${prestigeGain()}` : "RITE";
+    }
 
-    $("aiChip").textContent = saves.isSignedIn()
-      ? (state.aiOn ? "AI: READY" : "AI: OFF")
-      : "AI: OFF";
+    if ($("aiChip")) {
+      $("aiChip").textContent = saves.isSignedIn() ? (state.aiOn ? "AI: READY" : "AI: OFF") : "AI: OFF";
+    }
   }
 
   function renderUpgrades() {
     const root = $("upgrades");
+    if (!root) return;
     root.innerHTML = "";
 
     for (const u of UPG) {
@@ -866,14 +852,14 @@ import { createSaves } from "./saves.js";
 
       const meta = document.createElement("div");
       meta.className = "meta";
-      meta.innerHTML = 
-        <div class="name">${String(u.name).replaceAll("<","&lt;")} (LV ${lvl(u.id)})</div>
-        <div class="desc">${String(unlocked ? u.desc : LOCKED UNTIL ${fmt(u.unlock)} TOTAL.).replaceAll("<","&lt;")}</div>
-        <div class="cost">${unlocked ? COST: ${fmt(price)} ${currency.toUpperCase()} : "STATUS: LOCKED"}</div>
-      ;
+      meta.innerHTML = `
+        <div class="name">${esc(u.name)} (LV ${lvl(u.id)})</div>
+        <div class="desc">${esc(unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlock)} TOTAL.`)}</div>
+        <div class="cost">${unlocked ? `COST: ${fmt(price)} ${currency.toUpperCase()}` : "STATUS: LOCKED"}</div>
+      `;
 
       const btn = document.createElement("button");
-      btn.textContent = afford ? "ACQUIRE" : (unlocked ? "LOCKED" : "CLASSIF");
+      btn.textContent = afford ? "ACQUIRE" : unlocked ? "LOCKED" : "CLASSIF";
       btn.disabled = !afford;
 
       btn.onclick = async () => {
@@ -889,7 +875,9 @@ import { createSaves } from "./saves.js";
         recompute();
         renderAll();
 
-        try { await saveNow(false); } catch {}
+        try {
+          await saveNow(false);
+        } catch {}
         if (Math.random() < 0.18) aiComms("buy_" + u.id, "OPS");
       };
 
@@ -906,7 +894,7 @@ import { createSaves } from "./saves.js";
     return clamp(raw * (1 - 0.55 * state.corruption), 0, 1);
   }
   function updateScopeLabel() {
-    $("scopeLabel").textContent = "LOCK: " + Math.round(lockValue() * 100) + "%";
+    if ($("scopeLabel")) $("scopeLabel").textContent = "LOCK: " + Math.round(lockValue() * 100) + "%";
   }
 
   function renderAll() {
@@ -920,26 +908,30 @@ import { createSaves } from "./saves.js";
   // Scope Visualiser (kept lightweight)
   // ----------------------------
   const scope = $("scope");
-  const ctx = scope.getContext("2d", { alpha: false });
-  let sw = 0, sh = 0, dpr = 1;
+  const ctx = scope ? scope.getContext("2d", { alpha: false }) : null;
+  let sw = 0,
+    sh = 0,
+    dpr = 1;
 
   function resizeScope() {
+    if (!scope) return;
     dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
     const cssW = scope.clientWidth || 300;
     const cssH = 84;
     scope.style.height = cssH + "px";
     scope.width = Math.floor(cssW * dpr);
     scope.height = Math.floor(cssH * dpr);
-    sw = scope.width; sh = scope.height;
+    sw = scope.width;
+    sh = scope.height;
   }
   window.addEventListener("resize", resizeScope);
 
   function drawScope(_dt, t) {
-    if (!sw || !sh) return;
+    if (!ctx || !sw || !sh) return;
     ctx.fillStyle = "rgb(0,0,0)";
-    ctx.fillRect(0,0,sw,sh);
+    ctx.fillRect(0, 0, sw, sh);
 
-    const y = Math.floor((t/12) % sh);
+    const y = Math.floor((t / 12) % sh);
     ctx.fillStyle = "rgba(60,255,120,0.12)";
     ctx.fillRect(0, y, sw, Math.max(1, Math.floor(dpr)));
 
@@ -948,11 +940,12 @@ import { createSaves } from "./saves.js";
     ctx.beginPath();
 
     const lk = lockValue();
-    for (let x=0; x<sw; x+=Math.max(2, Math.floor(dpr*2))) {
-      const n = Math.sin((x/45) + (t/500)) * 0.35 + Math.sin((x/19) + (t/900)) * 0.20;
-      const amp = (0.25 + 0.75*lk) * (1 - 0.55*state.corruption);
-      const yy = Math.floor(sh*0.6 - n * amp * sh*0.38);
-      if (x === 0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+    for (let x = 0; x < sw; x += Math.max(2, Math.floor(dpr * 2))) {
+      const n = Math.sin(x / 45 + t / 500) * 0.35 + Math.sin(x / 19 + t / 900) * 0.2;
+      const amp = (0.25 + 0.75 * lk) * (1 - 0.55 * state.corruption);
+      const yy = Math.floor(sh * 0.6 - n * amp * sh * 0.38);
+      if (x === 0) ctx.moveTo(x, yy);
+      else ctx.lineTo(x, yy);
     }
     ctx.stroke();
   }
@@ -972,7 +965,9 @@ import { createSaves } from "./saves.js";
     touch();
     recompute();
     renderAll();
-    try { await saveNow(false); } catch {}
+    try {
+      await saveNow(false);
+    } catch {}
 
     if (Math.random() < 0.08) aiComms("ping", "OPS");
   };
@@ -980,8 +975,10 @@ import { createSaves } from "./saves.js";
   $("saveBtn").onclick = async () => {
     markActive();
     feedback(false);
-    try { await saveNow(true); } catch {}
-    pushLog("log","SYS", saves.isSignedIn() ? "SAVED (CLOUD)." : "SAVED (GUEST).");
+    try {
+      await saveNow(true);
+    } catch {}
+    pushLog("log", "SYS", saves.isSignedIn() ? "SAVED (CLOUD)." : "SAVED (GUEST).");
   };
 
   $("wipeBtn").onclick = async () => {
@@ -997,7 +994,9 @@ import { createSaves } from "./saves.js";
 
     saves.wipeLocal();
     if (saves.isSignedIn()) {
-      try { await saves.wipeCloud(); } catch {}
+      try {
+        await saves.wipeCloud();
+      } catch {}
     }
     location.reload();
   };
@@ -1008,12 +1007,14 @@ import { createSaves } from "./saves.js";
     feedback(true);
 
     const g = prestigeGain();
-    const ok = confirm(RITE resets this build.\nYou gain +${g} relics.\n\nProceed?);
+    const ok = confirm(`RITE resets this build.\nYou gain +${g} relics.\n\nProceed?`);
     if (!ok) return;
 
     doRite();
     renderAll();
-    try { await saveNow(true); } catch {}
+    try {
+      await saveNow(true);
+    } catch {}
     aiComms("rite", "MOTHERLINE");
   };
 
@@ -1022,12 +1023,10 @@ import { createSaves } from "./saves.js";
     feedback(false);
     state.aiOn = !state.aiOn;
     $("aiBtn").textContent = state.aiOn ? "AI COMMS" : "AI OFF";
-    $("aiChip").textContent = saves.isSignedIn()
-      ? (state.aiOn ? "AI: READY" : "AI: OFF")
-      : "AI: OFF";
+    if ($("aiChip")) $("aiChip").textContent = saves.isSignedIn() ? (state.aiOn ? "AI: READY" : "AI: OFF") : "AI: OFF";
     touch();
     saves.saveLocal(state);
-    if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(()=>{});
+    if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(() => {});
   };
 
   $("fbBtn").onclick = () => {
@@ -1039,20 +1038,26 @@ import { createSaves } from "./saves.js";
 
   $("helpBtn").onclick = () => {
     markActive();
-    openModal("HOME BASE COMMUNIQUE",
+    openModal(
+      "HOME BASE COMMUNIQUE",
+      `
       <p><span class="tag">HB</span>Operator, we’re receiving structured noise. Build Signal, unlock buffs, and keep Corruption from spiraling while we decode intent.</p>
-       <p><span class="tag">HOW</span>Tap <b>PING VOID</b> for Signal. Buy <b>DISH</b> for passive gain. New buffs unlock at Total milestones.</p>
-       <p><span class="tag">TIP</span>Sign in to sync across devices. (Cloud save loads on sign-in.)</p>
+      <p><span class="tag">HOW</span>Tap <b>PING VOID</b> for Signal. Buy <b>DISH</b> for passive gain. New buffs unlock at Total milestones.</p>
+      <p><span class="tag">TIP</span>Sign in to sync across devices. (Cloud save loads on sign-in.)</p>
+      `
     );
   };
 
   $("userChip").onclick = () => {
     markActive();
-    openModal("IDENTITY OVERRIDE",
+    openModal(
+      "IDENTITY OVERRIDE",
+      `
       <p><span class="tag">OPS</span>A callsign makes the logs readable.</p>
-       <input class="texty" id="nameInput" maxlength="18" placeholder="USERNAME" value="${esc(state.profile.name)}" />
-       <div style="height:10px"></div>
-       <button id="nameSave" style="width:100%">SAVE</button>
+      <input class="texty" id="nameInput" maxlength="18" placeholder="USERNAME" value="${esc(state.profile.name)}" />
+      <div style="height:10px"></div>
+      <button id="nameSave" style="width:100%">SAVE</button>
+      `
     );
 
     const input = document.getElementById("nameInput");
@@ -1061,13 +1066,15 @@ import { createSaves } from "./saves.js";
       state.profile.name = (name ? name : "GUEST").toUpperCase();
       closeModal();
 
-      popup("OPS", Copy that, ${state.profile.name}.);
-      pushLog("comms","OPS", Alright ${String(state.profile.name).replaceAll("<","&lt;")}. Keep it steady.);
+      popup("OPS", `Copy that, ${state.profile.name}.`);
+      pushLog("comms", "OPS", `Alright ${esc(state.profile.name)}. Keep it steady.`);
 
       touch();
       saves.saveLocal(state);
       if (saves.isSignedIn()) {
-        try { await saves.saveCloud(state, { force: true }); } catch {}
+        try {
+          await saves.saveCloud(state, { force: true });
+        } catch {}
       }
       renderAll();
     };
@@ -1108,23 +1115,29 @@ import { createSaves } from "./saves.js";
     markActive();
     const ok = confirm("Sign out? (Cloud save remains safe.)");
     if (!ok) return;
-    try { await saves.signOut(); } catch (e) { alert(e.message || String(e)); }
+    try {
+      await saves.signOut();
+    } catch (e) {
+      alert(e.message || String(e));
+    }
   };
 
   $("whoBtn").onclick = async () => {
     markActive();
     try {
       const uid = await saves.getUserId();
-      alert(uid ? UID: ${uid} : "Not signed in.");
-    } catch { alert("Not signed in."); }
+      alert(uid ? `UID: ${uid}` : "Not signed in.");
+    } catch {
+      alert("Not signed in.");
+    }
   };
 
   function setAuthUI({ signedIn, userId }) {
-    $("authStatus").textContent = signedIn ? "STATUS: SIGNED IN" : "STATUS: NOT SIGNED IN";
-    $("signOutBtn").disabled = !signedIn;
-    $("syncChip").textContent = signedIn ? "SYNC: CLOUD" : "SYNC: GUEST";
-    $("aiChip").textContent = signedIn ? (state.aiOn ? "AI: READY" : "AI: OFF") : "AI: OFF";
-    if (signedIn && userId) pushLog("log","SYS", SIGNED IN (${userId.slice(0,4)}…${userId.slice(-4)}).);
+    if ($("authStatus")) $("authStatus").textContent = signedIn ? "STATUS: SIGNED IN" : "STATUS: NOT SIGNED IN";
+    if ($("signOutBtn")) $("signOutBtn").disabled = !signedIn;
+    if ($("syncChip")) $("syncChip").textContent = signedIn ? "SYNC: CLOUD" : "SYNC: GUEST";
+    if ($("aiChip")) $("aiChip").textContent = signedIn ? (state.aiOn ? "AI: READY" : "AI: OFF") : "AI: OFF";
+    if (signedIn && userId) pushLog("log", "SYS", `SIGNED IN (${userId.slice(0, 4)}…${userId.slice(-4)}).`);
   }
 
   async function onAuthChange(info) {
@@ -1135,10 +1148,10 @@ import { createSaves } from "./saves.js";
         const res = await saves.syncOnSignIn(state);
         if (res.cloudLoaded) {
           loadIntoState(res.cloudLoaded);
-          pushLog("log","SYS","CLOUD SAVE LOADED (REPLACING GUEST RUN).");
-          popup("SYS","Cloud state loaded.");
+          pushLog("log", "SYS", "CLOUD SAVE LOADED (REPLACING GUEST RUN).");
+          popup("SYS", "Cloud state loaded.");
         } else {
-          pushLog("log","SYS","NO CLOUD SAVE FOUND. CREATED ONE FROM CURRENT RUN.");
+          pushLog("log", "SYS", "NO CLOUD SAVE FOUND. CREATED ONE FROM CURRENT RUN.");
         }
         await saveNow(true);
         renderAll();
@@ -1150,8 +1163,8 @@ import { createSaves } from "./saves.js";
         await checkDevAndMaybeInject();
         updateOnboardVisibility();
       } catch (e) {
-        pushLog("log","SYS","CLOUD SYNC FAILED: " + String(e?.message || e).replaceAll("<","&lt;"));
-        $("syncChip").textContent = "SYNC: CLOUD (ERR)";
+        pushLog("log", "SYS", "CLOUD SYNC FAILED: " + String(e?.message || e).replaceAll("<", "&lt;"));
+        if ($("syncChip")) $("syncChip").textContent = "SYNC: CLOUD (ERR)";
       }
     } else {
       removeDevPanel();
@@ -1163,10 +1176,11 @@ import { createSaves } from "./saves.js";
   // Boot narrative
   // ----------------------------
   function bootNarrative() {
-    if ($("log").children.length) return;
-    pushLog("log","SYS","SYGN1L ONLINE. SILENCE IS UNPROCESSED DATA.");
-    pushLog("comms","OPS","Ping the void so we can get a baseline.");
-    popup("OPS","Tap PING VOID, then buy DISH to start passive gain.");
+    const logEl = $("log");
+    if (logEl && logEl.children.length) return;
+    pushLog("log", "SYS", "SYGN1L ONLINE. SILENCE IS UNPROCESSED DATA.");
+    pushLog("comms", "OPS", "Ping the void so we can get a baseline.");
+    popup("OPS", "Tap PING VOID, then buy DISH to start passive gain.");
   }
 
   // ----------------------------
@@ -1208,10 +1222,10 @@ import { createSaves } from "./saves.js";
 
     drawScope(dt, t);
 
-    if ((t | 0) % 2500 < 16) {
+    if (((t | 0) % 2500) < 16) {
       touch();
       saves.saveLocal(state);
-      if (saves.isSignedIn()) saves.saveCloud(state, { force: false }).catch(()=>{});
+      if (saves.isSignedIn()) saves.saveCloud(state, { force: false }).catch(() => {});
     }
 
     requestAnimationFrame(loop);
@@ -1219,7 +1233,7 @@ import { createSaves } from "./saves.js";
 
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
-      saveNow(true).catch(()=>{});
+      saveNow(true).catch(() => {});
     }
   });
 
@@ -1240,9 +1254,10 @@ import { createSaves } from "./saves.js";
   renderAll();
   updateOnboardVisibility();
 
-  saves.initAuth(onAuthChange)
+  saves
+    .initAuth(onAuthChange)
     .then(() => {
-      checkDevAndMaybeInject().catch(()=>{});
+      checkDevAndMaybeInject().catch(() => {});
       requestAnimationFrame(loop);
     })
     .catch((e) => {
