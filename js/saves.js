@@ -1,261 +1,198 @@
-// /js/saves.js
-// Bulletproof auth + cloud save load/merge rules + offline/AFK catch-up.
-// Requires Supabase v2 script tag in index.html.
+// ./js/saves.js
+// Supabase auth + cloud save manager for SYGN1L
+// - Guest mode uses localStorage only
+// - Signed-in mode uses cloud (and can optionally mirror local for offline fallback)
+// - On sign-in: cloud save ALWAYS loads (replaces current in-memory state) if it exists
+// - If no cloud save exists yet: creates one from current state
 
-import { defaultState, sanitizeState, SAVE_VERSION, clamp } from "./state.js";
-import { recompute, corruptionTick, autoGainPerSec } from "./economy.js";
+const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
 
-export function createSaves(opts) {
-  const {
-    supabaseUrl,
-    supabaseAnonKey,
-    table = "saves",
-    offlineCapSec = 6 * 60 * 60,
-    cloudThrottleMs = 45_000
-  } = opts;
+const LOCAL_KEY = "sygn1l_guest_save_v1";
+const TABLE = "saves"; // columns: player_id (text/uuid), updated_at (timestamptz), state (jsonb)
 
-  const supabase = window.supabase?.createClient?.(supabaseUrl, supabaseAnonKey);
+const CLOUD_SAVE_THROTTLE_MS = 45_000;
 
-  let userId = null;
-  let cloudReady = false;
-
-  // local fallback ONLY for guests; once signed in, we treat cloud as source of truth.
-  const LOCAL_KEY = "sygn1l_guest_save_v1";
-
-  function isSignedIn() {
-    return !!(cloudReady && userId);
+export function createSaves() {
+  const supabase = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_ANON_KEY);
+  if (!supabase) {
+    console.warn("[SYGN1L] Supabase client missing. Cloud disabled.");
   }
 
-  // -------- AFK / Offline simulation (browser closed) --------
-  // We apply catch-up whenever we load any state (guest or cloud).
-  function applyOfflineProgress(state) {
-    const now = Date.now();
-    const last = Number(state?.meta?.lastTickMs || state?.meta?.updatedAtMs || 0);
-    if (!last || !Number.isFinite(last)) {
-      state.meta.lastTickMs = now;
-      return { appliedSec: 0, gained: 0 };
-    }
+  let _userId = null;
+  let _cloudReady = false;
+  let _lastCloudSaveAt = 0;
 
-    let dt = (now - last) / 1000;
-    if (!Number.isFinite(dt) || dt < 3) {
-      state.meta.lastTickMs = now;
-      return { appliedSec: 0, gained: 0 };
-    }
-
-    dt = Math.min(dt, offlineCapSec);
-
-    // compute current rates from upgrades
-    const d = recompute(state);
-
-    // passive gain
-    const passive = d.sps * dt;
-
-    // auto gain (per second)
-    const auto = autoGainPerSec(state, d) * dt;
-
-    const gained = passive + auto;
-    if (gained > 0) {
-      state.signal += gained;
-      state.total += gained;
-
-      // corruption should also creep while offline (scaled down a bit to be fair)
-      // simulate in chunks to keep it stable
-      const chunks = Math.min(60, Math.ceil(dt / 10));
-      const step = dt / chunks;
-      for (let i = 0; i < chunks; i++) corruptionTick(state, step * 0.85);
-    }
-
-    state.meta.lastTickMs = now;
-    state.meta.updatedAtMs = now;
-    // hard clamp to prevent accidental NaN bombs
-    state.signal = clamp(Number(state.signal) || 0, 0, 1e30);
-    state.total = clamp(Number(state.total) || 0, 0, 1e30);
-    state.corruption = clamp(Number(state.corruption) || 0, 0, 1);
-
-    return { appliedSec: dt, gained };
+  // ---- Local (guest) ----
+  function hasLocal() {
+    return !!localStorage.getItem(LOCAL_KEY);
   }
 
-  // -------- Local (guest) save/load --------
-  function loadLocalGuest() {
+  function loadLocal() {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (!raw) return null;
     try {
-      return sanitizeState(JSON.parse(raw));
+      return JSON.parse(raw);
     } catch {
       return null;
     }
   }
 
-  function saveLocalGuest(state) {
-    // guest-only; signed-in users should not rely on this
+  function saveLocal(state) {
     try {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
-    } catch {}
+      return true;
+    } catch {
+      return false;
+    }
   }
 
-  function clearLocalGuest() {
-    try { localStorage.removeItem(LOCAL_KEY); } catch {}
+  function wipeLocal() {
+    localStorage.removeItem(LOCAL_KEY);
   }
 
-  // -------- Cloud (signed in) save/load --------
-  async function loadCloudState(uid) {
+  // ---- Auth state ----
+  function isSignedIn() {
+    return !!_userId && _cloudReady;
+  }
+
+  async function getUserId() {
+    if (!supabase) return null;
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.user?.id || null;
+  }
+
+  async function initAuth(onChange) {
+    if (!supabase) {
+      _userId = null;
+      _cloudReady = false;
+      onChange?.({ signedIn: false, userId: null });
+      return;
+    }
+
+    // initial
+    const uid = await getUserId();
+    _userId = uid;
+    _cloudReady = !!uid;
+
+    onChange?.({ signedIn: isSignedIn(), userId: _userId });
+
+    // listener
+    supabase.auth.onAuthStateChange(async (_evt, session) => {
+      _userId = session?.user?.id || null;
+      _cloudReady = !!_userId;
+      onChange?.({ signedIn: isSignedIn(), userId: _userId });
+    });
+  }
+
+  async function signUp(email, password) {
+    if (!supabase) throw new Error("Supabase missing");
+    const { error } = await supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    return true;
+  }
+
+  async function signIn(email, password) {
+    if (!supabase) throw new Error("Supabase missing");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return true;
+  }
+
+  async function signOut() {
+    if (!supabase) throw new Error("Supabase missing");
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    return true;
+  }
+
+  // ---- Cloud IO ----
+  async function loadCloud() {
+    if (!supabase || !isSignedIn()) return null;
+
     const { data, error } = await supabase
-      .from(table)
+      .from(TABLE)
       .select("state, updated_at")
-      .eq("player_id", uid)
+      .eq("player_id", _userId)
       .maybeSingle();
 
     if (error) throw error;
     if (!data?.state) return null;
 
-    const s = sanitizeState(data.state);
-    // server timestamp fallback
-    const serverMs = data.updated_at ? Date.parse(data.updated_at) : 0;
-    const ms = Number(s.meta?.updatedAtMs || 0) || serverMs || 0;
-    return { state: s, updatedMs: ms };
+    const cloudState = data.state;
+    const cloudUpdatedMs =
+      cloudState?.updatedAtMs ||
+      (data.updated_at ? Date.parse(data.updated_at) : 0);
+
+    return { cloudState, cloudUpdatedMs };
   }
 
-  async function writeCloudState(state, force = false) {
-    if (!isSignedIn()) return false;
+  async function saveCloud(state, { force = false } = {}) {
+    if (!supabase || !isSignedIn()) return false;
 
     const now = Date.now();
-    const lastWrite = Number(state.meta?.lastCloudWriteMs || 0);
-    if (!force && now - lastWrite < cloudThrottleMs) return false;
-
-    state.v = SAVE_VERSION;
-    state.meta.updatedAtMs = now;
-    state.meta.lastTickMs = state.meta.lastTickMs || now;
-    state.meta.lastCloudWriteMs = now;
+    if (!force && (now - _lastCloudSaveAt) < CLOUD_SAVE_THROTTLE_MS) return false;
+    _lastCloudSaveAt = now;
 
     const payload = {
-      player_id: userId,
-      updated_at: new Date(now).toISOString(),
+      player_id: _userId,
+      updated_at: new Date().toISOString(),
       state: JSON.parse(JSON.stringify(state))
     };
 
-    const { error } = await supabase.from(table).upsert(payload);
+    const { error } = await supabase.from(TABLE).upsert(payload);
     if (error) throw error;
     return true;
   }
 
-  async function deleteCloudState() {
-    if (!isSignedIn()) return;
-    const { error } = await supabase.from(table).delete().eq("player_id", userId);
+  async function wipeCloud() {
+    if (!supabase || !isSignedIn()) return false;
+    const { error } = await supabase.from(TABLE).delete().eq("player_id", _userId);
     if (error) throw error;
+    return true;
   }
 
-  // -------- Auth --------
-  async function getSession() {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) throw error;
-    return session;
-  }
-
-  async function signIn(email, password) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
-  }
-
-  async function signUp(email, password) {
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) throw error;
-  }
-
-  async function signOut() {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-  }
-
-  // -------- Initialization / Source of truth rules --------
   /**
-   * init() decides what state to run:
-   * - if signed-in: CLOUD IS SOURCE OF TRUTH (always load cloud if present)
-   * - if no cloud exists yet: seed cloud with either existing guest state or a fresh state
-   * - guest: local guest state, with offline progress applied
+   * On sign-in:
+   * - If cloud exists: RETURN cloud state (caller should replace in-memory state)
+   * - If cloud doesn't exist: create from current state and return null
+   *
+   * This prevents the “guest run keeps going after sign-in” issue.
    */
-  async function init() {
-    if (!supabase) {
-      // no supabase available -> pure guest
-      let st = loadLocalGuest() || defaultState();
-      applyOfflineProgress(st);
-      saveLocalGuest(st);
-      return { state: st, mode: "guest", cloud: false };
+  async function syncOnSignIn(currentState) {
+    if (!supabase || !isSignedIn()) return { mode: "guest", cloudLoaded: null };
+
+    const cloud = await loadCloud();
+    if (cloud?.cloudState) {
+      return { mode: "cloud", cloudLoaded: cloud.cloudState };
     }
 
-    const session = await getSession();
-    if (!session?.user?.id) {
-      cloudReady = false;
-      userId = null;
-
-      // guest mode
-      let st = loadLocalGuest() || defaultState();
-      applyOfflineProgress(st);
-      saveLocalGuest(st);
-      return { state: st, mode: "guest", cloud: false };
-    }
-
-    // signed in
-    cloudReady = true;
-    userId = session.user.id;
-
-    // IMPORTANT RULE: once signed-in, we do NOT continue guest progress blindly.
-    // We load cloud if it exists; if not, we create it.
-    const cloud = await loadCloudState(userId);
-
-    if (cloud?.state) {
-      const st = cloud.state;
-      applyOfflineProgress(st);
-      // push offline-applied changes back to cloud (force)
-      await writeCloudState(st, true);
-      // guest file is now irrelevant; optional to clear
-      // clearLocalGuest();
-      return { state: st, mode: "signed_in", cloud: true };
-    }
-
-    // no cloud save exists yet -> seed it
-    const guest = loadLocalGuest();
-    const seed = guest ? guest : defaultState();
-    applyOfflineProgress(seed);
-    await writeCloudState(seed, true);
-    // clearLocalGuest();
-    return { state: seed, mode: "signed_in", cloud: true };
+    // No cloud yet: create it from current state (guest progress becomes account seed)
+    await saveCloud(currentState, { force: true });
+    return { mode: "cloud", cloudLoaded: null };
   }
 
-  // Listen for auth changes and let main.js decide what to do
-  function onAuthChange(cb) {
-    if (!supabase) return () => {};
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
-      cloudReady = !!session?.user?.id;
-      userId = session?.user?.id || null;
-      cb({ signedIn: !!userId, userId });
-    });
-    return () => sub.subscription?.unsubscribe?.();
-  }
-
-  // Public API
   return {
     supabase,
-    isSignedIn,
-    getUserId: () => userId,
-    init,
-    onAuthChange,
-
-    // guest
-    loadLocalGuest,
-    saveLocalGuest,
-    clearLocalGuest,
-
-    // cloud
-    loadCloudState: async () => (isSignedIn() ? loadCloudState(userId) : null),
-    writeCloudState,
-    deleteCloudState,
+    // local
+    LOCAL_KEY,
+    hasLocal,
+    loadLocal,
+    saveLocal,
+    wipeLocal,
 
     // auth
-    signIn,
+    initAuth,
     signUp,
+    signIn,
     signOut,
+    isSignedIn,
+    getUserId,
 
-    // offline helper
-    applyOfflineProgress
+    // cloud
+    loadCloud,
+    saveCloud,
+    wipeCloud,
+    syncOnSignIn
   };
 }
