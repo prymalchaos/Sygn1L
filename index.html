@@ -6,27 +6,34 @@
   <title>SYGN1L</title>
 
   <style>
-    :root{
-      --bg:#020402;
-      --panel: rgba(0,0,0,.35);
-      --border: rgba(60,255,120,.22);
-      --text: #CFFFD6;
-      --muted:#7EDB92;
+    /* ===== Phase palette (recommended) ===== */
+:root{
+  /* Base */
+  --bg0:#020402;
+  --bg1:#010701;
+  --text:#CFFFD6;
+  --muted:#7EDB92;
 
-      --p0:#39FF6A;   /* phase tints */
-      --p1:#62FF9D;
-      --p2:#A0FFD0;
-      --p3:#8CFFF2;
-      --p4:#FF6BE5;
-      --p5:#FF3B6B;
+  /* Phase accents (P1..P6) */
+  --p0:#39FF6A; /* phase 1: neon green */
+  --p1:#62FF9D; /* phase 2: mint */
+  --p2:#A0FFD0; /* phase 3: cyan-mint */
+  --p3:#8CFFEF; /* phase 4: icy glitch */
+  --p4:#FF6BE5; /* phase 5: ritual magenta */
+  --p5:#FF3B6B; /* phase 6: breach red */
 
-      --accent: var(--p0);
-      --danger: #FF3B6B;
+  /* Live accent (JS will overwrite this each phase) */
+  --accent: var(--p0);
 
-      --r: 16px;
-      --shadow: 0 10px 24px rgba(0,0,0,.55);
-      --glow: 0 0 18px rgba(60,255,120,.22);
-    }
+  /* Derived styling */
+  --danger:#FF3B6B;
+  --border: rgba(57,255,106,.25);
+  --radius:16px;
+  --shadow:0 10px 22px rgba(0,0,0,.55);
+  --glow:0 0 18px rgba(57,255,106,.25);
+}
+
+
 
     html{ background:var(--bg); -webkit-text-size-adjust:100%; }
     body{
@@ -274,6 +281,76 @@
       font:inherit;
       outline:none;
     }
+    
+    /* ===== Make the whole UI obey --accent ===== */
+.card,
+.stat,
+.up,
+.chip,
+button,
+.scopeWrap{
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.card::after{
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 12%, transparent),
+    inset 0 0 22px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.dot{
+  background: var(--accent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+button:hover{
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.big{
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 18%, transparent),
+    color-mix(in srgb, var(--accent) 6%, transparent)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.fill{
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 60%, transparent),
+    color-mix(in srgb, var(--accent) 18%, transparent)
+  );
+  box-shadow: 0 0 18px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* Scanlines subtly shift with phase */
+.fx.scanlines{
+  background: repeating-linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--accent) 18%, transparent),
+    color-mix(in srgb, var(--accent) 18%, transparent) 1px,
+    rgba(0,0,0,0) 4px,
+    rgba(0,0,0,0) 8px
+  );
+  opacity:.22;
+}
+
+/* Popup comms tint */
+.pop{
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow:
+    0 10px 26px rgba(0,0,0,.55),
+    0 0 20px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.pop .who{ color: color-mix(in srgb, var(--accent) 60%, #9CFFB2); }
+
+/* Keep corruption visually dangerous */
+.fill.danger{
+  background: linear-gradient(90deg, rgba(255,59,107,.55), rgba(255,59,107,.18));
+  box-shadow: 0 0 18px rgba(255,59,107,.18);
+}
   </style>
 </head>
 
