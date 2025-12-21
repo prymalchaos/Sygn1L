@@ -852,14 +852,29 @@ import { createSaves } from "./saves.js";
   if (local) loadIntoState(local);
 
   // Apply offline progress (works for guest + signed-in; cloud replaces if sign-in loads)
-  applyOfflineProgress();
+  function applyOfflineProgress() {
+  const last = state.updatedAtMs || 0;
+  if (!last) return;
 
-  state.profile.name = (state.profile.name || "GUEST").toUpperCase().slice(0, 18);
+  let dt = (nowMs() - last) / 1000;
+  if (!isFinite(dt) || dt < 3) return;
+  dt = Math.min(dt, OFFLINE_CAP_SEC);
 
   recompute();
-  setPhase(state.phase || 1);
-  bootNarrative();
-  renderAll();
+
+  const gain = derived.sps * dt;
+  if (gain > 0) {
+    state.signal += gain;
+    state.total += gain;
+
+    const mins = Math.max(1, Math.floor(dt / 60));
+    // Transmission style update
+    popup("CONTROL", `While you were gone: +${fmt(gain)} Signal recovered (${mins}m).`);
+    pushLog("log", "SYS", `OFFLINE RECOVERY: +${fmt(gain)} SIGNAL (${mins}m).`);
+
+    touch();
+  }
+}
 
   // Auth init (will replace state from cloud on sign-in)
   saves.initAuth(onAuthChange).finally(() => requestAnimationFrame(loop));
