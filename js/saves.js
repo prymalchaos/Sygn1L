@@ -140,7 +140,9 @@ export function createSaves() {
       state: JSON.parse(JSON.stringify(state))
     };
 
-    const { error } = await supabase.from(TABLE).upsert(payload);
+    const { error } = const { error } = await supabase
+  .from(TABLE)
+  .upsert(payload, { onConflict: "player_id" });
     if (error) throw error;
     return true;
   }
