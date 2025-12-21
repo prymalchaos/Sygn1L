@@ -7,31 +7,37 @@
 
   <style>
     /* ===== Phase palette (recommended) ===== */
+/* ===== Dark CRT / Industrial Terminal Palette ===== */
 :root{
-  /* Base */
-  --bg0:#020402;
-  --bg1:#010701;
-  --text:#CFFFD6;
-  --muted:#7EDB92;
+  --bg0:#040707;
+  --bg1:#020404;
 
-  /* Phase accents (P1..P6) */
-  --p0:#39FF6A; /* phase 1: neon green */
-  --p1:#62FF9D; /* phase 2: mint */
-  --p2:#A0FFD0; /* phase 3: cyan-mint */
-  --p3:#8CFFEF; /* phase 4: icy glitch */
-  --p4:#FF6BE5; /* phase 5: ritual magenta */
-  --p5:#FF3B6B; /* phase 6: breach red */
+  --text:#DFFFE8;
+  --muted:rgba(223,255,232,.72);
 
-  /* Live accent (JS will overwrite this each phase) */
+  /* Phase accents (JS swaps --accent to these) */
+  --p0:#39FF6A; /* P1 green */
+  --p1:#58FFAE; /* P2 mint */
+  --p2:#7EF7FF; /* P3 cyan */
+  --p3:#A6FFF1; /* P4 icy */
+  --p4:#FF6BE5; /* P5 magenta */
+  --p5:#FF3B6B; /* P6 red */
+
   --accent: var(--p0);
 
-  /* Derived styling */
-  --danger:#FF3B6B;
-  --border: rgba(57,255,106,.25);
+  /* Structural */
   --radius:16px;
-  --shadow:0 10px 22px rgba(0,0,0,.55);
-  --glow:0 0 18px rgba(57,255,106,.25);
+  --shadow:0 14px 34px rgba(0,0,0,.72);
+  --border: rgba(160,255,210,.14);
+  --glass: rgba(0,0,0,.44);
+  --panel: rgba(6,14,10,.62);
+
+  /* Glow */
+  --glowSoft: 0 0 14px color-mix(in srgb, var(--accent) 22%, transparent);
+  --glowHard: 0 0 24px color-mix(in srgb, var(--accent) 35%, transparent);
 }
+
+
 
 
 
@@ -351,6 +357,119 @@ button:hover{
   background: linear-gradient(90deg, rgba(255,59,107,.55), rgba(255,59,107,.18));
   box-shadow: 0 0 18px rgba(255,59,107,.18);
 }
+/* ===== Dark CRT / Industrial Terminal Palette ===== */
+
+
+/* ===== Keep the page dark (prevents “washed card” effect) ===== */
+body{
+  background:
+    radial-gradient(900px 600px at 60% 10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%),
+    radial-gradient(700px 520px at 15% 30%, rgba(0,0,0,.35), transparent 60%),
+    linear-gradient(180deg, var(--bg1), var(--bg0));
+  color:var(--text);
+}
+
+/* ===== Cards: darker glass + subtle inner CRT edge ===== */
+.card{
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.35)),
+    radial-gradient(1200px 800px at 50% 0%, rgba(255,255,255,.06), transparent 55%);
+  border:1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.card::after{
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.05),
+    inset 0 0 26px rgba(0,0,0,.55);
+}
+
+/* ===== Chips + stat boxes: keep dark, only edges glow ===== */
+.chip,
+.stat,
+.up,
+.scopeWrap{
+  background: rgba(0,0,0,.38);
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+/* Dot stays bright */
+.dot{
+  background: var(--accent);
+  box-shadow: var(--glowHard);
+}
+
+/* ===== Text contrast ===== */
+.subtitle{ color: var(--muted); }
+.stat .k{ color: rgba(223,255,232,.60); }
+.stat .v{
+  color: rgba(223,255,232,.96);
+  text-shadow: 0 0 10px rgba(0,0,0,.55);
+}
+
+/* ===== Buttons: darker base, bright rim when available ===== */
+button{
+  background: rgba(0,0,0,.32);
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  color: rgba(223,255,232,.94);
+}
+button:hover{ box-shadow: var(--glowSoft); }
+button:disabled{
+  opacity:.45;
+  box-shadow:none;
+  filter:saturate(.85);
+}
+
+/* Primary button */
+.big{
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--accent) 14%, transparent),
+      rgba(0,0,0,.34)
+    );
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent),
+    0 10px 26px rgba(0,0,0,.45);
+}
+
+/* Affordable upgrade rows glow, without brightening the whole card */
+.up.afford{
+  box-shadow: var(--glowSoft);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+/* ===== Fill bar uses accent but stays readable ===== */
+.fill{
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 55%, transparent),
+    color-mix(in srgb, var(--accent) 18%, transparent)
+  );
+  box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* Corruption stays red */
+.fill.danger{
+  background: linear-gradient(90deg, rgba(255,59,107,.62), rgba(255,59,107,.18));
+  box-shadow: 0 0 16px rgba(255,59,107,.20);
+}
+
+/* ===== Scanlines toned down (too much = wash) ===== */
+.fx.scanlines{
+  opacity:.16;
+}
+
+/* ===== Popups: darker, sharper, readable ===== */
+.pop{
+  background: rgba(0,0,0,.78);
+  border:1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  box-shadow:
+    0 14px 34px rgba(0,0,0,.62),
+    0 0 20px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.pop .who{ color: color-mix(in srgb, var(--accent) 55%, rgba(223,255,232,.85)); }
+.pop .msg{ color: rgba(223,255,232,.94); }
+
+
   </style>
 </head>
 
