@@ -37,8 +37,8 @@ import { createSaves } from "./saves.js";
   // - Set ONE of these to your own account.
   // - Leave both as-is to disable dev mode entirely.
   // ----------------------------
-  const DEV_MASTER_UID = "7ac61fd5-1d8a-4c27-95b9-a491f2121380";     // e.g. "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-  const DEV_MASTER_EMAIL = "cursingstone@gmail.com";   // e.g. "you@domain.com"
+  const DEV_MASTER_UID = "7ac61fd5-1d8a-4c27-95b9-a491f2121380";
+  const DEV_MASTER_EMAIL = "cursingstone@gmail.com";
 
   // ----------------------------
   // Activity gating
@@ -91,7 +91,6 @@ import { createSaves } from "./saves.js";
   const nowMs = () => Date.now();
   const esc = (s) => String(s)
     .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
-    // PATCH: fix quote escaping (was "quot;" which breaks HTML entities)
     .replaceAll('"',"&quot;").replaceAll("'","&#039;");
 
   function fmt(n) {
@@ -355,7 +354,6 @@ import { createSaves } from "./saves.js";
     return !hasMeaningful;
   }
 
-  // PATCH: helper to force username prompt (used by onboarding + sign-in)
   function forceUsernamePrompt(from = "CONTROL") {
     popup(from, "Callsign required. Tap USER to register.");
     try { $("userChip")?.click?.(); } catch {}
@@ -387,7 +385,6 @@ import { createSaves } from "./saves.js";
     $("onboardNext").onclick = () => {
       feedback(false);
 
-      // PATCH: on final step, do NOT allow completion unless username is set
       if (i === script.length - 1) {
         if ((state.profile.name || "GUEST").toUpperCase() === "GUEST") {
           forceUsernamePrompt("CONTROL");
@@ -425,7 +422,6 @@ import { createSaves } from "./saves.js";
   // ----------------------------
   async function checkDevAndMaybeInject() {
     try {
-      // Hard-off unless configured
       const hasConfig = (DEV_MASTER_UID && DEV_MASTER_UID.trim()) || (DEV_MASTER_EMAIL && DEV_MASTER_EMAIL.trim());
       if (!hasConfig) return;
 
@@ -450,7 +446,7 @@ import { createSaves } from "./saves.js";
     if (el) el.remove();
   }
 
-  // DEV: phase snapshots for realistic playtesting
+  // DEV: phase snapshots for realistic playtesting (fixed baselines)
   const PHASE_SNAPSHOTS = {
     1: {
       phase: 1,
@@ -463,7 +459,7 @@ import { createSaves } from "./saves.js";
     },
     2: {
       phase: 2,
-      total: 720,   // between 500 and 1799
+      total: 720,
       signal: 220,
       corruption: 0.08,
       build: 1,
@@ -472,7 +468,7 @@ import { createSaves } from "./saves.js";
     },
     3: {
       phase: 3,
-      total: 2400,  // between 1800 and 8999
+      total: 2400,
       signal: 650,
       corruption: 0.18,
       build: 1,
@@ -481,7 +477,7 @@ import { createSaves } from "./saves.js";
     },
     4: {
       phase: 4,
-      total: 10_200, // between 9000 and 11999
+      total: 10_200,
       signal: 1500,
       corruption: 0.42,
       build: 1,
@@ -490,7 +486,7 @@ import { createSaves } from "./saves.js";
     },
     5: {
       phase: 5,
-      total: 13_400, // between 12000 and 34999
+      total: 13_400,
       signal: 2800,
       corruption: 0.55,
       build: 1,
@@ -499,7 +495,7 @@ import { createSaves } from "./saves.js";
     },
     6: {
       phase: 6,
-      total: 42_000, // 35000+
+      total: 42_000,
       signal: 8200,
       corruption: 0.78,
       build: 2,
@@ -508,14 +504,64 @@ import { createSaves } from "./saves.js";
     }
   };
 
+  // DEV: user-captured snapshots (local only)
+  const DEV_SNAP_KEY = "sygn1l_dev_snaps_v1";
+
+  function loadDevSnaps() {
+    try { return JSON.parse(localStorage.getItem(DEV_SNAP_KEY) || "{}"); }
+    catch { return {}; }
+  }
+  function saveDevSnaps(snaps) {
+    try { localStorage.setItem(DEV_SNAP_KEY, JSON.stringify(snaps)); } catch {}
+  }
+
+  function captureDevSnapshot(slot = 1) {
+    const s = {
+      build: state.build,
+      relics: state.relics,
+      signal: state.signal,
+      total: state.total,
+      corruption: state.corruption,
+      phase: state.phase,
+      up: { ...state.up }
+    };
+    const snaps = loadDevSnaps();
+    snaps[String(slot)] = s;
+    saveDevSnaps(snaps);
+    return s;
+  }
+
+  async function applyCapturedSnapshot(slot = 1) {
+    const snaps = loadDevSnaps();
+    const snap = snaps[String(slot)];
+    if (!snap) return false;
+
+    // Apply a baseline first (keeps rules consistent), then overwrite to exact captured values
+    await applyPhaseSnapshot(clamp(Number(snap.phase) || 1, 1, 6));
+    state.build = snap.build;
+    state.relics = snap.relics;
+    state.signal = snap.signal;
+    state.total = snap.total;
+    state.corruption = snap.corruption;
+    state.up = { ...state.up, ...snap.up };
+
+    touch();
+    recompute();
+    renderAll();
+
+    saves.saveLocal(state);
+    if (saves.isSignedIn()) {
+      try { await saves.saveCloud(state, { force: true }); } catch {}
+    }
+    return true;
+  }
+
   async function applyPhaseSnapshot(ph) {
     const snap = PHASE_SNAPSHOTS[clamp(Number(ph) || 1, 1, 6)];
     if (!snap) return;
 
-    // Keep identity (username) as-is
     const keepName = (state.profile?.name || "GUEST").toUpperCase().slice(0, 18);
 
-    // Apply snapshot state
     state.build = snap.build;
     state.relics = snap.relics;
     state.signal = snap.signal;
@@ -523,7 +569,6 @@ import { createSaves } from "./saves.js";
     state.corruption = snap.corruption;
     state.phase = snap.phase;
 
-    // Reset upgrades exactly to snapshot
     state.up = {
       dish: snap.up.dish || 0,
       scan: snap.up.scan || 0,
@@ -533,7 +578,6 @@ import { createSaves } from "./saves.js";
       relicAmp: snap.up.relicAmp || 0
     };
 
-    // Cooldowns/ambient timing: reset so testing feels fresh
     state.lastAmbientAt = 0;
     state.lastAiAt = 0;
 
@@ -541,10 +585,11 @@ import { createSaves } from "./saves.js";
 
     touch();
     recompute();
-    setPhase(state.phase);
+
+    // IMPORTANT: do NOT call setPhase(state.phase) here.
+    // Phase is derived from total via phaseCheck() inside renderAll().
     renderAll();
 
-    // Persist
     saves.saveLocal(state);
     if (saves.isSignedIn()) {
       try { await saves.saveCloud(state, { force: true }); } catch {}
@@ -582,6 +627,19 @@ import { createSaves } from "./saves.js";
         <div class="grid2">
           <button id="devAddSignal">+10K SIGNAL</button>
           <button id="devClearCorr">CLEAR CORRUPTION</button>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="muted" style="margin-bottom:10px">Captured snapshots (local only)</div>
+
+        <div class="grid2">
+          <button id="devCap1">CAPTURE SLOT 1</button>
+          <button id="devLoad1">LOAD SLOT 1</button>
+        </div>
+        <div class="grid2">
+          <button id="devCap2">CAPTURE SLOT 2</button>
+          <button id="devLoad2">LOAD SLOT 2</button>
         </div>
 
         <div style="height:10px"></div>
@@ -631,6 +689,38 @@ import { createSaves } from "./saves.js";
       saves.saveLocal(state);
       if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(() => {});
       popup("SYS", "DEV: CORRUPTION CLEARED");
+    };
+
+    $("devCap1").onclick = () => {
+      markActive();
+      feedback(false);
+      captureDevSnapshot(1);
+      popup("SYS", "DEV: SNAPSHOT CAPTURED (SLOT 1)");
+      pushLog("log","SYS","DEV SNAPSHOT: CAPTURED SLOT 1.");
+    };
+
+    $("devLoad1").onclick = async () => {
+      markActive();
+      feedback(false);
+      const ok = await applyCapturedSnapshot(1);
+      popup("SYS", ok ? "DEV: SNAPSHOT LOADED (SLOT 1)" : "DEV: SLOT 1 EMPTY");
+      if (ok) pushLog("log","SYS","DEV SNAPSHOT: LOADED SLOT 1.");
+    };
+
+    $("devCap2").onclick = () => {
+      markActive();
+      feedback(false);
+      captureDevSnapshot(2);
+      popup("SYS", "DEV: SNAPSHOT CAPTURED (SLOT 2)");
+      pushLog("log","SYS","DEV SNAPSHOT: CAPTURED SLOT 2.");
+    };
+
+    $("devLoad2").onclick = async () => {
+      markActive();
+      feedback(false);
+      const ok = await applyCapturedSnapshot(2);
+      popup("SYS", ok ? "DEV: SNAPSHOT LOADED (SLOT 2)" : "DEV: SLOT 2 EMPTY");
+      if (ok) pushLog("log","SYS","DEV SNAPSHOT: LOADED SLOT 2.");
     };
 
     $("devAddRelics").onclick = async () => {
@@ -1044,14 +1134,11 @@ import { createSaves } from "./saves.js";
         await saveNow(true);
         renderAll();
 
-        // PATCH: after sign-in, if username is still GUEST, force prompt
         if ((state.profile.name || "GUEST").toUpperCase() === "GUEST") {
           forceUsernamePrompt("CONTROL");
         }
 
-        // DEV MODE: after sign-in, inject panel if master
         await checkDevAndMaybeInject();
-
         updateOnboardVisibility();
       } catch (e) {
         pushLog("log","SYS","CLOUD SYNC FAILED: " + String(e?.message || e).replaceAll("<","&lt;"));
@@ -1085,14 +1172,12 @@ import { createSaves } from "./saves.js";
 
     recompute();
 
-    // passive
     if (derived.sps > 0) {
       const g = derived.sps * dt;
       state.signal += g;
       state.total += g;
     }
 
-    // auto
     if (derived.autoRate > 0) {
       const p = derived.autoRate * dt;
       const g = p * (derived.click * derived.bw) * (1 - 0.25 * state.corruption);
@@ -1114,7 +1199,6 @@ import { createSaves } from "./saves.js";
 
     drawScope(dt, t);
 
-    // keep updatedAt fresh so offline calc works
     if ((t | 0) % 2500 < 16) {
       touch();
       saves.saveLocal(state);
@@ -1135,14 +1219,11 @@ import { createSaves } from "./saves.js";
   // ----------------------------
   resizeScope();
 
-  // Load guest local first
   const local = saves.loadLocal();
   if (local) loadIntoState(local);
 
-  // Apply offline earnings before first render
   applyOfflineEarnings();
 
-  // Prime
   state.profile.name = (state.profile.name || "GUEST").toUpperCase().slice(0, 18);
   recompute();
   setPhase(state.phase || 1);
@@ -1150,10 +1231,8 @@ import { createSaves } from "./saves.js";
   renderAll();
   updateOnboardVisibility();
 
-  // Auth init + loop
   saves.initAuth(onAuthChange)
     .then(() => {
-      // If already signed-in on load, onAuthChange will run, but this makes dev panel appear ASAP.
       checkDevAndMaybeInject().catch(()=>{});
       requestAnimationFrame(loop);
     })
