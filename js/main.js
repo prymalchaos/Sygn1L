@@ -14,7 +14,7 @@ import { createSaves } from "./saves.js";
   // ----------------------------
   const OFFLINE_CAP_SEC = 6 * 60 * 60;     // 6 hours max offline gain
   const ACTIVE_WINDOW_MS = 20_000;         // “active” if interacted in last 20s
-  const AMBIENT_EVERY_MS = 180_000;        // ~3 minutes
+  const AMBIENT_EVERY_MS = 300_000;        // ~3 minutes
   const EDGE_FUNCTION = "sygn1l-comms";    // Supabase Edge Function name
 
   // ----------------------------
