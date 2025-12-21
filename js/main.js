@@ -33,6 +33,14 @@ import { createSaves } from "./saves.js";
   const EDGE_FUNCTION = "sygn1l-comms";     // Supabase Edge Function name
 
   // ----------------------------
+  // DEV MODE (Master Admin)
+  // - Set ONE of these to your own account.
+  // - Leave both as-is to disable dev mode entirely.
+  // ----------------------------
+  const DEV_MASTER_UID = "";     // e.g. "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+  const DEV_MASTER_EMAIL = "";   // e.g. "you@domain.com"
+
+  // ----------------------------
   // Activity gating
   // ----------------------------
   let lastActionAt = 0;
@@ -410,6 +418,141 @@ import { createSaves } from "./saves.js";
       return;
     }
     if (shouldShowOnboard()) showOnboard();
+  }
+
+  // ----------------------------
+  // DEV MODE (Master Admin) - inject phase jumper panel
+  // ----------------------------
+  async function checkDevAndMaybeInject() {
+    try {
+      // Hard-off unless configured
+      const hasConfig = (DEV_MASTER_UID && DEV_MASTER_UID.trim()) || (DEV_MASTER_EMAIL && DEV_MASTER_EMAIL.trim());
+      if (!hasConfig) return;
+
+      if (!saves?.supabase || !saves.isSignedIn()) return;
+
+      const { data } = await saves.supabase.auth.getUser();
+      const u = data?.user;
+      if (!u) return;
+
+      const okUid = DEV_MASTER_UID && DEV_MASTER_UID.trim() && u.id === DEV_MASTER_UID.trim();
+      const okEmail = DEV_MASTER_EMAIL && DEV_MASTER_EMAIL.trim() &&
+        String(u.email || "").toLowerCase() === DEV_MASTER_EMAIL.trim().toLowerCase();
+
+      if (!okUid && !okEmail) return;
+
+      injectDevPanel();
+    } catch {}
+  }
+
+  function removeDevPanel() {
+    const el = document.getElementById("devPanel");
+    if (el) el.remove();
+  }
+
+  function injectDevPanel() {
+    if (document.getElementById("devPanel")) return;
+
+    const wrap = document.querySelector(".wrap");
+    if (!wrap) return;
+
+    const card = document.createElement("section");
+    card.className = "card";
+    card.id = "devPanel";
+    card.innerHTML = `
+      <div class="hd">
+        <div>DEV CONSOLE</div>
+        <div class="muted">MASTER ACCESS</div>
+      </div>
+      <div class="pad">
+        <div class="muted" style="margin-bottom:10px">Phase jump (testing only)</div>
+
+        <div class="grid2" style="grid-template-columns: repeat(3, 1fr);">
+          <button data-ph="1">P1</button>
+          <button data-ph="2">P2</button>
+          <button data-ph="3">P3</button>
+          <button data-ph="4">P4</button>
+          <button data-ph="5">P5</button>
+          <button data-ph="6">P6</button>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="grid2">
+          <button id="devAddSignal">+10K SIGNAL</button>
+          <button id="devClearCorr">CLEAR CORRUPTION</button>
+        </div>
+
+        <div style="height:10px"></div>
+
+        <div class="grid2">
+          <button id="devAddRelics">+10 RELICS</button>
+          <button id="devHide">HIDE DEV</button>
+        </div>
+      </div>
+    `;
+    wrap.prepend(card);
+
+    // Phase jump
+    card.querySelectorAll("button[data-ph]").forEach((btn) => {
+      btn.onclick = async () => {
+        markActive();
+        feedback(false);
+
+        const ph = Number(btn.getAttribute("data-ph")) || 1;
+        state.phase = clamp(ph, 1, 6);
+        setPhase(state.phase);
+
+        touch();
+        saves.saveLocal(state);
+        if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(() => {});
+        renderAll();
+
+        popup("SYS", `DEV: PHASE ${state.phase}`);
+      };
+    });
+
+    // Cheats
+    $("devAddSignal").onclick = async () => {
+      markActive();
+      feedback(false);
+      state.signal += 10_000;
+      state.total += 10_000;
+      touch();
+      recompute();
+      renderAll();
+      saves.saveLocal(state);
+      if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(() => {});
+      popup("SYS", "DEV: +10K SIGNAL");
+    };
+
+    $("devClearCorr").onclick = async () => {
+      markActive();
+      feedback(false);
+      state.corruption = 0;
+      touch();
+      renderAll();
+      saves.saveLocal(state);
+      if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(() => {});
+      popup("SYS", "DEV: CORRUPTION CLEARED");
+    };
+
+    $("devAddRelics").onclick = async () => {
+      markActive();
+      feedback(false);
+      state.relics += 10;
+      touch();
+      renderAll();
+      saves.saveLocal(state);
+      if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(() => {});
+      popup("SYS", "DEV: +10 RELICS");
+    };
+
+    $("devHide").onclick = () => {
+      markActive();
+      feedback(false);
+      removeDevPanel();
+    };
   }
 
   // ----------------------------
@@ -810,12 +953,16 @@ import { createSaves } from "./saves.js";
           forceUsernamePrompt("CONTROL");
         }
 
+        // DEV MODE: after sign-in, inject panel if master
+        await checkDevAndMaybeInject();
+
         updateOnboardVisibility();
       } catch (e) {
         pushLog("log","SYS","CLOUD SYNC FAILED: " + String(e?.message || e).replaceAll("<","&lt;"));
         $("syncChip").textContent = "SYNC: CLOUD (ERR)";
       }
     } else {
+      removeDevPanel();
       updateOnboardVisibility();
     }
   }
@@ -909,7 +1056,11 @@ import { createSaves } from "./saves.js";
 
   // Auth init + loop
   saves.initAuth(onAuthChange)
-    .then(() => requestAnimationFrame(loop))
+    .then(() => {
+      // If already signed-in on load, onAuthChange will run, but this makes dev panel appear ASAP.
+      checkDevAndMaybeInject().catch(()=>{});
+      requestAnimationFrame(loop);
+    })
     .catch((e) => {
       showFatal(e?.message || e);
       requestAnimationFrame(loop);
