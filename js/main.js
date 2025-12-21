@@ -769,8 +769,8 @@ import { createSaves } from "./saves.js";
       meta.className = "meta";
       meta.innerHTML = `
         <div class="name">${String(u.name).replaceAll("<","&lt;")} (LV ${lvl(u.id)})</div>
-        <div class="desc">$String(unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlock)} TOTAL.`)replaceAll("<","&lt;")}</div>
-        <div class="cost">${unlocked ? \`COST: ${fmt(price)} ${currency.toUpperCase()}\` : "STATUS: LOCKED"}</div>
+        <div class="desc">${String(unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlock)} TOTAL.`).replaceAll("<","&lt;")}</div>
+        <div class="cost">${unlocked ? `COST: ${fmt(price)} ${currency.toUpperCase()}` : "STATUS: LOCKED"}</div>
       `;
 
       const btn = document.createElement("button");
