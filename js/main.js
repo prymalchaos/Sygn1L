@@ -532,29 +532,36 @@ import { createSaves } from "./saves.js";
   }
 
   async function applyCapturedSnapshot(slot = 1) {
-    const snaps = loadDevSnaps();
-    const snap = snaps[String(slot)];
-    if (!snap) return false;
+  const snaps = loadDevSnaps();
+  const snap = snaps[String(slot)];
+  if (!snap) return false;
 
-    // Apply a baseline first (keeps rules consistent), then overwrite to exact captured values
-    await applyPhaseSnapshot(clamp(Number(snap.phase) || 1, 1, 6));
-    state.build = snap.build;
-    state.relics = snap.relics;
-    state.signal = snap.signal;
-    state.total = snap.total;
-    state.corruption = snap.corruption;
-    state.up = { ...state.up, ...snap.up };
+  // Apply a baseline first (keeps rules consistent), then overwrite to exact captured values
+  await applyPhaseSnapshot(clamp(Number(snap.phase) || 1, 1, 6));
 
-    touch();
-    recompute();
-    renderAll();
+  state.build = snap.build;
+  state.relics = snap.relics;
+  state.signal = snap.signal;
+  state.total = snap.total;
+  state.corruption = snap.corruption;
 
-    saves.saveLocal(state);
-    if (saves.isSignedIn()) {
-      try { await saves.saveCloud(state, { force: true }); } catch {}
-    }
-    return true;
+  // Keep upgrades exactly as captured
+  state.up = { ...state.up, ...snap.up };
+
+  touch();
+  recompute();
+
+  // ✅ PATCH: ensure phase UI updates immediately even if phase number didn't “change”
+  setPhase(state.phase);
+
+  renderAll();
+
+  saves.saveLocal(state);
+  if (saves.isSignedIn()) {
+    try { await saves.saveCloud(state, { force: true }); } catch {}
   }
+  return true;
+}
 
   async function applyPhaseSnapshot(ph) {
   const snap = PHASE_SNAPSHOTS[clamp(Number(ph) || 1, 1, 6)];
