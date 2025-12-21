@@ -450,6 +450,107 @@ import { createSaves } from "./saves.js";
     if (el) el.remove();
   }
 
+  // DEV: phase snapshots for realistic playtesting
+  const PHASE_SNAPSHOTS = {
+    1: {
+      phase: 1,
+      total: 80,
+      signal: 40,
+      corruption: 0.02,
+      build: 1,
+      relics: 0,
+      up: { dish: 2, scan: 0, probes: 0, auto: 0, stabil: 0, relicAmp: 0 }
+    },
+    2: {
+      phase: 2,
+      total: 720,   // between 500 and 1799
+      signal: 220,
+      corruption: 0.08,
+      build: 1,
+      relics: 0,
+      up: { dish: 7, scan: 2, probes: 1, auto: 0, stabil: 0, relicAmp: 0 }
+    },
+    3: {
+      phase: 3,
+      total: 2400,  // between 1800 and 8999
+      signal: 650,
+      corruption: 0.18,
+      build: 1,
+      relics: 0,
+      up: { dish: 13, scan: 4, probes: 2, auto: 2, stabil: 0, relicAmp: 0 }
+    },
+    4: {
+      phase: 4,
+      total: 10_200, // between 9000 and 11999
+      signal: 1500,
+      corruption: 0.42,
+      build: 1,
+      relics: 0,
+      up: { dish: 26, scan: 8, probes: 4, auto: 5, stabil: 1, relicAmp: 0 }
+    },
+    5: {
+      phase: 5,
+      total: 13_400, // between 12000 and 34999
+      signal: 2800,
+      corruption: 0.55,
+      build: 1,
+      relics: 3,
+      up: { dish: 32, scan: 10, probes: 5, auto: 7, stabil: 2, relicAmp: 1 }
+    },
+    6: {
+      phase: 6,
+      total: 42_000, // 35000+
+      signal: 8200,
+      corruption: 0.78,
+      build: 2,
+      relics: 12,
+      up: { dish: 60, scan: 14, probes: 8, auto: 14, stabil: 4, relicAmp: 3 }
+    }
+  };
+
+  async function applyPhaseSnapshot(ph) {
+    const snap = PHASE_SNAPSHOTS[clamp(Number(ph) || 1, 1, 6)];
+    if (!snap) return;
+
+    // Keep identity (username) as-is
+    const keepName = (state.profile?.name || "GUEST").toUpperCase().slice(0, 18);
+
+    // Apply snapshot state
+    state.build = snap.build;
+    state.relics = snap.relics;
+    state.signal = snap.signal;
+    state.total = snap.total;
+    state.corruption = snap.corruption;
+    state.phase = snap.phase;
+
+    // Reset upgrades exactly to snapshot
+    state.up = {
+      dish: snap.up.dish || 0,
+      scan: snap.up.scan || 0,
+      probes: snap.up.probes || 0,
+      auto: snap.up.auto || 0,
+      stabil: snap.up.stabil || 0,
+      relicAmp: snap.up.relicAmp || 0
+    };
+
+    // Cooldowns/ambient timing: reset so testing feels fresh
+    state.lastAmbientAt = 0;
+    state.lastAiAt = 0;
+
+    state.profile.name = keepName;
+
+    touch();
+    recompute();
+    setPhase(state.phase);
+    renderAll();
+
+    // Persist
+    saves.saveLocal(state);
+    if (saves.isSignedIn()) {
+      try { await saves.saveCloud(state, { force: true }); } catch {}
+    }
+  }
+
   function injectDevPanel() {
     if (document.getElementById("devPanel")) return;
 
@@ -465,7 +566,7 @@ import { createSaves } from "./saves.js";
         <div class="muted">MASTER ACCESS</div>
       </div>
       <div class="pad">
-        <div class="muted" style="margin-bottom:10px">Phase jump (testing only)</div>
+        <div class="muted" style="margin-bottom:10px">Phase snapshot load (testing only)</div>
 
         <div class="grid2" style="grid-template-columns: repeat(3, 1fr);">
           <button data-ph="1">P1</button>
@@ -493,39 +594,19 @@ import { createSaves } from "./saves.js";
     `;
     wrap.prepend(card);
 
-    // Phase jump
-// Phase jump
-card.querySelectorAll("button[data-ph]").forEach((btn) => {
-  btn.onclick = async () => {
-    markActive();
-    feedback(false);
+    // Phase snapshot load
+    card.querySelectorAll("button[data-ph]").forEach((btn) => {
+      btn.onclick = async () => {
+        markActive();
+        feedback(false);
 
-    // Use dataset + parseInt to avoid any weird attribute parsing
-    const phRaw = parseInt(btn.dataset.ph, 10);
-    const ph = (Number.isFinite(phRaw) ? phRaw : 1);
+        const ph = Number(btn.getAttribute("data-ph")) || 1;
+        await applyPhaseSnapshot(ph);
 
-    // Clamp safely without relying on clamp() handling NaN
-    const target = Math.max(1, Math.min(6, ph));
-
-    // CRITICAL: align TOTAL to the chosen phase so phaseCheck() doesn't snap back to P6
-    const at = PHASES[target - 1]?.at ?? 0;
-    const nextAt = (target < 6) ? (PHASES[target]?.at ?? (at + 1)) : (at + 1);
-
-    // Put total inside the band for that phase:
-    // [at, nextAt) so reverse-scan phaseCheck lands exactly on `target`
-    state.total = at + Math.max(1, Math.floor((nextAt - at) * 0.25));
-    state.signal = Math.max(state.signal, state.total); // keeps HUD feeling sane
-
-    setPhase(target);
-
-    touch();
-    saves.saveLocal(state);
-    if (saves.isSignedIn()) saves.saveCloud(state, { force: true }).catch(() => {});
-    renderAll();
-
-    popup("SYS", `DEV: PHASE ${state.phase}`);
-  };
-});
+        popup("SYS", `DEV: PHASE ${clamp(ph,1,6)} SNAPSHOT LOADED`);
+        pushLog("log", "SYS", `DEV SNAPSHOT: PHASE ${clamp(ph,1,6)} LOADED.`);
+      };
+    });
 
     // Cheats
     $("devAddSignal").onclick = async () => {
@@ -688,8 +769,8 @@ card.querySelectorAll("button[data-ph]").forEach((btn) => {
       meta.className = "meta";
       meta.innerHTML = `
         <div class="name">${String(u.name).replaceAll("<","&lt;")} (LV ${lvl(u.id)})</div>
-        <div class="desc">${String(unlocked ? u.desc : `LOCKED UNTIL ${fmt(u.unlock)} TOTAL.`).replaceAll("<","&lt;")}</div>
-        <div class="cost">${unlocked ? `COST: ${fmt(price)} ${currency.toUpperCase()}` : "STATUS: LOCKED"}</div>
+        <div class="desc">${String(unlocked ? u.desc : \`LOCKED UNTIL ${fmt(u.unlock)} TOTAL.\`).replaceAll("<","&lt;")}</div>
+        <div class="cost">${unlocked ? \`COST: ${fmt(price)} ${currency.toUpperCase()}\` : "STATUS: LOCKED"}</div>
       `;
 
       const btn = document.createElement("button");
