@@ -8,12 +8,12 @@ import { clamp } from "./state.js";
 // Phases (1..6) + UI tint tokens (CSS will map these to real colors)
 // ----------------------------
 export const PHASES = [
-  { n: 1, at: 0,     tint: "p1", status: "ARRAY: STABLE", sub: "THE ARRAY LISTENS. YOU PING.", obj: "Tap PING. Buy DISH." },
-  { n: 2, at: 500,   tint: "p2", status: "ARRAY: DRIFT",  sub: "Structure emerging. Keep it clean.", obj: "Unlock SCAN. Reach 120 for PROBES." },
-  { n: 3, at: 1800,  tint: "p3", status: "ARRAY: ACTIVE", sub: "It’s answering. Don’t answer back.", obj: "Unlock AUTO. Increase Signal/sec." },
-  { n: 4, at: 9000,  tint: "p4", status: "ARRAY: GLITCH", sub: "Instability rising. Containment online.", obj: "Unlock STABIL. Watch corruption." },
-  { n: 5, at: 12000, tint: "p5", status: "ARRAY: RITUAL", sub: "We can reset and keep residue.", obj: "RITE is live. Time your reset." },
-  { n: 6, at: 35000, tint: "p6", status: "ARRAY: BREACH", sub: "Something is using our signal to arrive.", obj: "Scale relics. Corruption bites back." }
+  { n: 1, at: 0,     tint: "p0", status: "ARRAY: STABLE", sub: "THE ARRAY LISTENS. YOU PING.", obj: "Tap PING. Buy DISH." },
+  { n: 2, at: 500,   tint: "p1", status: "ARRAY: DRIFT",  sub: "Structure emerging. Keep it clean.", obj: "Unlock SCAN. Reach 120 for PROBES." },
+  { n: 3, at: 1800,  tint: "p2", status: "ARRAY: ACTIVE", sub: "It’s answering. Don’t answer back.", obj: "Unlock AUTO. Increase Signal/sec." },
+  { n: 4, at: 9000,  tint: "p3", status: "ARRAY: GLITCH", sub: "Instability rising. Containment online.", obj: "Unlock STABIL. Watch corruption." },
+  { n: 5, at: 12000, tint: "p4", status: "ARRAY: RITUAL", sub: "We can reset and keep residue.", obj: "RITE is live. Time your reset." },
+  { n: 6, at: 35000, tint: "p5", status: "ARRAY: BREACH", sub: "Something is using our signal to arrive.", obj: "Scale relics. Corruption bites back." }
 ];
 
 export function phaseForTotal(total) {
