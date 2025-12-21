@@ -1,3 +1,4 @@
+
 (() => {
   const $ = (id) => document.getElementById(id);
 
@@ -14,18 +15,18 @@
   const supabase = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // Edge Function name for AI comms:
-  // Must exist in Supabase: Functions -> sygn1l-comms
   const EDGE_FUNCTION = "sygn1l-comms";
 
   // ----------------------------
   // Core rules
   // ----------------------------
-  const LOCAL_KEY = "sygn1l_core_save_v1";
-  const OFFLINE_CAP_SEC = 6 * 60 * 60;       // 6 hours
-  const CLOUD_SAVE_THROTTLE_MS = 45_000;     // avoid spamming DB
-  const AI_COOLDOWN_MS = 180_000;            // 3 minutes
-  const AMBIENT_COOLDOWN_MS = 180_000;       // 3 minutes
-  const ACTIVE_WINDOW_MS = 20_000;           // user must have interacted recently
+  const LOCAL_KEY = "sygn1l_core_save_v2";           // bumped version to avoid older broken local merges
+  const OFFLINE_CAP_SEC = 6 * 60 * 60;              // 6 hours max offline gain
+  const CLOUD_SAVE_THROTTLE_MS = 45_000;
+  const AI_COOLDOWN_MS = 180_000;                   // 3 minutes
+  const AMBIENT_COOLDOWN_MS = 180_000;              // 3 minutes
+  const ACTIVE_WINDOW_MS = 20_000;                  // must have interacted recently
+  const AUTOSAVE_EVERY_MS = 2500;                   // local cache cadence while running
 
   // ----------------------------
   // Feedback
@@ -83,7 +84,7 @@
   function fmt(n){
     n = Number(n) || 0;
     if (n < 1000) return n.toFixed(0);
-    const u = ["K","M","B","T"];
+    const u = ["K","M","B","T","Qa","Qi"];
     let i = -1;
     while (n >= 1000 && i < u.length-1){ n/=1000; i++; }
     return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + u[i];
@@ -103,6 +104,7 @@
     const box = document.createElement("div");
     box.className = "pop";
     box.innerHTML = `<div class="who">${esc(who)}</div><div class="msg">${esc(msg)}</div><div class="hint">TAP TO CLOSE</div>`;
+    box.style.pointerEvents = "auto";
     box.addEventListener("click", () => box.remove());
     host.prepend(box);
   }
@@ -121,10 +123,12 @@
     $("modalBack").setAttribute("aria-hidden","true");
     $("modalBody").innerHTML = "";
   }
-  $("modalClose").onclick = closeModal;
-  $("modalBack").addEventListener("click", (e) => {
-    if (e.target === $("modalBack")) closeModal();
-  });
+  if ($("modalClose")) $("modalClose").onclick = closeModal;
+  if ($("modalBack")) {
+    $("modalBack").addEventListener("click", (e) => {
+      if (e.target === $("modalBack")) closeModal();
+    });
+  }
 
   // ----------------------------
   // STATE
@@ -148,15 +152,17 @@
 
     // upgrades
     up: {
-      dish: 0,      // +sps
-      scan: 0,      // +bw
-      probes: 0,    // +click
-      auto: 0,      // auto pings
-      stabil: 0,    // slows corruption
-      relicAmp: 0   // permanent multiplier
+      dish: 0,
+      scan: 0,
+      probes: 0,
+      auto: 0,
+      stabil: 0,
+      relicAmp: 0
     },
 
-    updatedAtMs: 0
+    // timestamps
+    updatedAtMs: 0,    // last time state changed
+    lastSeenMs: 0      // last time the game was "alive" (for offline gain)
   };
 
   // derived (not stored)
@@ -167,35 +173,46 @@
     autoRate: 0
   };
 
-  function touch(){ state.updatedAtMs = nowMs(); }
+  function normalizeName(){
+    state.profile.name = (state.profile.name || "GUEST").toUpperCase().slice(0,18);
+  }
+
+  function touch(){
+    const n = nowMs();
+    state.updatedAtMs = n;
+    state.lastSeenMs = n;
+  }
 
   // ----------------------------
-  // PHASES (6) with interface tint shifts
+  // PHASES (6) + tint
   // ----------------------------
+  // NOTE: We set --accent to a real hex here, so it will visually change even if CSS vars aren't wired perfectly yet.
   const PHASES = [
-    { n:1, at:0,     tint:"--p0", status:"ARRAY: STABLE", sub:"THE ARRAY LISTENS. YOU PING.", obj:"Tap PING VOID. Buy DISH." },
-    { n:2, at:500,   tint:"--p1", status:"ARRAY: DRIFT",  sub:"We’re getting structure. Keep it clean.", obj:"Buy SCAN. Reach 120 total for PROBES." },
-    { n:3, at:1800,  tint:"--p2", status:"ARRAY: ACTIVE", sub:"It’s answering. Don’t answer back.", obj:"Unlock AUTO. Boost Signal/sec." },
-    { n:4, at:9000,  tint:"--p3", status:"ARRAY: GLITCH", sub:"Instability rising. Containment protocols online.", obj:"Buy STABIL. Keep corruption under control." },
-    { n:5, at:12000, tint:"--p4", status:"ARRAY: RITUAL", sub:"We can reset the Array and keep the residue.", obj:"RITE becomes available. Consider timing." },
-    { n:6, at:35000, tint:"--p5", status:"ARRAY: BREACH", sub:"Something is using our signal to arrive.", obj:"Push relic scaling. Corruption will bite back." },
+    { n:1, at:0,     accent:"#39ff6a", status:"ARRAY: STABLE", sub:"THE ARRAY LISTENS. YOU PING.", obj:"Tap PING VOID. Buy DISH." },
+    { n:2, at:500,   accent:"#62ff9d", status:"ARRAY: DRIFT",  sub:"We’re getting structure. Keep it clean.", obj:"Buy SCAN. Reach 120 total for PROBES." },
+    { n:3, at:1800,  accent:"#a0ffd0", status:"ARRAY: ACTIVE", sub:"It’s answering. Don’t answer back.", obj:"Unlock AUTO. Boost Signal/sec." },
+    { n:4, at:9000,  accent:"#8cffef", status:"ARRAY: GLITCH", sub:"Instability rising. Containment protocols online.", obj:"Buy STABIL. Keep corruption under control." },
+    { n:5, at:12000, accent:"#ff6be5", status:"ARRAY: RITUAL", sub:"We can reset the Array and keep the residue.", obj:"RITE becomes available. Consider timing." },
+    { n:6, at:35000, accent:"#ff3b6b", status:"ARRAY: BREACH", sub:"Something is using our signal to arrive.", obj:"Push relic scaling. Corruption will bite back." },
   ];
 
   function setPhase(n){
     state.phase = clamp(n,1,6);
     const ph = PHASES[state.phase-1];
-    document.documentElement.style.setProperty("--accent", `var(${ph.tint})`);
-    $("phase").textContent = `PHASE ${state.phase}`;
-    $("status").textContent = ph.status;
-    $("subtitle").textContent = ph.sub;
-    $("objective").textContent = "OBJECTIVE: " + ph.obj;
-    $("phaseTint").textContent = "P" + state.phase;
+
+    document.documentElement.style.setProperty("--accent", ph.accent);
+
+    if ($("phase")) $("phase").textContent = `PHASE ${state.phase}`;
+    if ($("status")) $("status").textContent = ph.status;
+    if ($("subtitle")) $("subtitle").textContent = ph.sub;
+    if ($("objective")) $("objective").textContent = "OBJECTIVE: " + ph.obj;
+    if ($("phaseTint")) $("phaseTint").textContent = "P" + state.phase;
   }
 
   function phaseCheck(){
     for (let i = PHASES.length-1; i >= 0; i--){
       if (state.total >= PHASES[i].at){
-        if (state.phase !== PHASES[i].n) {
+        if (state.phase !== PHASES[i].n){
           setPhase(PHASES[i].n);
           pushLog("log","SYS",`PHASE ${state.phase} ENGAGED.`);
         }
@@ -205,16 +222,14 @@
   }
 
   // ----------------------------
-  // UPGRADES (core set)
-  // label names must be < 10 chars? Button labels are, upgrade names can be longer.
+  // UPGRADES
   // ----------------------------
   const UPG = [
-    { id:"dish",   name:"DISH CALIBRATION", unlock:0,    base:10,  mult:1.18, desc:"+1 Signal/sec.", buy(){ state.up.dish++; } },
-    { id:"scan",   name:"DEEP SCAN",        unlock:100,  base:50,  mult:1.25, desc:"+10% bandwidth.", buy(){ state.up.scan++; } },
-    { id:"probes", name:"PROBE SWARM",      unlock:120,  base:80,  mult:1.22, desc:"+1 click power.", buy(){ state.up.probes++; } },
-    { id:"auto",   name:"AUTO ROUTINE",     unlock:600,  base:520, mult:1.30, desc:"Auto pings/sec.", buy(){ state.up.auto++; } },
-    { id:"stabil", name:"STABILIZER",       unlock:9500, base:7200,mult:1.33, desc:"Slows corruption.", buy(){ state.up.stabil++; } },
-
+    { id:"dish",   name:"DISH CALIBRATION", unlock:0,    base:10,   mult:1.18, desc:"+1 Signal/sec.", buy(){ state.up.dish++; } },
+    { id:"scan",   name:"DEEP SCAN",        unlock:100,  base:50,   mult:1.25, desc:"+10% bandwidth.", buy(){ state.up.scan++; } },
+    { id:"probes", name:"PROBE SWARM",      unlock:120,  base:80,   mult:1.22, desc:"+1 click power.", buy(){ state.up.probes++; } },
+    { id:"auto",   name:"AUTO ROUTINE",     unlock:600,  base:520,  mult:1.30, desc:"Auto pings/sec.", buy(){ state.up.auto++; } },
+    { id:"stabil", name:"STABILIZER",       unlock:9500, base:7200, mult:1.33, desc:"Slows corruption.", buy(){ state.up.stabil++; } },
     { id:"relicAmp", name:"RELIC AMP", unlock:0, base:3, mult:1.65, currency:"relics",
       desc:"Spend relics: +8% mult.", buy(){ state.up.relicAmp++; } },
   ];
@@ -259,7 +274,7 @@
     state.build += 1;
 
     pushLog("log","SYS",`RITE COMPLETE. +${gain} RELICS.`);
-    pushLog("comms","OPS",`We keep the residue. We pretend it’s control.`);
+    pushLog("comms","OPS","We keep the residue. We pretend it’s control.");
 
     // reset build-scoped
     state.signal = 0;
@@ -278,7 +293,7 @@
   }
 
   // ----------------------------
-  // SAVE: Local + Cloud (robust rules)
+  // SAVE: Local + Cloud (fixed rules)
   // ----------------------------
   let userId = null;
   let cloudReady = false;
@@ -289,9 +304,11 @@
   }
 
   function saveLocal(){
+    // IMPORTANT: local is a cache, but still used for offline progress.
+    // We update timestamps so offline gain uses lastSeenMs.
     touch();
     localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
-    $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
+    if ($("syncChip")) $("syncChip").textContent = cloudReady ? "SYNC: CLOUD+LOCAL" : "SYNC: LOCAL";
   }
 
   function loadLocal(){
@@ -299,34 +316,40 @@
     if (!raw) return false;
     try{
       const data = JSON.parse(raw);
-      // merge safely
       if (data && typeof data === "object"){
         state.profile = Object.assign(state.profile, data.profile || {});
         state.up = Object.assign(state.up, data.up || {});
-        for (const k of ["build","relics","signal","total","corruption","phase","aiOn","lastAiAt","lastAmbientAt","updatedAtMs"]){
+        for (const k of ["build","relics","signal","total","corruption","phase","aiOn","lastAiAt","lastAmbientAt","updatedAtMs","lastSeenMs"]){
           if (k in data) state[k] = data[k];
         }
       }
-      state.profile.name = (state.profile.name || "GUEST").toUpperCase().slice(0,18);
+      normalizeName();
       return true;
     } catch {
       return false;
     }
   }
 
-  function applyOffline(){
-    const last = state.updatedAtMs || 0;
+  function applyOfflineFromLastSeen(labelTag="SYS"){
+    const last = Number(state.lastSeenMs || 0);
     if (!last) return;
+
     let dt = (nowMs() - last) / 1000;
-    if (!isFinite(dt) || dt < 3) return;
+    if (!isFinite(dt) || dt < 2.5) return;
+
     dt = Math.min(dt, OFFLINE_CAP_SEC);
     recompute();
-    const g = derived.sps * dt;
-    if (g > 0){
-      state.signal += g;
-      state.total += g;
-      pushLog("log","SYS",`OFFLINE: +${fmt(g)} SIGNAL (${Math.floor(dt/60)}m).`);
+
+    const gain = derived.sps * dt;
+    if (gain > 0){
+      state.signal += gain;
+      state.total += gain;
+      pushLog("log", labelTag, `OFFLINE: +${fmt(gain)} SIGNAL (${Math.floor(dt/60)}m).`);
     }
+
+    // After applying, update lastSeen so we don’t double-apply.
+    state.lastSeenMs = nowMs();
+    state.updatedAtMs = state.lastSeenMs;
   }
 
   async function saveCloud(force=false){
@@ -344,7 +367,7 @@
 
     const { error } = await supabase.from("saves").upsert(payload);
     if (error) throw error;
-    $("syncChip").textContent = "SYNC: CLOUD+LOCAL";
+    if ($("syncChip")) $("syncChip").textContent = "SYNC: CLOUD+LOCAL";
     return true;
   }
 
@@ -367,94 +390,88 @@
     if (!cloudState || typeof cloudState !== "object") return;
     state.profile = Object.assign(state.profile, cloudState.profile || {});
     state.up = Object.assign(state.up, cloudState.up || {});
-    for (const k of ["build","relics","signal","total","corruption","phase","aiOn","lastAiAt","lastAmbientAt","updatedAtMs"]){
+    for (const k of ["build","relics","signal","total","corruption","phase","aiOn","lastAiAt","lastAmbientAt","updatedAtMs","lastSeenMs"]){
       if (k in cloudState) state[k] = cloudState[k];
     }
-    state.profile.name = (state.profile.name || "GUEST").toUpperCase().slice(0,18);
+    normalizeName();
+  }
+
+  // Cloud-truth sync:
+  // - If cloud exists: ALWAYS load it on sign-in (no guest/local precedence)
+  // - If cloud doesn't exist: create it from current state
+  async function syncOnSignIn(){
+    try{
+      const cloud = await loadCloud();
+
+      if (cloud?.cloudState){
+        mergeCloudState(cloud.cloudState);
+
+        // Apply offline based on the cloud state's lastSeenMs (works across devices)
+        applyOfflineFromLastSeen("SYS");
+
+        pushLog("log","SYS","CLOUD LOADED (SIGNED IN).");
+      } else {
+        // First-time account: create cloud from current state (which may include guest progress)
+        touch();
+        await saveCloud(true);
+        pushLog("log","SYS","CLOUD CREATED FOR ACCOUNT.");
+      }
+
+      // keep local cache aligned to cloud
+      saveLocal();
+    } catch (err){
+      cloudReady = false;
+      if ($("syncChip")) $("syncChip").textContent = "SYNC: LOCAL";
+      pushLog("log","SYS","CLOUD SYNC FAILED: " + esc(err?.message || String(err)));
+    }
   }
 
   async function initAuth(){
     if (!supabase){
-      $("authStatus").textContent = "STATUS: SUPABASE MISSING";
+      if ($("authStatus")) $("authStatus").textContent = "STATUS: SUPABASE MISSING";
       return;
     }
+
+    const applySignedInUI = () => {
+      if ($("authStatus")) $("authStatus").textContent = "STATUS: SIGNED IN";
+      if ($("signOutBtn")) $("signOutBtn").disabled = false;
+      if ($("syncChip")) $("syncChip").textContent = "SYNC: CLOUD";
+      if ($("aiChip")) $("aiChip").textContent = state.aiOn ? "AI: READY" : "AI: OFF";
+    };
+
+    const applySignedOutUI = () => {
+      if ($("authStatus")) $("authStatus").textContent = "STATUS: NOT SIGNED IN";
+      if ($("signOutBtn")) $("signOutBtn").disabled = true;
+      if ($("syncChip")) $("syncChip").textContent = "SYNC: LOCAL";
+      if ($("aiChip")) $("aiChip").textContent = "AI: OFF";
+    };
 
     // initial session
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user?.id){
       userId = session.user.id;
       cloudReady = true;
-      $("authStatus").textContent = "STATUS: SIGNED IN";
-      $("signOutBtn").disabled = false;
-      $("syncChip").textContent = "SYNC: CLOUD";
-      $("aiChip").textContent = state.aiOn ? "AI: READY" : "AI: OFF";
+      applySignedInUI();
       await syncOnSignIn();
     } else {
       userId = null;
       cloudReady = false;
-      $("authStatus").textContent = "STATUS: NOT SIGNED IN";
-      $("signOutBtn").disabled = true;
-      $("syncChip").textContent = "SYNC: LOCAL";
-      $("aiChip").textContent = "AI: OFF";
+      applySignedOutUI();
     }
 
     supabase.auth.onAuthStateChange(async (_evt, session2) => {
       if (session2?.user?.id){
         userId = session2.user.id;
         cloudReady = true;
-        $("authStatus").textContent = "STATUS: SIGNED IN";
-        $("signOutBtn").disabled = false;
-        $("syncChip").textContent = "SYNC: CLOUD";
-        $("aiChip").textContent = state.aiOn ? "AI: READY" : "AI: OFF";
+        applySignedInUI();
         await syncOnSignIn();
       } else {
         userId = null;
         cloudReady = false;
-        $("authStatus").textContent = "STATUS: NOT SIGNED IN";
-        $("signOutBtn").disabled = true;
-        $("syncChip").textContent = "SYNC: LOCAL";
-        $("aiChip").textContent = "AI: OFF";
+        applySignedOutUI();
       }
       renderAll();
     });
-  }
-
-  // Critical: never overwrite cloud from a fresh device with no local file.
-  async function syncOnSignIn(){
-    try{
-      const localExists = hasLocalFile();
-      const cloud = await loadCloud();
-
-      if (cloud?.cloudState){
-        if (!localExists){
-          mergeCloudState(cloud.cloudState);
-          pushLog("log","SYS","CLOUD LOADED (NO LOCAL).");
-        } else {
-          const localUpdated = state.updatedAtMs || 0;
-          if (cloud.cloudUpdated > localUpdated){
-            mergeCloudState(cloud.cloudState);
-            pushLog("log","SYS","CLOUD LOADED (NEWER).");
-          } else {
-            await saveCloud(true);
-            pushLog("log","SYS","LOCAL PUSHED TO CLOUD.");
-          }
-        }
-      } else {
-        // no cloud save yet
-        if (localExists){
-          await saveCloud(true);
-          pushLog("log","SYS","CLOUD CREATED FROM LOCAL.");
-        } else {
-          pushLog("log","SYS","NO CLOUD SAVE YET.");
-        }
-      }
-
-      saveLocal();
-    } catch (err){
-      cloudReady = false;
-      $("syncChip").textContent = "SYNC: LOCAL";
-      pushLog("log","SYS","CLOUD SYNC FAILED: " + esc(err?.message || String(err)));
-    }
   }
 
   // ----------------------------
@@ -462,8 +479,8 @@
   // ----------------------------
   function aiReady(){
     if (!state.aiOn) return false;
-    if (!cloudReady) return false;       // need auth + functions
-    if (!isActive()) return false;       // don't fire while AFK
+    if (!cloudReady) return false;
+    if (!isActive()) return false;
     if ((nowMs() - (state.lastAiAt||0)) < AI_COOLDOWN_MS) return false;
     return true;
   }
@@ -473,7 +490,7 @@
 
     state.lastAiAt = nowMs();
     saveLocal();
-    $("aiChip").textContent = "AI: ...";
+    if ($("aiChip")) $("aiChip").textContent = "AI: ...";
 
     try{
       const payload = {
@@ -496,24 +513,23 @@
 
       popup(who, text);
       pushLog("comms", who, esc(text));
-      $("aiChip").textContent = "AI: READY";
+      if ($("aiChip")) $("aiChip").textContent = "AI: READY";
       return true;
     } catch (err){
-      $("aiChip").textContent = "AI: OFF";
+      if ($("aiChip")) $("aiChip").textContent = "AI: OFF";
       pushLog("log","SYS","AI FAILED: " + esc(err?.message || String(err)));
       return false;
     }
   }
 
   // Ambient human comms every ~3 minutes, no explicit in-game trigger.
-  // Still requires: active use, signed in, AI toggle on.
   const HUMAN_POOL = [
     (n)=>`Hey ${n}, you still with us?`,
     (n)=>`If this gets weird, say so, ${n}.`,
     (n)=>`You’re doing fine, ${n}. Keep the pings steady.`,
     (n)=>`I don’t love this… but we need the data, ${n}.`,
     (n)=>`Take a breath, ${n}. Then keep scanning.`,
-    (n)=>`If it starts “feeling” personal, tell me, ${n}.`
+    (n)=>`If it starts feeling personal, tell me, ${n}.`
   ];
 
   async function maybeAmbient(){
@@ -522,16 +538,14 @@
     if (!isActive()) return;
     if ((nowMs() - (state.lastAmbientAt||0)) < AMBIENT_COOLDOWN_MS) return;
 
-    // separate timer from AI main cooldown; we keep it light
     state.lastAmbientAt = nowMs();
     saveLocal();
 
-    // 1 sentence, human
     const msg = HUMAN_POOL[Math.floor(Math.random()*HUMAN_POOL.length)](state.profile.name);
     popup("OPS", msg);
     pushLog("comms","OPS", esc(msg));
 
-    // occasionally ask GPT to respond to the current vibe (still one sentence)
+    // occasionally ask GPT to add a one-liner vibe response
     if (Math.random() < 0.35) {
       await aiComms("ambient", "OPS");
     }
@@ -541,33 +555,35 @@
   // UI render
   // ----------------------------
   function renderHUD(){
-    $("signal").textContent = fmt(state.signal);
-    $("sps").textContent = fmt(derived.sps);
+    if ($("signal")) $("signal").textContent = fmt(state.signal);
+    if ($("sps")) $("sps").textContent = fmt(derived.sps);
 
-    $("buildChip").textContent = "BUILD: " + state.build;
-    $("relicChip").textContent = "RELICS: " + state.relics;
+    if ($("buildChip")) $("buildChip").textContent = "BUILD: " + state.build;
+    if ($("relicChip")) $("relicChip").textContent = "RELICS: " + state.relics;
 
-    $("userChip").textContent = "USER: " + state.profile.name;
+    if ($("userChip")) $("userChip").textContent = "USER: " + state.profile.name;
 
     // corruption
-    $("corrFill").style.width = (state.corruption*100).toFixed(1) + "%";
-    $("corrText").textContent = (state.corruption*100).toFixed(1) + "% (" + corruptionLabel(state.corruption) + ")";
+    if ($("corrFill")) $("corrFill").style.width = (state.corruption*100).toFixed(1) + "%";
+    if ($("corrText")) $("corrText").textContent = (state.corruption*100).toFixed(1) + "% (" + corruptionLabel(state.corruption) + ")";
 
     // rite
     const rite = $("riteBtn");
-    const can = canRite();
-    rite.disabled = !can;
-    rite.textContent = can ? `RITE +${prestigeGain()}` : "RITE";
+    if (rite){
+      const can = canRite();
+      rite.disabled = !can;
+      rite.textContent = can ? `RITE +${prestigeGain()}` : "RITE";
+    }
 
-    $("aiChip").textContent = cloudReady ? (state.aiOn ? "AI: READY" : "AI: OFF") : "AI: OFF";
+    if ($("aiChip")) $("aiChip").textContent = cloudReady ? (state.aiOn ? "AI: READY" : "AI: OFF") : "AI: OFF";
   }
 
   function renderUpgrades(){
     const root = $("upgrades");
+    if (!root) return;
     root.innerHTML = "";
 
     for (const u of UPG){
-      // show relic amp only if you have relics or already bought
       if (u.id === "relicAmp" && state.relics <= 0 && lvl("relicAmp") === 0) continue;
 
       const unlocked = state.total >= u.unlock;
@@ -604,9 +620,8 @@
         recompute();
         renderAll();
         saveLocal();
-        try{ await saveCloud(false); }catch(_){}
+        try{ await saveCloud(false); } catch(_){}
 
-        // small chance to call AI
         if (Math.random() < 0.22) await aiComms("buy_" + u.id, "OPS");
       };
 
@@ -627,11 +642,12 @@
   // Scope visualiser (noise -> spikes)
   // ----------------------------
   const scope = $("scope");
-  const ctx = scope.getContext("2d", { alpha:false });
+  const ctx = scope ? scope.getContext("2d", { alpha:false }) : null;
   let sw=0, sh=0, dpr=1;
   const sig = { cols:[], vel:[], phase:0 };
 
   function resizeScope(){
+    if (!scope || !ctx) return;
     dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
     const cssW = scope.clientWidth || 300;
     const cssH = 84;
@@ -654,7 +670,7 @@
     return clamp(raw * (1 - 0.55*state.corruption), 0, 1);
   }
   function updateScopeLabel(){
-    $("scopeLabel").textContent = "LOCK: " + Math.round(lockValue()*100) + "%";
+    if ($("scopeLabel")) $("scopeLabel").textContent = "LOCK: " + Math.round(lockValue()*100) + "%";
   }
   function rand01(seed){
     seed = (seed ^ 0x6D2B79F5) >>> 0;
@@ -663,8 +679,14 @@
     return ((seed ^ (seed >>> 14)) >>> 0) / 4294967296;
   }
 
+  function getAccentHex(){
+    // JS sets --accent to a literal hex, so this is safe.
+    const v = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim();
+    return v || "#39ff6a";
+  }
+
   function drawScope(dt, t){
-    if (!sw || !sh) return;
+    if (!ctx || !sw || !sh) return;
 
     const lk = lockValue();
     const corr = state.corruption;
@@ -707,7 +729,7 @@
     }
 
     ctx.lineWidth = Math.max(1, 1*dpr);
-    ctx.strokeStyle = "rgba(60,255,120,0.85)";
+    ctx.strokeStyle = getAccentHex();
     ctx.beginPath();
     for (let i=0;i<cols;i++){
       const x = Math.floor((i/(cols-1)) * (sw-1));
@@ -727,160 +749,192 @@
   // ----------------------------
   // Controls
   // ----------------------------
-  $("ping").onclick = async () => {
-    markActive();
-    feedback(false);
+  if ($("ping")) {
+    $("ping").onclick = async () => {
+      markActive();
+      feedback(false);
 
-    // click gains scaled by bandwidth and corruption penalties
-    const gain = derived.click * derived.bw * (1 - 0.35*state.corruption);
-    state.signal += gain;
-    state.total += gain;
+      const gain = derived.click * derived.bw * (1 - 0.35*state.corruption);
+      state.signal += gain;
+      state.total += gain;
 
-    // clicking invites corruption slightly
-    state.corruption = clamp(state.corruption + 0.00055, 0, 1);
+      state.corruption = clamp(state.corruption + 0.00055, 0, 1);
 
-    touch();
-    recompute();
-    renderAll();
-    saveLocal();
-    try{ await saveCloud(false); }catch(_){}
+      touch();
+      recompute();
+      renderAll();
+      saveLocal();
+      try{ await saveCloud(false); } catch(_){}
 
-    // AI occasional on ping
-    if (Math.random() < 0.10) await aiComms("ping", "OPS");
-  };
+      if (Math.random() < 0.10) await aiComms("ping", "OPS");
+    };
+  }
 
-  $("saveBtn").onclick = async () => {
-    markActive();
-    feedback(false);
-    saveLocal();
-    try{
-      await saveCloud(true);
-      pushLog("log","SYS","SAVED (CLOUD).");
-    } catch (err){
-      pushLog("log","SYS","SAVED (LOCAL).");
-    }
-  };
+  if ($("saveBtn")) {
+    $("saveBtn").onclick = async () => {
+      markActive();
+      feedback(false);
+      saveLocal();
+      try{
+        await saveCloud(true);
+        pushLog("log","SYS","SAVED (CLOUD).");
+      } catch (err){
+        pushLog("log","SYS","SAVED (LOCAL).");
+      }
+    };
+  }
 
-  $("wipeBtn").onclick = async () => {
-    markActive();
-    feedback(true);
-    const ok = confirm("WIPE deletes local save.\nIf signed in, it also deletes cloud save.\n\nProceed?");
-    if (!ok) return;
+  if ($("wipeBtn")) {
+    $("wipeBtn").onclick = async () => {
+      markActive();
+      feedback(true);
+      const ok = confirm("WIPE deletes local save.\nIf signed in, it also deletes cloud save.\n\nProceed?");
+      if (!ok) return;
 
-    localStorage.removeItem(LOCAL_KEY);
-    if (cloudReady && userId && supabase){
-      try{ await supabase.from("saves").delete().eq("player_id", userId); } catch(_){}
-    }
-    location.reload();
-  };
+      localStorage.removeItem(LOCAL_KEY);
+      if (cloudReady && userId && supabase){
+        try{ await supabase.from("saves").delete().eq("player_id", userId); } catch(_){}
+      }
+      location.reload();
+    };
+  }
 
-  $("riteBtn").onclick = async () => {
-    if (!canRite()) return;
-    markActive();
-    feedback(true);
+  if ($("riteBtn")) {
+    $("riteBtn").onclick = async () => {
+      if (!canRite()) return;
+      markActive();
+      feedback(true);
 
-    const g = prestigeGain();
-    const ok = confirm(`RITE resets this build.\nYou gain +${g} relics.\n\nProceed?`);
-    if (!ok) return;
+      const g = prestigeGain();
+      const ok = confirm(`RITE resets this build.\nYou gain +${g} relics.\n\nProceed?`);
+      if (!ok) return;
 
-    doRite();
-    renderAll();
-    saveLocal();
-    try{ await saveCloud(true); }catch(_){}
-    await aiComms("rite", "MOTHERLINE");
-  };
+      doRite();
+      renderAll();
+      saveLocal();
+      try{ await saveCloud(true); } catch(_){}
+      await aiComms("rite", "MOTHERLINE");
+    };
+  }
 
-  $("aiBtn").onclick = () => {
-    markActive();
-    feedback(false);
-    state.aiOn = !state.aiOn;
-    $("aiBtn").textContent = state.aiOn ? "AI COMMS" : "AI OFF";
-    $("aiChip").textContent = cloudReady ? (state.aiOn ? "AI: READY" : "AI: OFF") : "AI: OFF";
-    saveLocal();
-  };
+  if ($("aiBtn")) {
+    $("aiBtn").onclick = () => {
+      markActive();
+      feedback(false);
+      state.aiOn = !state.aiOn;
+      $("aiBtn").textContent = state.aiOn ? "AI COMMS" : "AI OFF";
+      if ($("aiChip")) $("aiChip").textContent = cloudReady ? (state.aiOn ? "AI: READY" : "AI: OFF") : "AI: OFF";
+      saveLocal();
+    };
+  }
 
-  $("fbBtn").onclick = () => {
-    markActive();
-    feedback(false);
-    feedbackOn = !feedbackOn;
-    $("fbBtn").textContent = feedbackOn ? "FEEDBACK" : "FB OFF";
-  };
+  if ($("fbBtn")) {
+    $("fbBtn").onclick = () => {
+      markActive();
+      feedback(false);
+      feedbackOn = !feedbackOn;
+      $("fbBtn").textContent = feedbackOn ? "FEEDBACK" : "FB OFF";
+    };
+  }
 
-  $("helpBtn").onclick = () => {
-    markActive();
-    openModal("HOME BASE COMMUNIQUE",
-      `<p><span class="tag">HB</span>Operator, we’re receiving structured noise. We need you to build Signal, unlock buffs, and keep Corruption from spiraling while we decode intent.</p>
-       <p><span class="tag">HOW</span>Tap <b>PING VOID</b> to gain Signal. Buy <b>DISH</b> for passive Signal/sec. Unlock new buffs by reaching Total milestones. If Corruption climbs, stabilize the system and keep scanning.</p>
-       <p><span class="tag">TIP</span>Sign in (email/pass) to sync your save across devices.</p>`
-    );
-  };
+  if ($("helpBtn")) {
+    $("helpBtn").onclick = () => {
+      markActive();
+      openModal("HOME BASE COMMUNIQUE",
+        `<p><span class="tag">HB</span>Operator, we’re receiving structured noise. We need you to build Signal, unlock buffs, and keep Corruption from spiraling while we decode intent.</p>
+         <p><span class="tag">HOW</span>Tap <b>PING VOID</b> to gain Signal. Buy <b>DISH</b> for passive Signal/sec. Unlock new buffs by reaching Total milestones.</p>
+         <p><span class="tag">TIP</span>Sign in (email/pass) to sync your save across devices.</p>`
+      );
+    };
+  }
 
   // Username editor
-  $("userChip").onclick = () => {
-    markActive();
-    openModal("IDENTITY OVERRIDE",
-      `<p><span class="tag">OPS</span>A callsign makes the logs readable.</p>
-       <input class="texty" id="nameInput" maxlength="18" placeholder="USERNAME" value="${esc(state.profile.name)}" />
-       <div style="height:10px"></div>
-       <button id="nameSave" style="width:100%">SAVE</button>`
-    );
-    const input = document.getElementById("nameInput");
-    document.getElementById("nameSave").onclick = async () => {
-      const name = (input.value || "").trim().slice(0,18);
-      state.profile.name = (name ? name : "GUEST").toUpperCase();
-      closeModal();
-      popup("OPS", `Copy that, ${state.profile.name}.`);
-      pushLog("comms","OPS",`Alright ${esc(state.profile.name)}. Keep it steady.`);
-      saveLocal();
-      try{ await saveCloud(true); }catch(_){}
-      renderAll();
+  if ($("userChip")) {
+    $("userChip").onclick = () => {
+      markActive();
+      openModal("IDENTITY OVERRIDE",
+        `<p><span class="tag">OPS</span>A callsign makes the logs readable.</p>
+         <input class="texty" id="nameInput" maxlength="18" placeholder="USERNAME" value="${esc(state.profile.name)}" />
+         <div style="height:10px"></div>
+         <button id="nameSave" style="width:100%">SAVE</button>`
+      );
+      const input = document.getElementById("nameInput");
+      document.getElementById("nameSave").onclick = async () => {
+        const name = (input.value || "").trim().slice(0,18);
+        state.profile.name = (name ? name : "GUEST").toUpperCase();
+        closeModal();
+
+        popup("OPS", `Copy that, ${state.profile.name}.`);
+        pushLog("comms","OPS", `Alright ${esc(state.profile.name)}. Keep it steady.`);
+
+        saveLocal();
+
+        if (cloudReady && userId){
+          try{
+            await saveCloud(true);
+            pushLog("log","SYS","IDENTITY SAVED (CLOUD).");
+          } catch(err){
+            pushLog("log","SYS","CLOUD IDENTITY SAVE FAILED: " + esc(err?.message || String(err)));
+          }
+        }
+
+        renderAll();
+      };
     };
-  };
+  }
 
   // Account buttons
-  $("signUpBtn").onclick = async () => {
-    markActive();
-    if (!supabase) return alert("Supabase missing.");
-    const email = $("email").value.trim();
-    const pass = $("pass").value;
-    if (!email || !pass) return alert("Enter email + password.");
-    const { error } = await supabase.auth.signUp({ email, password: pass });
-    if (error) return alert(error.message);
-    alert("Signed up. Now press SIGNIN.");
-  };
+  if ($("signUpBtn")) {
+    $("signUpBtn").onclick = async () => {
+      markActive();
+      if (!supabase) return alert("Supabase missing.");
+      const email = $("email").value.trim();
+      const pass = $("pass").value;
+      if (!email || !pass) return alert("Enter email + password.");
+      const { error } = await supabase.auth.signUp({ email, password: pass });
+      if (error) return alert(error.message);
+      alert("Signed up. Now press SIGNIN.");
+    };
+  }
 
-  $("signInBtn").onclick = async () => {
-    markActive();
-    if (!supabase) return alert("Supabase missing.");
-    const email = $("email").value.trim();
-    const pass = $("pass").value;
-    if (!email || !pass) return alert("Enter email + password.");
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
-    if (error) return alert(error.message);
-  };
+  if ($("signInBtn")) {
+    $("signInBtn").onclick = async () => {
+      markActive();
+      if (!supabase) return alert("Supabase missing.");
+      const email = $("email").value.trim();
+      const pass = $("pass").value;
+      if (!email || !pass) return alert("Enter email + password.");
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
+      if (error) return alert(error.message);
+    };
+  }
 
-  $("signOutBtn").onclick = async () => {
-    markActive();
-    if (!supabase) return;
-    const ok = confirm("Sign out? Cloud save remains safe.");
-    if (!ok) return;
-    const { error } = await supabase.auth.signOut();
-    if (error) alert(error.message);
-  };
+  if ($("signOutBtn")) {
+    $("signOutBtn").onclick = async () => {
+      markActive();
+      if (!supabase) return;
+      const ok = confirm("Sign out? Cloud save remains safe.");
+      if (!ok) return;
+      const { error } = await supabase.auth.signOut();
+      if (error) alert(error.message);
+    };
+  }
 
-  $("whoBtn").onclick = async () => {
-    markActive();
-    if (!supabase) return alert("Supabase missing.");
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user?.id) alert("UID: " + session.user.id);
-    else alert("Not signed in.");
-  };
+  if ($("whoBtn")) {
+    $("whoBtn").onclick = async () => {
+      markActive();
+      if (!supabase) return alert("Supabase missing.");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) alert("UID: " + session.user.id);
+      else alert("Not signed in.");
+    };
+  }
 
   // ----------------------------
   // Boot narrative
   // ----------------------------
   function bootNarrative(){
-    if ($("log").children.length) return;
+    if ($("log") && $("log").children.length) return;
     pushLog("log","SYS","SYGN1L ONLINE. SILENCE IS UNPROCESSED DATA.");
     pushLog("comms","OPS","Ping the void so we can get a baseline.");
     popup("OPS","Tap PING VOID, then buy DISH to start passive gain.");
@@ -891,6 +945,7 @@
   // ----------------------------
   let last = performance.now();
   let upgradesRefreshAcc = 0;
+  let lastAutoSaveT = performance.now();
 
   function loop(t){
     const dt = Math.min(0.05, (t - last)/1000);
@@ -922,15 +977,15 @@
     if (upgradesRefreshAcc >= 0.25){
       upgradesRefreshAcc = 0;
       renderUpgrades();
-      maybeAmbient(); // ambient comm checks at same cadence
+      maybeAmbient();
     }
 
     drawScope(dt, t|0);
 
-    // keep local save fresh while tab open (so offline progress works)
-    if ((t|0) % 2500 < 16){
+    // predictable autosave
+    if ((t - lastAutoSaveT) >= AUTOSAVE_EVERY_MS){
+      lastAutoSaveT = t;
       saveLocal();
-      // occasional cloud sync if signed in
       if (cloudReady) saveCloud(false).catch(()=>{});
     }
 
@@ -949,9 +1004,13 @@
   // Start
   // ----------------------------
   resizeScope();
+
+  // load local cache first (guest/offline)
   loadLocal();
-  applyOffline();
-  state.profile.name = (state.profile.name || "GUEST").toUpperCase().slice(0,18);
+  normalizeName();
+  if (!state.lastSeenMs) state.lastSeenMs = nowMs(); // backfill for older saves
+  applyOfflineFromLastSeen("SYS");
+
   recompute();
   setPhase(state.phase || 1);
   bootNarrative();
@@ -960,4 +1019,5 @@
   initAuth().finally(() => {
     requestAnimationFrame(loop);
   });
+
 })();
