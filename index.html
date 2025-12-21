@@ -569,7 +569,40 @@
 
   <!-- Supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  function showFatal(msg){
+    console.error(msg);
+    var host = document.getElementById("popHost");
+    if(!host) return;
+    var box = document.createElement("div");
+    box.className = "pop";
+    box.innerHTML =
+      '<div class="who">BOOT</div>' +
+      '<div class="msg">JS ERROR: ' + String(msg).replace(/</g,"&lt;") + '</div>' +
+      '<div class="hint">Tap to close</div>';
+    box.addEventListener("click", function(){ box.remove(); });
+    host.prepend(box);
+  }
+  window.addEventListener("error", function(e){ showFatal(e && e.message ? e.message : e); });
+  window.addEventListener("unhandledrejection", function(e){
+    var r = e && e.reason ? (e.reason.message || e.reason) : e;
+    showFatal(r);
+  });
 
+  // also prove whether ANY JS is alive
+  document.addEventListener("DOMContentLoaded", function(){
+    var host = document.getElementById("popHost");
+    if(host){
+      var box = document.createElement("div");
+      box.className = "pop";
+      box.innerHTML = '<div class="who">BOOT</div><div class="msg">HTML loaded. Waiting for modules…</div><div class="hint">Tap to close</div>';
+      box.addEventListener("click", function(){ box.remove(); });
+      host.prepend(box);
+    }
+  });
+})();
+</script>
   <!-- Game entry point (ES module) -->
   <script type="module" src="./js/main.js"></script>
 </body>
