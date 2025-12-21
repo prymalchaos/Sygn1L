@@ -64,23 +64,24 @@ export function createSaves() {
   }
 
   async function initAuth(onChange) {
-    if (!supabase) {
-      _userId = null;
-      _cloudReady = false;
-      onChange?.({ signedIn: false, userId: null });
-      return;
-    }
+  if (!supabase) {
+    _userId = null;
+    _cloudReady = false;
+    onChange?.({ signedIn: false, userId: null });
+    return;
+  }
 
-    _userId = await getUserId();
+  const uid = await getUserId();
+  _userId = uid;
+  _cloudReady = !!uid;
+  onChange?.({ signedIn: isSignedIn(), userId: _userId });
+
+  supabase.auth.onAuthStateChange(async (_evt, session) => {
+    _userId = session?.user?.id || null;
     _cloudReady = !!_userId;
     onChange?.({ signedIn: isSignedIn(), userId: _userId });
-
-    supabase.auth.onAuthStateChange((_evt, session) => {
-      _userId = session?.user?.id || null;
-      _cloudReady = !!_userId;
-      onChange?.({ signedIn: isSignedIn(), userId: _userId });
-    });
-  }
+  });
+}
 
   async function signUp(email, password) {
     if (!supabase) throw new Error("Supabase missing");
