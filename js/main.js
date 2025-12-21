@@ -489,7 +489,7 @@ function updateOnboardVisibility() {
       ? (state.aiOn ? "AI: READY" : "AI: OFF")
       : "AI: OFF";
   }
-
+updateOnboardVisibility();
   function renderUpgrades() {
     const root = $("upgrades");
     root.innerHTML = "";
