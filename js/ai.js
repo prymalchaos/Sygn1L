@@ -1,17 +1,17 @@
 // /js/ai.js
 // AI comms + ambient human chatter.
 // Rules:
-// - Max once per cooldown (default 3 min) for AI calls
-// - Ambient human message ~ every 3 min (no explicit in-game trigger)
-// - NEVER fires if user is AFK (no input recently)
-// - Uses player name
+// - Max once per cooldown for AI calls
+// - Ambient human message on its own cooldown
+// - NEVER fires if user is AFK
+// - Uses canonical state.timers fields ONLY
 // - One sentence messages
 
 import { esc } from "./state.js";
 
 export function createAI({
-  saves,          // from createSaves()
-  ui,             // from createUI()
+  saves,
+  ui,
   edgeFunction = "sygn1l-comms",
   activeWindowMs = 20_000,
   aiCooldownMs = 180_000,
@@ -22,6 +22,9 @@ export function createAI({
   let enabled = true;
   let lastActionAt = 0;
 
+  // ----------------------------
+  // Activity tracking (AFK gate)
+  // ----------------------------
   function markActive() { lastActionAt = Date.now(); }
   window.addEventListener("pointerdown", markActive, { passive: true });
   window.addEventListener("keydown", markActive, { passive: true });
@@ -35,7 +38,9 @@ export function createAI({
     if (el) el.textContent = text;
   }
 
-  // One-sentence human pool (casual, teammate vibe)
+  // ----------------------------
+  // Human ambient pool
+  // ----------------------------
   const HUMAN = [
     (n) => `Hey ${n}, you good?`,
     (n) => `Keep it steady, ${n}, the pattern’s sharpening.`,
@@ -45,40 +50,49 @@ export function createAI({
     (n) => `I hate to ask, ${n}, but push a little harder.`
   ];
 
-  // Public: toggle
+  // ----------------------------
+  // Public enable/disable
+  // ----------------------------
   function setEnabled(on) {
     enabled = !!on;
     setChip(enabled ? "AI: READY" : "AI: OFF");
   }
+
   function toggleEnabled() {
     enabled = !enabled;
     setEnabled(enabled);
     return enabled;
   }
 
-  // Gate for invoking Edge Function
+  // ----------------------------
+  // AI invocation gate
+  // ----------------------------
   function canInvoke(state) {
     if (!enabled) return false;
-    if (!saves?.isSignedIn?.()) return false;         // require signed-in
+    if (!saves?.isSignedIn?.()) return false;
     if (!saves?.supabase) return false;
     if (!isActive()) return false;
 
     const now = Date.now();
-    const last = Number(state?.meta?.lastAiAtMs || 0);
+    const last = Number(state?.timers?.lastAiAt || 0);
     if (now - last < aiCooldownMs) return false;
 
     return true;
   }
 
+  // ----------------------------
+  // Invoke Edge Function
+  // ----------------------------
   async function invokeEdge(state, eventName, speakerHint = "OPS") {
     if (!canInvoke(state)) return false;
 
-    // reserve cooldown immediately to prevent double-taps
-    state.meta.lastAiAtMs = Date.now();
-    state.meta.updatedAtMs = Date.now();
+    const now = Date.now();
+    state.timers.lastAiAt = now;
+    state.meta.updatedAtMs = now;
+
     setChip("AI: …");
 
-    // Persist quickly so another tab/device doesn’t spam
+    // Persist immediately to prevent cross-tab spam
     try { await saves.writeCloudState(state, true); } catch {}
 
     try {
@@ -93,64 +107,76 @@ export function createAI({
         corruption: Number((state.corruption || 0).toFixed(3))
       };
 
-      const { data, error } = await saves.supabase.functions.invoke(edgeFunction, { body: payload });
+      const { data, error } =
+        await saves.supabase.functions.invoke(edgeFunction, { body: payload });
+
       if (error) throw error;
 
-      const who = (data?.who || speakerHint || "COMMS").toString().slice(0, 18);
-      let text = (data?.text || "").toString().trim();
+      const who =
+        (data?.who || speakerHint || "COMMS").toString().slice(0, 18);
 
-      // enforce one sentence hard-ish (simple cut)
-      const cut = text.split(/(?<=[.!?])\s+/)[0] || "…";
-      text = cut.slice(0, 160);
+      const text =
+        ((data?.text || "")
+          .toString()
+          .split(/(?<=[.!?])\s+/)[0] || "…")
+          .slice(0, 160);
 
       ui.popup(who, text);
       ui.pushLog("comms", who, esc(text));
       setChip("AI: READY");
       return true;
-    } catch (err) {
+    } catch {
       setChip("AI: OFFLINE");
       ui.pushLog("log", "SYS", "AI COMMS FAILED.");
       return false;
     }
   }
 
-  // Ambient human comms (no Edge call required)
+  // ----------------------------
+  // Ambient human comms gate
+  // ----------------------------
   function canAmbient(state) {
     if (!enabled) return false;
-    if (!saves?.isSignedIn?.()) return false; // you can relax this later, but keeps it consistent
+    if (!saves?.isSignedIn?.()) return false;
     if (!isActive()) return false;
 
     const now = Date.now();
-    const last = Number(state?.meta?.lastAmbientAtMs || 0);
+    const last = Number(state?.timers?.lastAmbientAt || 0);
     if (now - last < ambientCooldownMs) return false;
 
     return true;
   }
 
+  // ----------------------------
+  // Ambient human comms
+  // ----------------------------
   async function maybeAmbient(state) {
     if (!canAmbient(state)) return false;
 
-    state.meta.lastAmbientAtMs = Date.now();
-    state.meta.updatedAtMs = Date.now();
+    const now = Date.now();
+    state.timers.lastAmbientAt = now;
+    state.meta.updatedAtMs = now;
 
     const n = state.profile?.name || "GUEST";
-    const msg = HUMAN[Math.floor(Math.random() * HUMAN.length)](n).slice(0, 140);
+    const msg =
+      HUMAN[Math.floor(Math.random() * HUMAN.length)](n).slice(0, 140);
 
     ui.popup("OPS", msg);
     ui.pushLog("comms", "OPS", esc(msg));
     setChip("AI: READY");
 
-    // Occasionally ask the Edge Function to add flavor, still obeying AI cooldown
+    // Occasionally layer in AI flavour
     if (Math.random() < 0.30) {
       await invokeEdge(state, "ambient", "OPS");
     }
 
-    // Save ambient timestamps to cloud (throttled by saves module)
     try { await saves.writeCloudState(state, false); } catch {}
     return true;
   }
 
-  // Wire up button if present
+  // ----------------------------
+  // UI wiring
+  // ----------------------------
   const aiBtn = $("aiBtn");
   if (aiBtn) {
     aiBtn.onclick = () => {
@@ -160,7 +186,6 @@ export function createAI({
     };
   }
 
-  // init chip
   setChip("AI: READY");
 
   return {
@@ -168,7 +193,7 @@ export function createAI({
     isActive,
     setEnabled,
     toggleEnabled,
-    invokeEdge,     // call on certain gameplay moments
-    maybeAmbient    // call from main loop cadence (eg every 0.25s)
+    invokeEdge,
+    maybeAmbient
   };
 }
