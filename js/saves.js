@@ -14,6 +14,83 @@ export function createSaves() {
   const supabase = window.supabase?.createClient?.(
     SUPABASE_URL,
     SUPABASE_ANON_KEY
+    
+      // ----------------------------
+  // UI wiring helper (called by main.js)
+  // ----------------------------
+  function wireAuthUI({
+    emailEl,
+    passEl,
+    signUpBtn,
+    signInBtn,
+    signOutBtn,
+    whoBtn,
+    authStatusEl,
+    onSignedIn,
+    onSignedOut
+  }) {
+    function setStatus(signedIn, userId) {
+      if (authStatusEl) {
+        authStatusEl.textContent = signedIn
+          ? `SIGNED IN (${String(userId).slice(0, 8)}…)`
+          : "GUEST";
+      }
+
+      if (signUpBtn) signUpBtn.disabled = signedIn;
+      if (signInBtn) signInBtn.disabled = signedIn;
+      if (signOutBtn) signOutBtn.disabled = !signedIn;
+      if (whoBtn) whoBtn.disabled = !signedIn;
+    }
+
+    // Hook auth state changes
+    initAuth(({ signedIn, userId }) => {
+      setStatus(signedIn, userId);
+      if (signedIn) onSignedIn?.();
+      else onSignedOut?.();
+    });
+
+    // Button handlers
+    if (signUpBtn) {
+      signUpBtn.onclick = async () => {
+        try {
+          await signUp(emailEl?.value?.trim() || "", passEl?.value || "");
+        } catch (e) {
+          alert(`Sign up failed: ${e?.message || e}`);
+        }
+      };
+    }
+
+    if (signInBtn) {
+      signInBtn.onclick = async () => {
+        try {
+          await signIn(emailEl?.value?.trim() || "", passEl?.value || "");
+        } catch (e) {
+          alert(`Sign in failed: ${e?.message || e}`);
+        }
+      };
+    }
+
+    if (signOutBtn) {
+      signOutBtn.onclick = async () => {
+        try {
+          await signOut();
+        } catch (e) {
+          alert(`Sign out failed: ${e?.message || e}`);
+        }
+      };
+    }
+
+    if (whoBtn) {
+      whoBtn.onclick = async () => {
+        try {
+          const uid = await getUserId();
+          alert(uid ? `User: ${uid}` : "No user session.");
+        } catch (e) {
+          alert(`Error: ${e?.message || e}`);
+        }
+      };
+    }
+  }
   );
 
   if (!supabase) {
@@ -193,6 +270,7 @@ export function createSaves() {
     signOut,
     isSignedIn,
     getUserId,
+    wireAuthUI,
 
     // cloud
     loadCloud,
