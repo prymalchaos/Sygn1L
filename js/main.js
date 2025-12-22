@@ -452,7 +452,7 @@ import { createDevTools } from "./core/dev.js";
     }
 
     // Corruption tick
-    state.corruption = corruptionTick(state, derived, dt);
+    corruptionTick(state, dt);
 scope.tick(dt, t, { total: state.total, bw: derived.bw, corruption: state.corruption });
     // Phase tick hook
     const mod = currentPhaseModule();
