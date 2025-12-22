@@ -63,6 +63,12 @@ export const UPGRADES = [
   { id: "probes", name: "PROBES",     unlock: 220,   base: 95,   mult: 1.22, desc: "+1 Click power per level." },
   { id: "auto",   name: "AUTO",       unlock: 1200,  base: 680,  mult: 1.30, desc: "Adds auto pings/sec." },
   { id: "stabil", name: "STABIL",     unlock: 22000, base: 9800, mult: 1.33, desc: "Slows corruption growth." },
+  // stretch goals (signal currency)
+  { id: "lens",   name: "ARRAY LENS",   unlock: 25_000,     base: 18_000,    mult: 1.38, desc: "Big Bandwidth boost per level." },
+  { id: "relay",  name: "RELAY GRID",   unlock: 120_000,    base: 95_000,    mult: 1.42, desc: "Auto rate scales harder." },
+  { id: "burst",  name: "BURST CAP",    unlock: 600_000,    base: 520_000,   mult: 1.48, desc: "Click power ramps aggressively." },
+  { id: "over",   name: "OVERCLOCK",    unlock: 3_000_000,  base: 2_800_000, mult: 1.55, desc: "Global multiplier (expensive, worth it)." },
+
 
   // relic currency
   { id: "relicAmp", name: "R-AMP", unlock: 0, base: 3, mult: 1.65, currency: "relics", desc: "Spend relics: +8% permanent mult." }
@@ -115,33 +121,34 @@ function clickScale(probesLv) {
 // Derived stats
 // ----------------------------
 export function recompute(state) {
-  const total = Number(state?.total || 0);
-
-  // Click power
   const probesLv = lvl(state, "probes");
-  const click = clickScale(probesLv);
+  const click = 1 + probesLv;
 
-  // Bandwidth: scan exponential + relic amp linear, multiplied by hype
-  const scanLv = lvl(state, "scan");
-  const bwScan = Math.pow(1.12, scanLv);         // slightly stronger than 1.10
+  // Bandwidth
+  const bwScan  = Math.pow(1.10, lvl(state, "scan"));
   const bwRelic = 1 + 0.08 * lvl(state, "relicAmp");
-  const hype = hypeFromTotal(total);
 
-  const bw = bwScan * bwRelic * hype;
+  // ✅ NEW stretch upgrades
+  const bwLens  = Math.pow(1.35, lvl(state, "lens"));      // chunky BW booster
+  const global  = Math.pow(1.22, lvl(state, "over"));      // global multiplier
 
-  // Passive gain: dish is the “engine block”
-  const dishLv = lvl(state, "dish");
-  const spsBase = dishScale(dishLv);
-  const sps = spsBase * bw;
+  const bw = bwScan * bwRelic * bwLens * global;
 
-  // Auto pings per second (synergy w probes)
+  // Passive
+  const sps = (lvl(state, "dish") * 1.0) * bw;
+
+  // Auto rate
   const autoLv = lvl(state, "auto");
+  const relayLv = lvl(state, "relay");
   const autoRate =
     autoLv > 0
-      ? (autoLv * 0.85 * (1 + 0.18 * probesLv)) // stronger than before
+      ? (autoLv * 0.65 * (1 + 0.15 * probesLv) * (1 + 0.40 * relayLv))
       : 0;
 
-  return { click, bw, sps, autoRate, hype };
+  // Click multiplier (burst cap)
+  const burst = Math.pow(1.30, lvl(state, "burst"));
+
+  return { click: click * burst, bw, sps, autoRate };
 }
 
 // ----------------------------
