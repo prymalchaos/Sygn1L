@@ -737,6 +737,61 @@ html[data-phase="1"] #status,
 html[data-phase="1"] #syncChip{
   animation: ledPulse 5.2s infinite;
 }
+/* ============================
+   PHASE 1 — CRT MONOCHROME
+   ============================ */
+
+html[data-phase="1"]{
+  --text: #39FF6A;                /* primary phosphor green */
+  --muted: rgba(57,255,106,.72);  /* dimmer phosphor */
+  --border: rgba(57,255,106,.22);
+}
+
+/* All body text */
+html[data-phase="1"] body{
+  color: var(--text);
+}
+
+/* Headings */
+html[data-phase="1"] h1,
+html[data-phase="1"] .subtitle{
+  color: var(--text);
+  text-shadow:
+    0 0 6px rgba(57,255,106,.35),
+    0 0 14px rgba(57,255,106,.18);
+}
+
+/* General UI text */
+html[data-phase="1"] .muted{
+  color: var(--muted);
+}
+
+/* Stat values */
+html[data-phase="1"] .stat .v{
+  color: var(--text);
+  text-shadow:
+    0 0 8px rgba(57,255,106,.28);
+}
+
+/* Chips (PHASE / STATUS / SYNC etc) */
+html[data-phase="1"] .chip{
+  color: var(--text);
+  border-color: rgba(57,255,106,.28);
+  background: rgba(0,0,0,.45);
+  text-shadow: 0 0 6px rgba(57,255,106,.25);
+}
+
+/* Logs */
+html[data-phase="1"] .log p{
+  color: var(--text);
+}
+
+/* Log tags */
+html[data-phase="1"] .tag{
+  color: var(--text);
+  border-color: rgba(57,255,106,.28);
+}
+
 
   </style>
 </head>
