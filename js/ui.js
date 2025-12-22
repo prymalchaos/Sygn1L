@@ -18,20 +18,29 @@ export function createUI() {
     host.prepend(p);
   }
 
-  function popup(who, msg) {
-    const host = $("popHost");
-    if (!host) return;
-    const box = document.createElement("div");
-    box.className = "pop";
-    box.innerHTML = `
-      <div class="who">${esc(who)}</div>
-      <div class="msg">${esc(msg)}</div>
-      <div class="hint">TAP TO CLOSE</div>
-    `;
-    box.style.pointerEvents = "auto";
-    box.addEventListener("click", () => box.remove());
-    host.prepend(box);
+  function popup(who, msg, opts = {}) {
+  const level = opts.level || "info";
+
+  // Anything "BOOT"/systemy should never be a player popup.
+  const isBoot =
+    (who && String(who).toUpperCase() === "BOOT") ||
+    (msg && /HTML loaded|Waiting for modules|BOOT/i.test(String(msg)));
+
+  // If it's boot, quietly log it instead
+  if (isBoot) {
+    pushLog("log", "BOOT", String(msg));
+    return;
   }
+
+  // Optional: allow dev to silence popups entirely
+  if (window.__DEV__ && window.__DEV__.silentPopups) {
+    pushLog("log", String(who || "SYS"), String(msg));
+    return;
+  }
+
+  // ... existing popup rendering below ...
+  // (keep whatever you already do to show the popup)
+}
 
   // ----------------------------
   // Station monitor (narrative)
