@@ -837,17 +837,7 @@ html[data-phase="1"] .pop{
     showFatal(r);
   });
 
-  // also prove whether ANY JS is alive
-  document.addEventListener("DOMContentLoaded", function(){
-    var host = document.getElementById("popHost");
-    if(host){
-      var box = document.createElement("div");
-      box.className = "pop";
-      box.innerHTML = '<div class="who">BOOT</div><div class="msg">HTML loaded. Waiting for modules…</div><div class="hint">Tap to close</div>';
-      box.addEventListener("click", function(){ box.remove(); });
-      host.prepend(box);
-    }
-  });
+  
 })();
 </script>
   <!-- Game entry point (ES module) -->
