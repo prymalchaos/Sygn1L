@@ -452,15 +452,19 @@ import { createDevTools } from "./core/dev.js";
     }
 
     // Corruption tick
-    corruptionTick(state, dt);
+    // Corruption tick (in-place)
+corruptionTick(state, dt);
+
+// ✅ Scope tick (animates the canvas)
 scope.tick(dt, t, { total: state.total, bw: derived.bw, corruption: state.corruption });
-    // Phase tick hook
-    const mod = currentPhaseModule();
-    try {
-      mod?.tick?.(api, dt);
-    } catch (e) {
-      ui.pushLog("log", "SYS", `PHASE TICK ERROR: ${e?.message || e}`);
-    }
+
+// Phase tick hook
+const mod = currentPhaseModule();
+try {
+  mod?.tick?.(api, dt);
+} catch (e) {
+  ui.pushLog("log", "SYS", `PHASE TICK ERROR: ${e?.message || e}`);
+}
 
     // Render throttling: UI updates at most ~4fps unless something marked dirty.
     if (dirty || t - lastRender > 250) {
