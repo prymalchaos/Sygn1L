@@ -7,29 +7,39 @@ import { clamp } from "./state.js";
 // ----------------------------
 // Phase thresholds (TOTAL), but phase advancement can also be gated by ACTIVE PLAY.
 // ----------------------------
+// ---------------------------------------------------------------------------
+// PHASES (RESET)
+// You asked to purge legacy phase data and restart with:
+//  - Phase 0: onboarding
+//  - Phase 1: placeholder gameplay
+// Phase progression is now owned by the phase plugins (see /js/phases/*).
+// ---------------------------------------------------------------------------
 export const PHASES = [
-  { n: 1, at: 0,          tint: "p0", status: "ARRAY: STABLE", sub: "THE ARRAY LISTENS. YOU PING.", obj: "Tap PING. Buy DISH." },
-  { n: 2, at: 2.5e8,      tint: "p1", status: "ARRAY: DRIFT",  sub: "Structure emerging. Keep it clean.", obj: "Unlock SCAN. Reach 120 for PROBES." },
-  { n: 3, at: 5.0e11,     tint: "p2", status: "ARRAY: ACTIVE", sub: "It’s answering. Don’t answer back.", obj: "Unlock AUTO. Increase Signal/sec." },
-  { n: 4, at: 2.0e14,     tint: "p3", status: "ARRAY: GLITCH", sub: "Instability rising. Containment online.", obj: "Unlock STABIL. Watch corruption." },
-  { n: 5, at: 1.0e16,     tint: "p4", status: "ARRAY: RITUAL", sub: "We can reset and keep residue.", obj: "RITE is live. Time your reset." },
-  { n: 6, at: 1.0e18,     tint: "p5", status: "ARRAY: BREACH", sub: "Something is using our signal to arrive.", obj: "Scale relics. Corruption bites back." }
+  {
+    n: 0,
+    at: 0,
+    tint: "p0",
+    status: "ARRAY: BOOT",
+    sub: "CONTROL ONLINE. IDENTITY PENDING.",
+    obj: "Complete onboarding."
+  },
+  {
+    n: 1,
+    at: 0,
+    tint: "p0",
+    status: "ARRAY: STABLE",
+    sub: "THE ARRAY LISTENS. YOU PING.",
+    obj: "Tap PING. Buy DISH."
+  }
 ];
 
-// Active-play gates (seconds). This is the “half hour active” lever.
-export const PHASE_ACTIVE_GATES_SEC = {
-  2: 30 * 60, // Phase 2 requires ~30 minutes active play
-  3: 55 * 60,
-  4: 90 * 60,
-  5: 130 * 60,
-  6: 180 * 60
-};
+// Active-play gates are intentionally empty for now.
+export const PHASE_ACTIVE_GATES_SEC = {};
 
 export function phaseForTotal(total) {
-  for (let i = PHASES.length - 1; i >= 0; i--) {
-    if (total >= PHASES[i].at) return PHASES[i];
-  }
-  return PHASES[0];
+  // With only P0 + P1, total-based lookup is trivial.
+  // Keep this helper for future phases.
+  return total >= 0 ? PHASES[1] : PHASES[0];
 }
 
 /**
@@ -37,21 +47,9 @@ export function phaseForTotal(total) {
  * You can hit insane totals early, but Phase 2 won't unlock until activePlaySec meets the gate.
  */
 export function phaseForState(state) {
-  const total = Number(state?.total || 0);
-  const activePlaySec = Number(state?.meta?.activePlaySec || 0);
-
-  // Start from total-based phase
-  let ph = phaseForTotal(total);
-
-  // Apply active gates: if player hasn't played enough, clamp phase down.
-  for (let n = ph.n; n >= 2; n--) {
-    const gate = PHASE_ACTIVE_GATES_SEC[n] ?? 0;
-    if (activePlaySec < gate) {
-      ph = PHASES.find((p) => p.n === (n - 1)) || PHASES[0];
-    }
-  }
-
-  return ph;
+  // Phase plugins decide when to advance.
+  const n = Number(state?.phase ?? 0);
+  return PHASES.find((p) => p.n === n) || PHASES[0];
 }
 
 // ----------------------------
@@ -286,4 +284,6 @@ export function buyUpgrade(state, u) {
 
   state.up[u.id] = lvl(state, u.id) + 1;
   return true;
+
+
 }
