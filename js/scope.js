@@ -13,21 +13,22 @@ export function createScope(canvasEl, labelEl) {
     dpr = 1;
 
   const sig = { cols: [], vel: [], phase: 0 };
+// ✅ ping impulse state (brief sine-burst)
+let pingT = 0;     // seconds since last ping
+let pingA = 0;     // amplitude 0..1
+let pingF = 2.2;   // frequency Hz
+let pingDur = 1.6; // duration seconds
 
-  // --- ping impulse state (for a brief sine-burst)
-  // These MUST live in createScope scope, not inside resize().
-  let pingT = 0;     // seconds since last ping
-  let pingA = 0;     // amplitude 0..1
-  let pingF = 2.2;   // frequency in Hz
-  let pingDur = 1.6; // total duration seconds
+function ping(strength = 1, freqHz = 2.2, durationSec = 1.6) {
+  pingT = 0;
+  pingA = Math.max(0, Math.min(1, strength));
+  pingF = freqHz;
+  pingDur = Math.max(0.2, durationSec);
+}
 
-  function ping(strength = 1, freqHz = 2.2, durationSec = 1.6) {
-    pingT = 0;
-    pingA = clamp(strength, 0, 1);
-    pingF = Math.max(0.1, Number(freqHz) || 2.2);
-    pingDur = Math.max(0.2, Number(durationSec) || 1.6);
-  }
 
+  
+  
   function resize() {
     dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
     const cssW = canvasEl.clientWidth || 300;
@@ -177,5 +178,5 @@ export function createScope(canvasEl, labelEl) {
   resize();
   window.addEventListener("resize", resize, { passive: true });
 
-  return { resize, tick, ping };
+return { resize, tick, ping };
 }
