@@ -233,7 +233,7 @@ function narrative(text, ms = 2600) {
     renderHUD,
     renderUpgrades,
     openManual,
-    openUsernameEditor
+    openUsernameEditor,
     setNarrative,
 narrative,
   };
