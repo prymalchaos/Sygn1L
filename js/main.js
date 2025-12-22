@@ -179,14 +179,29 @@ import { createAI } from "./ai.js";
   // ----------------------------
   // Phase + render
   // ----------------------------
-  function syncPhaseFromTotal() {
-    const ph = phaseForTotal(state.total);
-    if (state.phase !== ph.n) {
-      state.phase = ph.n;
-      ui.applyPhaseUI(state.phase);
-      ui.pushLog("log", "SYS", `PHASE ${state.phase} ENGAGED.`);
-    }
+
+function setPhase(n, { silent = false } = {}) {
+  const next = clamp(Number(n) || 1, 1, PHASES.length);
+
+  state.phase = next;
+
+  // 🔑 CSS hook for per-phase visuals
+  document.documentElement.dataset.phase = String(next);
+
+  // Paint phase text/colors/etc (existing UI module)
+  ui.applyPhaseUI(next);
+
+  if (!silent) {
+    ui.pushLog("log", "SYS", `PHASE ${next} ENGAGED.`);
   }
+}
+
+function syncPhaseFromTotal() {
+  const ph = phaseForTotal(state.total);
+  if (state.phase !== ph.n) {
+    setPhase(ph.n);
+  }
+}
 
   function renderAll() {
     syncPhaseFromTotal();
@@ -366,7 +381,7 @@ import { createAI } from "./ai.js";
       doRite(state);
       touch();
       derived = recompute(state);
-      ui.applyPhaseUI(state.phase);
+      setPhase(state.phase, { silent: true });
 
       ui.pushLog("log", "SYS", `RITE COMPLETE. +${g} RELICS.`);
       ui.pushLog("comms", "OPS", "We keep the residue. We pretend it’s control.");
@@ -683,7 +698,7 @@ import { createAI } from "./ai.js";
     state.signal = snap.signal;
     state.total = snap.total;
     state.corruption = snap.corruption;
-    state.phase = snap.phase;
+    setPhase(state.phase, { silent: true });
 
     state.up = {
       dish: snap.up.dish || 0,
