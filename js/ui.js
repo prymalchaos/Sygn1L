@@ -20,6 +20,20 @@ async function initAudio() {
   clickBuffer = await audioCtx.decodeAudioData(arr);
 }
 
+function playUIClick() {
+  if (!window.__audioCtx || !window.__uiClickBuffer) return;
+  if (window.__audioCtx.state !== "running") return;
+
+  const src = window.__audioCtx.createBufferSource();
+  src.buffer = window.__uiClickBuffer;
+
+  const gain = window.__audioCtx.createGain();
+  gain.gain.value = 0.25;
+
+  src.connect(gain).connect(window.__audioCtx.destination);
+  src.start();
+}
+
 
 export function createUI() {
   const $ = (id) => document.getElementById(id);
