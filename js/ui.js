@@ -39,6 +39,22 @@ export function createUI() {
     host.prepend(box);
   }
 
+function setNarrative(text) {
+  const el = $("nText");
+  if (!el) return;
+  el.textContent = text;
+}
+let nTimer = null;
+function narrative(text, ms = 2600) {
+  setNarrative(text);
+  if (nTimer) clearTimeout(nTimer);
+  nTimer = setTimeout(() => {
+    // leave the last line up, or revert to something neutral:
+    // setNarrative("…");
+  }, ms);
+}
+
+
   // --- Modal
   function openModal(title, html) {
     must("modalTitle").textContent = title;
@@ -218,5 +234,7 @@ export function createUI() {
     renderUpgrades,
     openManual,
     openUsernameEditor
+    setNarrative,
+narrative,
   };
 }
