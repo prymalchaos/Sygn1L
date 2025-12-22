@@ -115,7 +115,10 @@ import { PHASE_MODULES } from "./phases/phases.js";
   const touch = () => {
     state.meta.updatedAtMs = nowMs();
   };
-
+const markInput = () => {
+  state.meta.lastInputAtMs = nowMs();
+  touch();
+};
   // ----------------------------
   // Load/save helpers
   // ----------------------------
@@ -232,7 +235,7 @@ function setPhase(n, { silent = false } = {}) {
 }
 
 function syncPhaseFromTotal() {
-  const ph = phaseForTotal(state.total);
+  const ph = phaseForState(state);
   if (state.phase !== ph.n) setPhase(ph.n);
 }
 
@@ -344,6 +347,7 @@ ai = createAI({
   if (pingBtn) {
     pingBtn.onclick = async () => {
       ai.markActive();
+      markInput();
       feedback(false);
 
       let g = clickGain(state, derived);
@@ -367,6 +371,7 @@ if (phaseMod?.modifyClickGain) {
   if (saveBtn) {
     saveBtn.onclick = async () => {
       ai.markActive();
+      markInput();
       feedback(false);
       try {
         await saveNow(true);
@@ -380,6 +385,7 @@ if (phaseMod?.modifyClickGain) {
   if (wipeBtn) {
     wipeBtn.onclick = async () => {
       ai.markActive();
+      markInput();
       feedback(true);
 
       const ok = ui.confirmAction(
@@ -402,6 +408,7 @@ if (phaseMod?.modifyClickGain) {
       if (!canRite(state)) return;
 
       ai.markActive();
+      markInput();
       feedback(true);
 
       const g = prestigeGain(state);
@@ -425,6 +432,7 @@ if (phaseMod?.modifyClickGain) {
   if (fbBtn) {
     fbBtn.onclick = () => {
       ai.markActive();
+      markInput();
       feedback(false);
       feedbackOn = !feedbackOn;
       fbBtn.textContent = feedbackOn ? "FEEDBACK" : "FB OFF";
@@ -434,6 +442,7 @@ if (phaseMod?.modifyClickGain) {
   if (helpBtn) {
     helpBtn.onclick = () => {
       ai.markActive();
+      markInput();
       ui.openManual();
     };
   }
@@ -441,6 +450,7 @@ if (phaseMod?.modifyClickGain) {
   if (userChip) {
     userChip.onclick = () => {
       ai.markActive();
+      markInput();
       ui.openUsernameEditor(state.profile.name || "GUEST", async (name) => {
         const next = (name || "").trim().slice(0, 18);
         state.profile.name = (next ? next : "GUEST").toUpperCase();
@@ -867,6 +877,7 @@ if (phaseMod?.modifyClickGain) {
 
     card.querySelector("#devClearCorr").onclick = async () => {
       ai.markActive();
+      markInput();
       feedback(false);
       state.corruption = 0;
       touch();
@@ -878,6 +889,7 @@ if (phaseMod?.modifyClickGain) {
 
     card.querySelector("#devCap1").onclick = () => {
       ai.markActive();
+      markInput();
       feedback(false);
       captureDevSnapshot(1);
       ui.popup("SYS", "DEV: SNAPSHOT CAPTURED (SLOT 1)");
@@ -886,6 +898,7 @@ if (phaseMod?.modifyClickGain) {
 
     card.querySelector("#devLoad1").onclick = async () => {
       ai.markActive();
+      markInput();
       feedback(false);
       const ok = await applyCapturedSnapshot(1);
       ui.popup("SYS", ok ? "DEV: SNAPSHOT LOADED (SLOT 1)" : "DEV: SLOT 1 EMPTY");
@@ -894,6 +907,7 @@ if (phaseMod?.modifyClickGain) {
 
     card.querySelector("#devCap2").onclick = () => {
       ai.markActive();
+      markInput();
       feedback(false);
       captureDevSnapshot(2);
       ui.popup("SYS", "DEV: SNAPSHOT CAPTURED (SLOT 2)");
@@ -902,6 +916,7 @@ if (phaseMod?.modifyClickGain) {
 
     card.querySelector("#devLoad2").onclick = async () => {
       ai.markActive();
+      markInput();
       feedback(false);
       const ok = await applyCapturedSnapshot(2);
       ui.popup("SYS", ok ? "DEV: SNAPSHOT LOADED (SLOT 2)" : "DEV: SLOT 2 EMPTY");
@@ -910,6 +925,7 @@ if (phaseMod?.modifyClickGain) {
 
     card.querySelector("#devAddRelics").onclick = async () => {
       ai.markActive();
+      markInput();
       feedback(false);
       state.relics += 10;
       touch();
@@ -921,6 +937,7 @@ if (phaseMod?.modifyClickGain) {
 
     card.querySelector("#devHide").onclick = () => {
       ai.markActive();
+      markInput();
       feedback(false);
       removeDevPanel();
     };
@@ -945,11 +962,22 @@ if (phaseMod?.modifyClickGain) {
   let upgradesAcc = 0;
   let autosaveAcc = 0;
 
-  function loop(t) {
-    const dt = Math.min(0.05, (t - last) / 1000);
-    last = t;
+function loop(t) {
+  const dt = Math.min(0.05, (t - last) / 1000);
+  last = t;
 
-    derived = recompute(state);
+  // ✅ ACTIVE PLAY TIMER (counts only after recent input)
+  const activeWindowMs = 12_000; // 12s since last input = still "active"
+  const since = nowMs() - (state.meta.lastInputAtMs || 0);
+  const isActive = (state.meta.lastInputAtMs || 0) > 0 && since <= activeWindowMs;
+
+  if (isActive) {
+    state.meta.activePlaySec = (state.meta.activePlaySec || 0) + dt;
+  }
+
+  derived = recompute(state);
+
+  // passive gain...
 
     // passive gain
     if (derived.sps > 0) {
