@@ -1,53 +1,57 @@
-// root/js/phases/phase1.js
+// /js/phases/phase1.js
+// Placeholder gameplay phase. Intentionally small.
 
-const CAL_TARGET = 1800; // ~30 mins if earning ~1/sec
+export default {
+  id: 1,
+  name: "CALIBRATION (PLACEHOLDER)",
 
-function isActive(state) {
-  // main.js should update this whenever player taps/buys/etc
-  const last = Number(state?.meta?.lastInputAtMs || 0);
-  return last && (Date.now() - last) < 8000; // active window: 8s
-}
+  enter(api) {
+    const { ui, state, styles } = api;
+    state.phaseData ||= {};
+    state.phaseData[1] ||= { pings: 0 };
 
-export const phase1 = {
-  onEnter({ state, ui }) {
-    if (!state.p1) state.p1 = { cal: 0, lastBeat: 0 };
-    ui.pushLog("log", "CONTROL", "PHASE 1: CALIBRATION RUNNING. HOLD STEADY.");
+    ui.monitor("PHASE 1 LINK STABLE. ARRAY RESPONSE: GREEN.");
+    ui.pushLog("log", "CONTROL", "PHASE 1: BEGIN BASIC CALIBRATION.");
+
+    // Example: phase-scope CSS injection (fully self-contained).
+    styles.add("p1-accent", `
+      /* Phase 1 inject: make PING feel more "alive" */
+      html[data-phase='1'] #ping{ transform: translateZ(0); }
+      html[data-phase='1'] #ping.afford{ filter: drop-shadow(0 0 10px rgba(90,255,170,.20)); }
+    `);
   },
 
-  onTick({ state, derived, ui, setPhase }, dt) {
-    if (!state.p1) state.p1 = { cal: 0, lastBeat: 0 };
+  exit(api) {
+    api.styles.remove("p1-accent");
+  },
 
-    // Only progresses while active
-    if (isActive(state)) {
-      const c = state.corruption || 0;
+  // Phase plugin can gate which upgrades appear.
+  filterUpgrades(upgrades) {
+    // Placeholder: keep it super simple at the start.
+    return upgrades.filter((u) => ["dish"].includes(u.id));
+  },
 
-      // Corruption slows calibration (tension + pacing control)
-      const corrSlow = 1 - 0.65 * c;        // at c=1 => 35% speed
-      const rate = 1.0 * corrSlow;          // ~1 cal/sec baseline
+  // Phase plugin can modify click gain.
+  modifyClickGain(base, api) {
+    const pings = api.state.phaseData?.[1]?.pings || 0;
+    // Tiny pacing lever: first 20 pings feel snappier.
+    const earlyBoost = pings < 20 ? 1.35 : 1.0;
+    return base * earlyBoost;
+  },
 
-      state.p1.cal += rate * dt;
+  onPing(api) {
+    api.state.phaseData[1].pings++;
 
-      // Occasional story beats every ~120 points
-      const beatEvery = 120;
-      if (state.p1.cal - (state.p1.lastBeat || 0) >= beatEvery) {
-        state.p1.lastBeat = state.p1.cal;
+    // Ultra-light world building beats
+    const p = api.state.phaseData[1].pings;
+    if (p === 1) api.ui.popup("OPS", "Good. Now do it again. And again.");
+    if (p === 10) api.ui.pushLog("comms", "CONTROL", "Calibration is responding to repetition.");
+    if (p === 30) api.ui.pushLog("comms", "OPS", "If it starts answering in words, don’t read them aloud.");
+  },
 
-        const lines = [
-          "CONTROL: Your signal is getting louder. Don’t get proud.",
-          "OPS: Array response jitter increasing. That’s not weather.",
-          "CONTROL: We used to call this ‘tuning’. Now we call it ‘prayer’.",
-          "OPS: Keep pinging. Something is counting."
-        ];
-        const line = lines[Math.floor(Math.random() * lines.length)];
-        ui.pushLog("comms", "OPS", line);
-      }
-    }
-
-    // Win condition: calibration complete
-    if (state.p1.cal >= CAL_TARGET) {
-      ui.popup("CONTROL", "CALIBRATION COMPLETE. PHASE 2 AUTHORIZED.");
-      ui.pushLog("log", "SYS", "PHASE 1 COMPLETE: ARRAY LOCK ACHIEVED.");
-      setPhase(2);
-    }
+  tick(api, dt) {
+    // Placeholder tick: no special logic yet.
+    // Keep a hook here so future phases can scale without touching core.
+    void api; void dt;
   }
 };
