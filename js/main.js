@@ -204,6 +204,18 @@ import { PHASE_MODULES } from "./phases/phases.js";
 
   // Paint phase text/colors/etc
   ui.applyPhaseUI(next);
+  // Paint phase text/colors/etc
+ui.applyPhaseUI(next);
+
+// ✅ PHASE MODULE HOOK
+phaseMod = PHASE_MODULES?.[next] || null;
+if (phaseMod?.onEnter) {
+  try {
+    phaseMod.onEnter({ state, ui, saves });
+  } catch (e) {
+    ui.pushLog("log", "SYS", "PHASE MODULE ERROR: " + esc(e?.message || e));
+  }
+}
 
   // ✅ PHASE MODULE HOOK
   phaseMod = PHASE_MODULES?.[next] || null;
