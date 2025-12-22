@@ -23,6 +23,8 @@ import { createAI } from "./ai.js";
 
 // ✅ NEW: Phase module layer
 import { getPhaseConfig, filterUpgradesForPhase } from "./phases.js";
+import { PHASE_MODULES } from "./phases.js";
+
 
 (() => {
   // ----------------------------
