@@ -22,20 +22,17 @@ export function getPhaseConfig(phaseNum) {
   };
 }
 
-export function filterUpgradesForPhase(upgrades, phaseCfg, state) {
-  // If no config or no allowlist, return original list
-  if (!phaseCfg || !Array.isArray(phaseCfg.allowedUpgrades)) return upgrades;
-
-  const allow = new Set(phaseCfg.allowedUpgrades);
-
-  // Always allow relicAmp only if relics currency exists (optional safety)
-  return upgrades.filter((u) => {
-    if (!u || !u.id) return false;
-    if (u.currency === "relics" && (state?.relics ?? 0) <= 0) {
-      // still show it if you want; this just hides until relics appear
-      // change to "return true" if you'd rather always show it
-      return false;
+export function filterUpgradesForPhase(upgrades, cfg, state) {
+  const list = upgrades.filter((u) => {
+    // ✅ Always show relic spending if player has relics (or already bought it)
+    if (u.id === "relicAmp") {
+      return (state.relics || 0) > 0 || (state.up?.relicAmp || 0) > 0;
     }
-    return allow.has(u.id);
+
+    // ...your existing phase rules here...
+    // (allowlist/denylist/minPhase/etc)
+    return true;
   });
+
+  return list;
 }
