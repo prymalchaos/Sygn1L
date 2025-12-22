@@ -1,44 +1,44 @@
-// /js/phases/phase1.js
-// Phase 1: Nostromo-style baseline acquisition
-// - Only DISH is available (proof-of-concept gating)
-// - Corruption is soft-capped and grows slower
-// - Provides phase-scoped hooks without rewriting economy.js
+// /js/phase1.js
+// Phase 1 module: Signal Acquisition (LOCK-IN)
+// Keeps logic isolated from main loop.
 
-import { clamp } from "../state.js";
+import { clamp } from "./state.js";
 
-export function createPhase1() {
-  const ALLOWED_UPGRADES = new Set(["dish"]);
+export const phase1 = {
+  id: 1,
+  name: "SIGNAL ACQUISITION",
 
-  return {
-    n: 1,
-    name: "BASELINE ACQUISITION",
+  // Runs once when Phase 1 becomes active
+  init(state, ui) {
+    // Create Phase 1-only fields if they don't exist
+    if (!state.p1) state.p1 = {};
+    if (state.p1.lock == null) state.p1.lock = 0;
+    if (state.p1.lockComplete == null) state.p1.lockComplete = false;
 
-    // Filter which upgrades the UI shows in this phase
-    filterUpgrades(upgrades /* array */, state) {
-      return upgrades.filter((u) => ALLOWED_UPGRADES.has(u.id));
-    },
+    ui.pushLog("log", "SYS", "PHASE 1 MODULE ONLINE.");
+    ui.pushLog("comms", "OPS", "We’re listening. Hold the baseline steady.");
+  },
 
-    // Click gain multiplier (leave at 1.0 for now)
-    clickMult(state, derived) {
-      return 1.0;
-    },
+  // Runs every frame while Phase 1 is active
+  tick(state, derived, dt, helpers) {
+    if (state.p1?.lockComplete) return;
 
-    // Corruption rules for phase 1
-    corruption: {
-      perPing: 0.00025,      // slower manual corruption
-      tickMult: 0.55,        // slow down passive corruptionTick
-      cap: 0.22              // keep it “stable” in P1
-    },
+    // Phase 1 progress grows slowly based on your current capability
+    const gain = helpers.lockGain(state, derived, dt);
+    state.p1.lock = clamp((state.p1.lock || 0) + gain, 0, 100);
 
-    // Called when entering the phase (optional flavour)
-    onEnter({ ui, state, prev }) {
-      ui?.popup?.("CONTROL", "Phase 1 online. Establish baseline. Ignore the urge to name the noise.");
-      ui?.pushLog?.("log", "SYS", "P1 CONSOLE MODE: BASELINE ACQUISITION.");
-    },
+    // Optional: a little drip-feed narrative
+    helpers.phase1Narrative(state);
 
-    // Clamp corruption according to phase rules
-    postTickClamp(state) {
-      state.corruption = clamp(Number(state.corruption) || 0, 0, this.corruption.cap);
+    // Completion condition
+    if (state.p1.lock >= 100) {
+      state.p1.lockComplete = true;
+      helpers.completePhase(2); // move to Phase 2
     }
-  };
-}
+  },
+
+  // Controls what upgrades can even be bought in Phase 1
+  allowUpgrade(upgradeId) {
+    return ["dish", "scan"].includes(upgradeId);
+  }
+};
