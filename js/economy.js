@@ -28,11 +28,16 @@ export function phaseForTotal(total) {
 // Button labels must be short elsewhere; upgrade names can be longer.
 // ----------------------------
 export const UPGRADES = [
-  { id: "dish",   name: "DISH CAL",   unlock: 0,    base: 10,   mult: 1.18, desc: "+1 Signal/sec per level." },
-  { id: "scan",   name: "DEEP SCAN",  unlock: 100,  base: 50,   mult: 1.25, desc: "+10% Bandwidth per level." },
-  { id: "probes", name: "PROBES",     unlock: 120,  base: 80,   mult: 1.22, desc: "+1 Click power per level." },
-  { id: "auto",   name: "AUTO",       unlock: 600,  base: 520,  mult: 1.30, desc: "Adds auto pings/sec." },
-  { id: "stabil", name: "STABIL",     unlock: 9500, base: 7200, mult: 1.33, desc: "Slows corruption growth." },
+  { id: "dish",   name: "DISH CAL",    unlock: 0,    base: 10,   mult: 1.18, desc: "+1 Signal/sec per level." },
+  { id: "scan",   name: "DEEP SCAN",   unlock: 100,  base: 50,   mult: 1.25, desc: "+10% Bandwidth per level." },
+  { id: "probes", name: "PROBES",      unlock: 120,  base: 80,   mult: 1.22, desc: "+1 Click power per level." },
+
+  // 🔥 NEW: Big-number engine (Phase 1 pacing/fun)
+  // Tuned to explode quickly: 2.6^10 ≈ 14,000x
+  { id: "amp",    name: "AMPLIFIER",   unlock: 160,  base: 120,  mult: 1.42, desc: "×2.6 to all gains per level." },
+
+  { id: "auto",   name: "AUTO",        unlock: 600,  base: 520,  mult: 1.30, desc: "Adds auto pings/sec." },
+  { id: "stabil", name: "STABIL",      unlock: 9500, base: 7200, mult: 1.33, desc: "Slows corruption growth." },
 
   // relic currency
   { id: "relicAmp", name: "R-AMP", unlock: 0, base: 3, mult: 1.65, currency: "relics", desc: "Spend relics: +8% permanent mult." }
@@ -59,14 +64,18 @@ export function recompute(state) {
   const bwRelic = 1 + 0.08 * lvl(state, "relicAmp");
   const bw = bwScan * bwRelic;
 
-  // Base passive gain
-  const sps = (lvl(state, "dish") * 1.0) * bw;
+  // 🔥 Amplifier multiplier: affects click + passive + auto
+  const ampMult = Math.pow(2.6, lvl(state, "amp"));
+
+  // Base passive gain (buffed so ramp starts earlier)
+  const DISH_BASE_SPS = 4.0; // was 1.0
+  const sps = (lvl(state, "dish") * DISH_BASE_SPS) * bw * ampMult;
 
   // Auto pings per second (synergy w probes)
   const autoLv = lvl(state, "auto");
   const autoRate = autoLv > 0 ? (autoLv * 0.65 * (1 + 0.15 * lvl(state, "probes"))) : 0;
 
-  return { click, bw, sps, autoRate };
+  return { click, bw, sps, autoRate, ampMult };
 }
 
 // ----------------------------
@@ -102,14 +111,16 @@ export function corruptionTick(state, dt) {
 export function clickGain(state, derived) {
   // Clicking gains are reduced by corruption
   const c = state.corruption || 0;
-  return derived.click * derived.bw * (1 - 0.35 * c);
+  const amp = derived.ampMult || 1;
+  return (derived.click * derived.bw * amp) * (1 - 0.35 * c);
 }
 
 export function autoGainPerSec(state, derived) {
   // Auto gains also reduced by corruption (slightly less harsh)
   const c = state.corruption || 0;
+  const amp = derived.ampMult || 1;
   // pings/sec * (gain per ping)
-  return derived.autoRate * (derived.click * derived.bw) * (1 - 0.25 * c);
+  return derived.autoRate * ((derived.click * derived.bw * amp) * (1 - 0.25 * c));
 }
 
 // ----------------------------
