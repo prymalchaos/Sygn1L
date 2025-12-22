@@ -107,6 +107,7 @@ import { PHASE_MODULES } from "./phases/phases.js";
   };
 
   let derived = recompute(state);
+  let phaseMod = null;
 
   const nowMs = () => Date.now();
   const touch = () => {
@@ -194,32 +195,30 @@ import { PHASE_MODULES } from "./phases/phases.js";
   }
 
   function setPhase(n, { silent = false } = {}) {
-    const next = clamp(Number(n) || 1, 1, PHASES.length);
-    if (state.phase === next) {
-      // Still ensure CSS/UI stays consistent if called redundantly
-      document.documentElement.dataset.phase = String(next);
-      ui.applyPhaseUI(next);
-      return;
-    }
+  const next = clamp(Number(n) || 1, 1, PHASES.length);
 
-    const prev = state.phase;
-    state.phase = next;
+  state.phase = next;
 
-    // CSS hook for per-phase visuals
-    document.documentElement.dataset.phase = String(next);
+  // 🔑 CSS hook for per-phase visuals
+  document.documentElement.dataset.phase = String(next);
 
-    // Phase module hooks
+  // Paint phase text/colors/etc
+  ui.applyPhaseUI(next);
+
+  // ✅ PHASE MODULE HOOK
+  phaseMod = PHASE_MODULES?.[next] || null;
+  if (phaseMod?.onEnter) {
     try {
-      const prevCfg = getPhaseConfig(prev);
-      prevCfg?.onExit?.(state, derived, getCtx());
-    } catch {}
-
-    ui.applyPhaseUI(next);
-
-    if (!silent) {
-      ui.pushLog("log", "SYS", `PHASE ${next} ENGAGED.`);
+      phaseMod.onEnter({ state, ui, saves });
+    } catch (e) {
+      ui.pushLog("log", "SYS", "PHASE MODULE ERROR: " + esc(e?.message || e));
     }
+  }
 
+  if (!silent) {
+    ui.pushLog("log", "SYS", `PHASE ${next} ENGAGED.`);
+  }
+}
     try {
       const nextCfg = getPhaseConfig(next);
       nextCfg?.onEnter?.(state, derived, getCtx());
