@@ -155,6 +155,30 @@ h1{
   text-shadow:0 0 10px rgba(0,0,0,.55);
 }
 
+/* Make SIGNAL stand out */
+#signal{
+  font-weight: 900;
+  font-size: 20px;              /* ~2px bigger than your current 18px values */
+  letter-spacing: .02em;
+  color: var(--accent);
+  text-shadow:
+    0 0 10px rgba(57,255,106,.22),
+    0 0 18px rgba(57,255,106,.12),
+    0 0 26px rgba(0,0,0,.55);
+}
+
+/* Optional: give SIGNAL a slightly different “panel readout” font vibe */
+#signal{
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* If the SIGNAL value lives inside a stat card, this gives that stat a subtle halo */
+.stat:has(#signal){
+  border-color: rgba(57,255,106,.22);
+  box-shadow: 0 0 18px rgba(57,255,106,.10);
+}
+
 .hd{
   display:flex;
   justify-content:space-between;
@@ -591,6 +615,11 @@ html[data-phase="1"] .pop{
   background:rgba(0,0,0,.86);
 }
 
+#ping.big{
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
 </style>
 </head>
 
@@ -646,6 +675,8 @@ html[data-phase="1"] .pop{
           <canvas id="scope"></canvas>
         </div>
 
+<button class="big" id="ping">PING VOID</button>
+
         <div style="height:10px"></div>
 
         <div class="stat">
@@ -683,7 +714,7 @@ html[data-phase="1"] .pop{
       </div>
 
       <div class="pad">
-        <button class="big" id="ping">PING VOID</button>
+        
 
         <div class="grid2">
           <button id="saveBtn">SAVE</button>
