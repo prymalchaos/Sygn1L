@@ -1,8 +1,8 @@
-// ./js/phases/phases.js
-import { phase1 } from "./phase1.js";
+// root/js/phases/phases.js
+import { createPhase1Module } from "./phase1.js";
 
 export const PHASE_MODULES = {
-  1: phase1
-  // 2: phase2,
-  // 3: phase3,
+  1: createPhase1Module(),
+  // 2: createPhase2Module(),
+  // 3: ...
 };
