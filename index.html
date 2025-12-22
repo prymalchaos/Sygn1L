@@ -726,7 +726,18 @@ html[data-phase="1"] canvas#scope{
     radial-gradient(500px 120px at 40% 40%, rgba(57,255,106,.10), transparent 70%),
     rgba(0,0,0,.28);
 }
-    
+    @keyframes ledPulse {
+  0%, 92%, 100% { filter: brightness(1); opacity: .96; }
+  94% { filter: brightness(1.3); opacity: 1; }
+  96% { filter: brightness(1.1); opacity: .98; }
+}
+
+/* subtle “console heartbeat” */
+html[data-phase="1"] #status,
+html[data-phase="1"] #syncChip{
+  animation: ledPulse 5.2s infinite;
+}
+
   </style>
 </head>
 
