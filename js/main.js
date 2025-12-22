@@ -339,46 +339,91 @@ ai = createAI({
     } catch {}
   }
 
+// Submarine-style sonar ping (Web Audio)
+// Call: sonarPingSound(1)   // 1 = normal, 0.5 subtle, 1.5 stronger
 function sonarPingSound(intensity = 1) {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const ctx = audioCtx;
 
-    const t0 = ctx.currentTime;
-    const dur = 0.22;
+    const now = ctx.currentTime;
+    const dur = 0.9; // total "audible" feel
 
-    // Oscillator: starts high, drops fast (sonar-ish)
+    // master
+    const out = ctx.createGain();
+    out.gain.value = 0.00001;
+    out.connect(ctx.destination);
+
+    // --- main ping oscillator (triangle feels "metallic" without being harsh)
     const osc = ctx.createOscillator();
-    osc.type = "sine";
+    osc.type = "triangle";
 
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.00001, t0);
+    // Sub-like ping: start higher and sweep down
+    const f0 = 1400;               // start Hz
+    const f1 = 520;                // end Hz
+    osc.frequency.setValueAtTime(f0, now);
+    osc.frequency.exponentialRampToValueAtTime(f1, now + 0.18);
 
-    // Optional filter for “underwater console” vibe
-    const filt = ctx.createBiquadFilter();
-    filt.type = "bandpass";
-    filt.frequency.setValueAtTime(1100, t0);
-    filt.Q.setValueAtTime(8, t0);
+    // --- filter: bandpass to make it "sonar" not "synth"
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.setValueAtTime(950, now);
+    bp.Q.setValueAtTime(8.0, now);
 
-    // Pitch sweep
-    const startF = 1300;
-    const endF = 240;
-    osc.frequency.setValueAtTime(startF, t0);
-    osc.frequency.exponentialRampToValueAtTime(endF, t0 + dur);
+    // --- amplitude envelope for the ping
+    const pingGain = ctx.createGain();
+    pingGain.gain.setValueAtTime(0.00001, now);
+    pingGain.gain.exponentialRampToValueAtTime(0.22 * intensity, now + 0.01);
+    pingGain.gain.exponentialRampToValueAtTime(0.00001, now + 0.22);
 
-    // Amplitude envelope
-    const peak = 0.05 * Math.max(0.25, Math.min(1.5, intensity)); // keep sane
-    gain.gain.exponentialRampToValueAtTime(peak, t0 + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.00001, t0 + dur);
+    // --- tail resonator (very quiet sine that "rings" after the ping)
+    const tailOsc = ctx.createOscillator();
+    tailOsc.type = "sine";
+    tailOsc.frequency.setValueAtTime(260, now);
 
-    osc.connect(filt);
-    filt.connect(gain);
-    gain.connect(ctx.destination);
+    const tailGain = ctx.createGain();
+    tailGain.gain.setValueAtTime(0.00001, now + 0.08);
+    tailGain.gain.exponentialRampToValueAtTime(0.06 * intensity, now + 0.12);
+    tailGain.gain.exponentialRampToValueAtTime(0.00001, now + 0.95);
 
-    osc.start(t0);
-    osc.stop(t0 + dur + 0.02);
+    // --- subtle slapback / hull reflection
+    const delay = ctx.createDelay(0.25);
+    delay.delayTime.setValueAtTime(0.12, now);
+
+    const fb = ctx.createGain();
+    fb.gain.setValueAtTime(0.35, now); // feedback amount (keep < 0.6)
+
+    const wet = ctx.createGain();
+    wet.gain.setValueAtTime(0.18 * intensity, now);
+
+    // feedback loop: delay -> fb -> delay
+    delay.connect(fb);
+    fb.connect(delay);
+
+    // routing
+    osc.connect(bp);
+    bp.connect(pingGain);
+
+    // dry
+    pingGain.connect(out);
+
+    // wet (echo)
+    pingGain.connect(delay);
+    delay.connect(wet);
+    wet.connect(out);
+
+    // tail
+    tailOsc.connect(tailGain);
+    tailGain.connect(out);
+
+    // start/stop
+    osc.start(now);
+    tailOsc.start(now);
+
+    osc.stop(now + dur);
+    tailOsc.stop(now + dur + 0.2);
   } catch {
-    // silently ignore (some browsers/device states)
+    // fail silently: no audio device / autoplay restrictions etc
   }
 }
 
