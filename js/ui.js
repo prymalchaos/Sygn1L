@@ -10,6 +10,16 @@ let audioCtx = null;
 let clickBuffer = null;
 let audioUnlocked = false;
 
+async function initAudio() {
+  if (audioCtx) return;
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  const res = await fetch("audio/ui_click.wav"); // adjust path if needed
+  const arr = await res.arrayBuffer();
+  clickBuffer = await audioCtx.decodeAudioData(arr);
+}
+
 
 export function createUI() {
   const $ = (id) => document.getElementById(id);
