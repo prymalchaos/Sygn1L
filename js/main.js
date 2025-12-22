@@ -20,6 +20,7 @@ import {
 import { createUI } from "./ui.js";
 import { createScope } from "./scope.js";
 import { createAI } from "./ai.js";
+import { createPhaseController } from "./phases/index.js";
 
 (() => {
   // ----------------------------
@@ -180,21 +181,28 @@ import { createAI } from "./ai.js";
   // Phase + render
   // ----------------------------
 
-function setPhase(n, { silent = false } = {}) {
-  const next = clamp(Number(n) || 1, 1, PHASES.length);
+  function setPhase(n, { silent = false } = {}) {
+    const prev = state.phase;
+    const next = clamp(Number(n) || 1, 1, PHASES.length);
 
-  state.phase = next;
+    state.phase = next;
 
-  // 🔑 CSS hook for per-phase visuals
-  document.documentElement.dataset.phase = String(next);
+    // CSS hook for per-phase visuals
+    document.documentElement.dataset.phase = String(next);
 
-  // Paint phase text/colors/etc (existing UI module)
-  ui.applyPhaseUI(next);
+    // Paint phase text/colors/etc
+    ui.applyPhaseUI(next);
 
-  if (!silent) {
-    ui.pushLog("log", "SYS", `PHASE ${next} ENGAGED.`);
+    // Phase enter hook
+    const mod = currentPhaseModule();
+    if (prev !== next && typeof mod?.onEnter === "function") {
+      try { mod.onEnter({ ui, state, prev }); } catch {}
+    }
+
+    if (!silent) {
+      ui.pushLog("log", "SYS", `PHASE ${next} ENGAGED.`);
+    }
   }
-}
 
 function syncPhaseFromTotal() {
   const ph = phaseForTotal(state.total);
@@ -210,9 +218,11 @@ function syncPhaseFromTotal() {
     const syncText = saves.isSignedIn() ? "SYNC: CLOUD" : "SYNC: GUEST";
     ui.renderHUD(state, derived, syncText);
 
+      const mod = currentPhaseModule();
+
     ui.renderUpgrades({
       state,
-      upgrades: UPGRADES,
+      upgrades: mod.filterUpgrades(UPGRADES, state),
       canBuy: (u) => canBuy(state, u),
       getCost: (u) => cost(state, u),
       getLevel: (id) => lvl(state, id),
@@ -257,6 +267,13 @@ function syncPhaseFromTotal() {
     const btn = ui.$("aiBtn");
     if (btn) btn.textContent = on ? "AI COMMS" : "AI OFF";
   }
+
+  const phases = createPhaseController();
+
+  function currentPhaseModule() {
+    return phases.get(state.phase);
+  }
+
 
   // ----------------------------
   // Controls wiring
@@ -318,7 +335,10 @@ function syncPhaseFromTotal() {
       state.total += g;
 
       // small corruption kick per manual tap (keeps tension)
-      state.corruption = clamp((state.corruption || 0) + 0.00055, 0, 1);
+            const mod = currentPhaseModule();
+      const add = Number(mod?.corruption?.perPing ?? 0.00055);
+      const cap = Number(mod?.corruption?.cap ?? 1);
+      state.corruption = clamp((state.corruption || 0) + add, 0, cap);
 
       touch();
       derived = recompute(state);
@@ -959,7 +979,10 @@ function syncPhaseFromTotal() {
     }
 
     // corruption
-    corruptionTick(state, dt);
+       const mod = currentPhaseModule();
+    const tickMult = Number(mod?.corruption?.tickMult ?? 1);
+    corruptionTick(state, dt * tickMult);
+    try { mod.postTickClamp(state); } catch {}
 
     // phase from total
     syncPhaseFromTotal();
