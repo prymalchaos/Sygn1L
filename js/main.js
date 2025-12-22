@@ -7,7 +7,7 @@ import {
   lvl,
   cost,
   recompute,
-  phaseForTotal,
+  phaseForState,
   corruptionTick,
   clickGain,
   autoGainPerSec,
