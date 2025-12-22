@@ -438,8 +438,12 @@ function sonarPingSound(intensity = 1) {
       markInput();
       feedback(false);
             scope.ping?.(1, 2.2, 1.6);
-            if (audioCtx?.state === "suspended") audioCtx.resume?.();
-            sonarPingSound(1 + Math.min(1, (state.corruption || 0) * 1.5));
+
+sonarPingSound(1 + Math.min(1, (state.corruption || 0) * 1.5));
+
+if (audioCtx && audioCtx.state === "suspended") {
+  try { await audioCtx.resume(); } catch {}
+}
 
       let g = clickGain(state, derived);
 if (phaseMod?.modifyClickGain) {
