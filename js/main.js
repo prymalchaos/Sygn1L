@@ -126,6 +126,22 @@ import { createDevTools } from "./core/dev.js";
     ui.pushLog("log", "SYS", on ? "AI ENABLED." : "AI DISABLED.");
   }
 
+function unlockAudioOnce() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+
+  initAudio().then(() => {
+    if (audioCtx.state === "suspended") {
+      audioCtx.resume();
+    }
+  });
+}
+
+// Attach to first real interaction
+window.addEventListener("pointerdown", unlockAudioOnce, { once: true });
+window.addEventListener("keydown", unlockAudioOnce, { once: true });
+
+
   // ----------------------------
   // Phase runtime
   // ----------------------------
