@@ -54,6 +54,18 @@ function narrative(text, ms = 2600) {
   }, ms);
 }
 
+function narrative(text, duration = 2400) {
+  const el = document.getElementById("narrative");
+  if (!el) return;
+
+  el.textContent = text;
+  el.classList.add("show");
+
+  clearTimeout(el._t);
+  el._t = setTimeout(() => {
+    el.classList.remove("show");
+  }, duration);
+}
 
   // --- Modal
   function openModal(title, html) {
