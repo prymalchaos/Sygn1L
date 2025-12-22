@@ -99,11 +99,13 @@ import { PHASE_MODULES } from "./phases/phases.js";
 
     // meta for ai.js + saves + offline
     meta: {
-      updatedAtMs: 0,
-      lastAiAtMs: 0,
-      lastAmbientAtMs: 0,
-      aiEnabled: true
-    }
+  updatedAtMs: 0,
+  lastAiAtMs: 0,
+  lastAmbientAtMs: 0,
+  lastInputAtMs: 0,     // ✅ NEW
+  activePlaySec: 0,     // ✅ NEW
+  aiEnabled: true
+}
   };
 
   let derived = recompute(state);
