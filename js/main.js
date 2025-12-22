@@ -339,6 +339,49 @@ ai = createAI({
     } catch {}
   }
 
+function sonarPingSound(intensity = 1) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const ctx = audioCtx;
+
+    const t0 = ctx.currentTime;
+    const dur = 0.22;
+
+    // Oscillator: starts high, drops fast (sonar-ish)
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.00001, t0);
+
+    // Optional filter for “underwater console” vibe
+    const filt = ctx.createBiquadFilter();
+    filt.type = "bandpass";
+    filt.frequency.setValueAtTime(1100, t0);
+    filt.Q.setValueAtTime(8, t0);
+
+    // Pitch sweep
+    const startF = 1300;
+    const endF = 240;
+    osc.frequency.setValueAtTime(startF, t0);
+    osc.frequency.exponentialRampToValueAtTime(endF, t0 + dur);
+
+    // Amplitude envelope
+    const peak = 0.05 * Math.max(0.25, Math.min(1.5, intensity)); // keep sane
+    gain.gain.exponentialRampToValueAtTime(peak, t0 + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.00001, t0 + dur);
+
+    osc.connect(filt);
+    filt.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
+  } catch {
+    // silently ignore (some browsers/device states)
+  }
+}
+
   function feedback(strong = false) {
     const ok = strong ? haptic(18) : haptic(10);
     if (!ok) clickSound();
@@ -350,6 +393,8 @@ ai = createAI({
       markInput();
       feedback(false);
             scope.ping?.(1, 2.2, 1.6);
+            if (audioCtx?.state === "suspended") audioCtx.resume?.();
+            sonarPingSound(1 + Math.min(1, (state.corruption || 0) * 1.5));
 
       let g = clickGain(state, derived);
 if (phaseMod?.modifyClickGain) {
