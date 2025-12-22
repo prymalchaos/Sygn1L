@@ -1,8 +1,15 @@
 // /js/ui.js
 // DOM + rendering only. No Supabase. No game math (that stays in economy.js).
 
+
+
 import { esc, fmt, fmtFull } from "./state.js";
 import { PHASES, corruptionLabel, prestigeGain, canRite } from "./economy.js";
+
+let audioCtx = null;
+let clickBuffer = null;
+let audioUnlocked = false;
+
 
 export function createUI() {
   const $ = (id) => document.getElementById(id);
