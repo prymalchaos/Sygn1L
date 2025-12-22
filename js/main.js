@@ -186,64 +186,53 @@ import { PHASE_MODULES } from "./phases/phases.js";
   }
 
   // ----------------------------
-  // Phase engine
-  // ----------------------------
-  let _currentPhase = state.phase;
+// Phase engine
+// ----------------------------
+let _currentPhase = state.phase;
 
-  function getCtx() {
-    return { ui, saves, ai, setPhase, showFatal };
-  }
-
-  function setPhase(n, { silent = false } = {}) {
-  const next = clamp(Number(n) || 1, 1, PHASES.length);
-
-  state.phase = next;
-
-  // 🔑 CSS hook for per-phase visuals
-  document.documentElement.dataset.phase = String(next);
-
-  // Paint phase text/colors/etc
-  ui.applyPhaseUI(next);
-  // Paint phase text/colors/etc
-ui.applyPhaseUI(next);
-
-// ✅ PHASE MODULE HOOK
-phaseMod = PHASE_MODULES?.[next] || null;
-if (phaseMod?.onEnter) {
-  try {
-    phaseMod.onEnter({ state, ui, saves });
-  } catch (e) {
-    ui.pushLog("log", "SYS", "PHASE MODULE ERROR: " + esc(e?.message || e));
-  }
+function getCtx() {
+  return { ui, saves, ai, setPhase, showFatal };
 }
 
-  // ✅ PHASE MODULE HOOK
+function setPhase(n, { silent = false } = {}) {
+  const next = clamp(Number(n) || 1, 1, PHASES.length);
+
+  // If we’re already in this phase, still ensure UI is applied
+  state.phase = next;
+
+  // CSS hook for per-phase visuals
+  document.documentElement.dataset.phase = String(next);
+
+  // Base phase UI (title/status/subtitle/objective/etc)
+  ui.applyPhaseUI(next);
+
+  // Phase module plugin (root/js/phases/phaseX.js via PHASE_MODULES map)
   phaseMod = PHASE_MODULES?.[next] || null;
   if (phaseMod?.onEnter) {
     try {
-      phaseMod.onEnter({ state, ui, saves });
+      phaseMod.onEnter({ state, derived, ui, saves, ai, setPhase });
     } catch (e) {
       ui.pushLog("log", "SYS", "PHASE MODULE ERROR: " + esc(e?.message || e));
     }
   }
 
+  // Optional “config layer” (if you’re still using getPhaseConfig)
+  try {
+    const cfg = getPhaseConfig(next);
+    cfg?.onEnter?.(state, derived, getCtx());
+  } catch {}
+
   if (!silent) {
     ui.pushLog("log", "SYS", `PHASE ${next} ENGAGED.`);
   }
+
+  _currentPhase = next;
 }
-    try {
-      const nextCfg = getPhaseConfig(next);
-      nextCfg?.onEnter?.(state, derived, getCtx());
-    } catch {}
 
-    _currentPhase = next;
-  }
-
-  function syncPhaseFromTotal() {
-    // still uses economy thresholds, but phase modules can later override this if needed
-    const ph = phaseForTotal(state.total);
-    if (state.phase !== ph.n) setPhase(ph.n);
-  }
+function syncPhaseFromTotal() {
+  const ph = phaseForTotal(state.total);
+  if (state.phase !== ph.n) setPhase(ph.n);
+}
 
   // ----------------------------
   // Render
