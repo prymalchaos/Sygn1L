@@ -349,6 +349,7 @@ ai = createAI({
       ai.markActive();
       markInput();
       feedback(false);
+            scope.ping?.(1, 2.2, 1.6);
 
       let g = clickGain(state, derived);
 if (phaseMod?.modifyClickGain) {
