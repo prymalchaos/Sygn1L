@@ -1,7 +1,7 @@
 // /js/ui.js
 // DOM + rendering only. No Supabase. No game math (that stays in economy.js).
 
-import { esc, fmt } from "./state.js";
+import { esc, fmt, fmtFull } from "./state.js";
 import { PHASES, corruptionLabel, prestigeGain, canRite } from "./economy.js";
 
 export function createUI() {
@@ -34,7 +34,6 @@ export function createUI() {
       <div class="msg">${esc(msg)}</div>
       <div class="hint">TAP TO CLOSE</div>
     `;
-    // allow tap to close even though host is overlay
     box.style.pointerEvents = "auto";
     box.addEventListener("click", () => box.remove());
     host.prepend(box);
@@ -63,7 +62,6 @@ export function createUI() {
     });
   }
 
-  // --- Confirmation dialog (uses native confirm for reliability on mobile)
   function confirmAction(text) {
     return window.confirm(text);
   }
@@ -72,9 +70,7 @@ export function createUI() {
   function applyPhaseUI(phaseN) {
     const ph = PHASES[Math.max(0, Math.min(PHASES.length - 1, phaseN - 1))];
 
-    // CSS hook: data-phase + --accent token
     document.documentElement.dataset.phase = String(ph.n);
-    // If your CSS uses --accent, we map it to --p1..--p6 variables
     document.documentElement.style.setProperty("--accent", `var(--${ph.tint})`);
 
     if ($("phase")) $("phase").textContent = `PHASE ${ph.n}`;
@@ -84,22 +80,39 @@ export function createUI() {
     if ($("phaseTint")) $("phaseTint").textContent = "P" + ph.n;
   }
 
+  // ✅ NEW: show full numbers until they overflow the panel, then abbreviate
+  function setSmartNumber(el, n) {
+    if (!el) return;
+
+    // 1) try full
+    el.textContent = fmtFull(n);
+
+    // 2) if it visually overflows, fall back to abbreviated
+    // (reading scrollWidth forces layout, so this works immediately)
+    if (el.scrollWidth > el.clientWidth) {
+      el.textContent = fmt(n);
+    }
+  }
+
   // --- HUD render
   function renderHUD(state, derived, syncText) {
-    if ($("signal")) $("signal").textContent = fmt(state.signal);
-    if ($("sps")) $("sps").textContent = fmt(derived.sps);
+    setSmartNumber($("signal"), state.signal);
+    setSmartNumber($("sps"), derived.sps);
 
     if ($("buildChip")) $("buildChip").textContent = "BUILD: " + state.build;
     if ($("relicChip")) $("relicChip").textContent = "RELICS: " + state.relics;
 
     if ($("userChip")) $("userChip").textContent = "USER: " + (state.profile?.name || "GUEST");
 
-    // corruption bar
     if ($("corrFill")) $("corrFill").style.width = ((state.corruption || 0) * 100).toFixed(1) + "%";
-    if ($("corrText")) $("corrText").textContent =
-      ((state.corruption || 0) * 100).toFixed(1) + "% (" + corruptionLabel(state.corruption || 0) + ")";
+    if ($("corrText")) {
+      $("corrText").textContent =
+        ((state.corruption || 0) * 100).toFixed(1) +
+        "% (" +
+        corruptionLabel(state.corruption || 0) +
+        ")";
+    }
 
-    // rite button shows gain
     const rite = $("riteBtn");
     if (rite) {
       const can = canRite(state);
@@ -107,28 +120,18 @@ export function createUI() {
       rite.textContent = can ? `RITE +${prestigeGain(state)}` : "RITE";
     }
 
-    // sync chip text supplied by main
     if ($("syncChip") && syncText) $("syncChip").textContent = syncText;
 
-    // AI chip display handled in ai.js, but we can show a default
     if ($("aiChip")) $("aiChip").textContent = $("aiChip").textContent || "AI: …";
   }
 
   // --- Upgrades render
-  /**
-   * @param {Array} upgrades - UPGRADES from economy.js
-   * @param {Function} canBuy - (u) => boolean
-   * @param {Function} getCost - (u) => number
-   * @param {Function} getLevel - (id) => number
-   * @param {Function} onBuy - async (u) => void
-   */
   function renderUpgrades({ state, upgrades, canBuy, getCost, getLevel, onBuy }) {
     const root = $("upgrades");
     if (!root) return;
     root.innerHTML = "";
 
     for (const u of upgrades) {
-      // show relic amp only when relevant
       if (u.id === "relicAmp" && (state.relics <= 0 && getLevel(u.id) === 0)) continue;
 
       const unlocked = (state.total || 0) >= u.unlock;
@@ -151,7 +154,6 @@ export function createUI() {
       btn.textContent = affordable ? "ACQUIRE" : (unlocked ? "LOCKED" : "CLASSIF");
       btn.disabled = !affordable;
 
-      // glow when available
       if (affordable) row.classList.add("afford");
 
       btn.onclick = async () => {
@@ -165,7 +167,6 @@ export function createUI() {
     }
   }
 
-  // --- Help/Manual
   function openManual() {
     openModal(
       "HOME BASE COMMUNIQUE",
@@ -186,7 +187,6 @@ export function createUI() {
     );
   }
 
-  // --- Username editor UI
   function openUsernameEditor(currentName, onSave) {
     openModal(
       "IDENTITY OVERRIDE",
@@ -206,7 +206,6 @@ export function createUI() {
     };
   }
 
-  // public
   return {
     $,
     pushLog,
