@@ -26,7 +26,7 @@ import { getPhaseConfig, filterUpgradesForPhase } from "./phases.js";
 import { PHASE_MODULES } from "./phases/phases.js";
 
 
-(() => {
+;(() => {
   // ----------------------------
   // Mobile-friendly error catcher (shows crashes on-screen)
   // ----------------------------
@@ -273,7 +273,8 @@ function syncPhaseFromTotal() {
   // ----------------------------
   // AI module
   // ----------------------------
-  const ai = createAI({
+  let ai = null;
+ai = createAI({
     saves,
     ui,
     edgeFunction: EDGE_FUNCTION,
