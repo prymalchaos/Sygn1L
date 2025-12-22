@@ -1,34 +1,36 @@
-// ./js/main.js
+// /js/main.js
+// Streamlined entry point.
+// Goal: keep "core" stable, push gameplay into /js/phases/phaseX.js plugins.
+
 import { createSaves } from "./saves.js";
-import { clamp, fmt, esc } from "./state.js";
+import { clamp, fmt } from "./state.js";
 import {
   PHASES,
   UPGRADES,
+  recompute,
   lvl,
   cost,
-  recompute,
-  phaseForState,
-  corruptionTick,
   clickGain,
   autoGainPerSec,
-  canRite,
-  prestigeGain,
-  doRite,
+  corruptionTick,
   canBuy,
-  buyUpgrade
+  buyUpgrade,
+  canRite,
+  doRite,
+  prestigeGain
 } from "./economy.js";
+
 import { createUI } from "./ui.js";
 import { createScope } from "./scope.js";
 import { createAI } from "./ai.js";
 
-// ✅ NEW: Phase module layer
-import { getPhaseConfig, filterUpgradesForPhase } from "./phases.js";
-import { PHASE_MODULES } from "./phases/phases.js";
+import { createStyleManager } from "./core/styleManager.js";
+import { createPhaseRuntime } from "./core/phaseRuntime.js";
+import { createDevTools } from "./core/dev.js";
 
-
-;(() => {
+(() => {
   // ----------------------------
-  // Mobile-friendly error catcher (shows crashes on-screen)
+  // Safety: show runtime errors as popups
   // ----------------------------
   function showFatal(msg) {
     console.error(msg);
@@ -59,119 +61,131 @@ import { PHASE_MODULES } from "./phases/phases.js";
   // ----------------------------
   // Tunables
   // ----------------------------
-  const OFFLINE_CAP_SEC = 6 * 60 * 60; // 6 hours max offline gain
-  const ACTIVE_WINDOW_MS = 20_000;
+  const OFFLINE_CAP_SEC = 6 * 60 * 60; // 6h
   const EDGE_FUNCTION = "sygn1l-comms";
-
-  // ----------------------------
-  // DEV MODE (Master Admin)
-  // ----------------------------
-  const DEV_MASTER_UID = "7ac61fd5-1d8a-4c27-95b9-a491f2121380";
-  const DEV_MASTER_EMAIL = "cursingstone@gmail.com";
 
   // ----------------------------
   // Core modules
   // ----------------------------
   const saves = createSaves();
   const ui = createUI();
+  const styles = createStyleManager();
+  const dev = createDevTools({ ui, saves });
 
   // Scope
   const scopeCanvas = document.getElementById("scope");
   const scopeLabel = document.getElementById("scopeLabel");
   const scope = createScope(scopeCanvas, scopeLabel);
 
+  // AI
+  const ai = createAI({
+    saves,
+    ui,
+    edgeFunction: EDGE_FUNCTION,
+    activeWindowMs: 20_000,
+    aiCooldownMs: 180_000,
+    ambientCooldownMs: 180_000
+  });
+
   // ----------------------------
   // State (single source of truth)
   // ----------------------------
   const state = {
     profile: { name: "GUEST" },
-
     build: 1,
     relics: 0,
-
     signal: 0,
     total: 0,
-
     corruption: 0,
-    phase: 1,
-
+    phase: 0,
     up: { dish: 0, scan: 0, probes: 0, auto: 0, stabil: 0, relicAmp: 0 },
-
-    // meta for ai.js + saves + offline
+    phaseData: {},
     meta: {
-  updatedAtMs: 0,
-  lastAiAtMs: 0,
-  lastAmbientAtMs: 0,
-  lastInputAtMs: 0,     // ✅ NEW
-  activePlaySec: 0,     // ✅ NEW
-  aiEnabled: true
-}
+      updatedAtMs: 0,
+      lastAiAtMs: 0,
+      lastAmbientAtMs: 0,
+      lastInputAtMs: 0,
+      activePlaySec: 0,
+      aiEnabled: true
+    }
   };
 
   let derived = recompute(state);
-  let phaseMod = null;
-
   const nowMs = () => Date.now();
-  const touch = () => {
-    state.meta.updatedAtMs = nowMs();
+  const touch = () => (state.meta.updatedAtMs = nowMs());
+  const markInput = () => {
+    state.meta.lastInputAtMs = nowMs();
+    touch();
   };
-const markInput = () => {
-  state.meta.lastInputAtMs = nowMs();
-  touch();
-};
+
+  function setAiEnabled(on) {
+    state.meta.aiEnabled = !!on;
+    ai.setEnabled(!!on);
+    const btn = ui.$("aiBtn");
+    if (btn) btn.textContent = on ? "AI COMMS" : "AI OFF";
+    ui.pushLog("log", "SYS", on ? "AI ENABLED." : "AI DISABLED.");
+  }
+
   // ----------------------------
-  // Load/save helpers
+  // Phase runtime
+  // ----------------------------
+  const runtime = createPhaseRuntime({ ui, styles, showFatal });
+  const api = {
+    ui,
+    styles,
+    saves,
+    ai,
+    state,
+    get derived() {
+      return derived;
+    },
+    setPhase,
+    touch,
+    recomputeAndRender,
+    setAiEnabled
+  };
+
+  async function setPhase(n, opts) {
+    state.phase = Number(n) || 0;
+    document.documentElement.dataset.phase = String(state.phase);
+    await runtime.setPhase(api, state.phase, opts);
+    recomputeAndRender();
+  }
+
+  // ----------------------------
+  // Load / Save
   // ----------------------------
   function loadIntoState(blob) {
     if (!blob || typeof blob !== "object") return;
 
-    // support old saves that had updatedAtMs at top-level
-    const legacyUpdated = Number(blob.updatedAtMs || 0);
-
+    // Keep it defensive: only copy known keys.
     if (blob.profile) state.profile = { ...state.profile, ...blob.profile };
     if (blob.up) state.up = { ...state.up, ...blob.up };
+    if (blob.phaseData && typeof blob.phaseData === "object") state.phaseData = { ...blob.phaseData };
 
     for (const k of ["build", "relics", "signal", "total", "corruption", "phase"]) {
       if (k in blob) state[k] = blob[k];
     }
 
-    if (blob.meta && typeof blob.meta === "object") {
-      state.meta = { ...state.meta, ...blob.meta };
-    } else if (legacyUpdated) {
-      state.meta.updatedAtMs = legacyUpdated;
-    }
+    if (blob.meta && typeof blob.meta === "object") state.meta = { ...state.meta, ...blob.meta };
 
     state.profile.name = (state.profile.name || "GUEST").toUpperCase().slice(0, 18);
-
-    // ✅ FIX: don’t hard clamp to 6 (future-proof for phase 7)
-    state.phase = clamp(Number(state.phase) || 1, 1, PHASES.length);
-
     state.corruption = clamp(Number(state.corruption) || 0, 0, 1);
+
+    // Only allow phases we ship (0..1 for now).
+    state.phase = clamp(Number(state.phase) || 0, 0, 1);
   }
 
   async function saveNow(forceCloud = false) {
     touch();
     saves.saveLocal(state);
-
-    if (saves.isSignedIn()) {
-      try {
-        await saves.saveCloud(state, forceCloud);
-        ui.$("syncChip").textContent = "SYNC: CLOUD";
-      } catch {
-        ui.$("syncChip").textContent = "SYNC: CLOUD (ERR)";
-      }
-    } else {
-      ui.$("syncChip").textContent = "SYNC: GUEST";
-    }
+    if (!saves.isSignedIn()) return;
+    await saves.saveCloud(state, forceCloud);
   }
 
-  // ----------------------------
-  // Offline earnings (one-time on boot)
-  // ----------------------------
   function applyOfflineEarnings() {
     const last = Number(state.meta.updatedAtMs || 0);
     if (!last) return;
-
     let dt = (nowMs() - last) / 1000;
     if (!isFinite(dt) || dt < 3) return;
     dt = Math.min(dt, OFFLINE_CAP_SEC);
@@ -182,122 +196,74 @@ const markInput = () => {
 
     state.signal += gain;
     state.total += gain;
-
-    const mins = Math.max(1, Math.floor(dt / 60));
-    ui.popup("CONTROL", `While you were gone: +${fmt(gain)} Signal recovered (${mins}m).`);
-    ui.pushLog("log", "SYS", `OFFLINE RECOVERY: +${fmt(gain)} SIGNAL (${mins}m).`);
-
+    ui.popup("CONTROL", `While you were gone: +${fmt(gain)} Signal recovered.`);
+    ui.pushLog("log", "SYS", `OFFLINE RECOVERY: +${fmt(gain)} SIGNAL.`);
     touch();
   }
 
   // ----------------------------
-// Phase engine
-// ----------------------------
-let _currentPhase = state.phase;
-
-function getCtx() {
-  return { ui, saves, ai, setPhase, showFatal };
-}
-
-function setPhase(n, { silent = false } = {}) {
-  const next = clamp(Number(n) || 1, 1, PHASES.length);
-
-  // If we’re already in this phase, still ensure UI is applied
-  state.phase = next;
-
-  // CSS hook for per-phase visuals
-  document.documentElement.dataset.phase = String(next);
-
-  // Base phase UI (title/status/subtitle/objective/etc)
-  ui.applyPhaseUI(next);
-  ui.narrative(`PHASE ${next} LINK STABLE. ${PHASES[next - 1]?.sub || ""}`.trim(), 3200);
-
-  // Phase module plugin (root/js/phases/phaseX.js via PHASE_MODULES map)
-  phaseMod = PHASE_MODULES?.[next] || null;
-  if (phaseMod?.onEnter) {
-    try {
-      phaseMod.onEnter({ state, derived, ui, saves, ai, setPhase });
-    } catch (e) {
-      ui.pushLog("log", "SYS", "PHASE MODULE ERROR: " + esc(e?.message || e));
-    }
-  }
-
-  // Optional “config layer” (if you’re still using getPhaseConfig)
-  try {
-    const cfg = getPhaseConfig(next);
-    cfg?.onEnter?.(state, derived, getCtx());
-  } catch {}
-
-  if (!silent) {
-    ui.pushLog("log", "SYS", `PHASE ${next} ENGAGED.`);
-  }
-
-  _currentPhase = next;
-}
-
-function syncPhaseFromTotal() {
-  const ph = phaseForState(state);
-  if (state.phase !== ph.n) setPhase(ph.n);
-}
-
-  // ----------------------------
   // Render
   // ----------------------------
-  function renderAll() {
-    syncPhaseFromTotal();
+  function currentPhaseModule() {
+    return runtime.getCurrent();
+  }
+
+  function upgradesForPhase() {
+    const mod = currentPhaseModule();
+    if (mod?.filterUpgrades) {
+      try {
+        return mod.filterUpgrades(UPGRADES, api) || [];
+      } catch (e) {
+        ui.pushLog("log", "SYS", `PHASE FILTER ERROR: ${e?.message || e}`);
+      }
+    }
+    return UPGRADES;
+  }
+
+  let dirty = true;
+  function markDirty() {
+    dirty = true;
+  }
+
+  function recomputeAndRender() {
+    derived = recompute(state);
+
+    // Control layout tweaks (space-saving)
+    // Hide PING once you're out of the early-game tutorial band.
+    ui.setVisible("ping", state.signal >= 0 && state.signal <= 200);
 
     const syncText = saves.isSignedIn() ? "SYNC: CLOUD" : "SYNC: GUEST";
     ui.renderHUD(state, derived, syncText);
 
-    // ✅ NEW: phase-gated upgrades
-    const phaseCfg = getPhaseConfig(state.phase);
-    const upgradesForPhase = filterUpgradesForPhase(UPGRADES, phaseCfg, state);
-
+    const upgrades = upgradesForPhase();
     ui.renderUpgrades({
       state,
-      upgrades: upgradesForPhase,
+      upgrades,
       canBuy: (u) => canBuy(state, u),
       getCost: (u) => cost(state, u),
       getLevel: (id) => lvl(state, id),
       onBuy: async (u) => {
         if (!canBuy(state, u)) return;
-
         buyUpgrade(state, u);
-        touch();
-        derived = recompute(state);
-        renderAll();
-
-        try { await saves.writeCloudState(state, false); } catch {}
-
-        if (Math.random() < 0.18) {
-          try { await ai.invokeEdge(state, "buy_" + u.id, "OPS"); } catch {}
-        }
+        markInput();
+        recomputeAndRender();
+        try {
+          await saves.writeCloudState(state, false);
+        } catch {}
       }
     });
+
+    // Keep onboarding card visible only in phase 0
+    ui.setVisible("onboardCard", state.phase === 0);
+
+    // Dev panel
+    dev.tick(api);
+
+    dirty = false;
   }
 
   // ----------------------------
-  // AI module
-  // ----------------------------
-  let ai = null;
-ai = createAI({
-    saves,
-    ui,
-    edgeFunction: EDGE_FUNCTION,
-    activeWindowMs: ACTIVE_WINDOW_MS,
-    aiCooldownMs: 180_000,
-    ambientCooldownMs: 180_000
-  });
-
-  function setAiEnabled(on) {
-    state.meta.aiEnabled = !!on;
-    ai.setEnabled(!!on);
-    const btn = ui.$("aiBtn");
-    if (btn) btn.textContent = on ? "AI COMMS" : "AI OFF";
-  }
-
-  // ----------------------------
-  // Controls wiring
+  // Controls
   // ----------------------------
   const pingBtn = ui.$("ping");
   const saveBtn = ui.$("saveBtn");
@@ -305,172 +271,42 @@ ai = createAI({
   const riteBtn = ui.$("riteBtn");
   const helpBtn = ui.$("helpBtn");
   const userChip = ui.$("userChip");
-  const fbBtn = ui.$("fbBtn");
-
-  let feedbackOn = true;
-  let audioCtx = null;
-async function ensureAudio() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === "suspended") {
-    try { await audioCtx.resume(); } catch {}
-  }
-  sonarPingSound(1);
-  return audioCtx;
-}
-
-
-  function haptic(ms = 10) {
-    if (!feedbackOn) return false;
-    if (navigator.vibrate) {
-      navigator.vibrate([ms]);
-      return true;
-    }
-    return false;
-  }
-
-  function clickSound() {
-    if (!feedbackOn) return;
-    try {
-      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      const ctx = audioCtx;
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = "square";
-      o.frequency.value = 820;
-      g.gain.value = 0.00001;
-      o.connect(g);
-      g.connect(ctx.destination);
-      o.start();
-      const t = ctx.currentTime;
-      g.gain.setValueAtTime(0.00001, t);
-      g.gain.exponentialRampToValueAtTime(0.022, t + 0.006);
-      g.gain.exponentialRampToValueAtTime(0.00001, t + 0.05);
-      o.stop(t + 0.055);
-    } catch {}
-  }
-
-// Submarine-style sonar ping (Web Audio)
-// Call: sonarPingSound(1)   // 1 = normal, 0.5 subtle, 1.5 stronger
-function sonarPingSound(intensity = 1) {
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const ctx = audioCtx;
-    if (ctx.state === "suspended") ctx.resume?.();
-
-    const now = ctx.currentTime;
-    const dur = 0.9; // total "audible" feel
-
-    // master
-    const out = ctx.createGain();
-    out.gain.value = 0.00001;
-    out.connect(ctx.destination);
-
-    // --- main ping oscillator (triangle feels "metallic" without being harsh)
-    const osc = ctx.createOscillator();
-    osc.type = "triangle";
-
-    // Sub-like ping: start higher and sweep down
-    const f0 = 1400;               // start Hz
-    const f1 = 520;                // end Hz
-    osc.frequency.setValueAtTime(f0, now);
-    osc.frequency.exponentialRampToValueAtTime(f1, now + 0.18);
-
-    // --- filter: bandpass to make it "sonar" not "synth"
-    const bp = ctx.createBiquadFilter();
-    bp.type = "bandpass";
-    bp.frequency.setValueAtTime(950, now);
-    bp.Q.setValueAtTime(8.0, now);
-
-    // --- amplitude envelope for the ping
-    const pingGain = ctx.createGain();
-    pingGain.gain.setValueAtTime(0.00001, now);
-    pingGain.gain.exponentialRampToValueAtTime(0.22 * intensity, now + 0.01);
-    pingGain.gain.exponentialRampToValueAtTime(0.00001, now + 0.22);
-
-    // --- tail resonator (very quiet sine that "rings" after the ping)
-    const tailOsc = ctx.createOscillator();
-    tailOsc.type = "sine";
-    tailOsc.frequency.setValueAtTime(260, now);
-
-    const tailGain = ctx.createGain();
-    tailGain.gain.setValueAtTime(0.00001, now + 0.08);
-    tailGain.gain.exponentialRampToValueAtTime(0.06 * intensity, now + 0.12);
-    tailGain.gain.exponentialRampToValueAtTime(0.00001, now + 0.95);
-
-    // --- subtle slapback / hull reflection
-    const delay = ctx.createDelay(0.25);
-    delay.delayTime.setValueAtTime(0.12, now);
-
-    const fb = ctx.createGain();
-    fb.gain.setValueAtTime(0.35, now); // feedback amount (keep < 0.6)
-
-    const wet = ctx.createGain();
-    wet.gain.setValueAtTime(0.18 * intensity, now);
-
-    // feedback loop: delay -> fb -> delay
-    delay.connect(fb);
-    fb.connect(delay);
-
-    // routing
-    osc.connect(bp);
-    bp.connect(pingGain);
-
-    // dry
-    pingGain.connect(out);
-
-    // wet (echo)
-    pingGain.connect(delay);
-    delay.connect(wet);
-    wet.connect(out);
-
-    // tail
-    tailOsc.connect(tailGain);
-    tailGain.connect(out);
-
-    // start/stop
-    osc.start(now);
-    tailOsc.start(now);
-
-    osc.stop(now + dur);
-    tailOsc.stop(now + dur + 0.2);
-  } catch {
-    // fail silently: no audio device / autoplay restrictions etc
-  }
-}
-
-  async function feedback(strong = false) {
-  haptic(strong ? 18 : 10);
-}
+  const aiBtn = ui.$("aiBtn");
 
   if (pingBtn) {
     pingBtn.onclick = async () => {
       ai.markActive();
       markInput();
 
-// PING: no generic chirp, we want sonar
-try { haptic(10); } catch {}
-await ensureAudio();
-
-scope.ping?.(1, 2.2, 1.6);
-ui.narrative("PING EMITTED. ECHO RECEIVED. ARRAY RESPONSE: NON-RANDOM.", 1800);
-
-sonarPingSound(1 + Math.min(1, (state.corruption || 0) * 1.5));
+      scope.ping?.(1, 2.2, 1.6);
 
       let g = clickGain(state, derived);
-if (phaseMod?.modifyClickGain) {
-  try { g = phaseMod.modifyClickGain(g, { state, derived }); } catch {}
-}
+      const mod = currentPhaseModule();
+      if (mod?.modifyClickGain) {
+        try {
+          g = mod.modifyClickGain(g, api);
+        } catch {}
+      }
+
       state.signal += g;
       state.total += g;
 
       state.corruption = clamp((state.corruption || 0) + 0.00055, 0, 1);
 
-      touch();
-      derived = recompute(state);
-      renderAll();
+      mod?.onPing?.(api);
 
-      try { await saves.writeCloudState(state, false); } catch {}
-      if (Math.random() < 0.08) ai.invokeEdge(state, "ping", "OPS");
+      recomputeAndRender();
+
+      try {
+        await saves.writeCloudState(state, false);
+      } catch {}
+
+      // Occasional AI flavour
+      if (Math.random() < 0.08) {
+        try {
+          await ai.invokeEdge(state, "ping", "OPS");
+        } catch {}
+      }
     };
   }
 
@@ -478,7 +314,6 @@ if (phaseMod?.modifyClickGain) {
     saveBtn.onclick = async () => {
       ai.markActive();
       markInput();
-      feedback(false);
       try {
         await saveNow(true);
         ui.pushLog("log", "SYS", saves.isSignedIn() ? "SAVED (CLOUD)." : "SAVED (GUEST).");
@@ -490,11 +325,7 @@ if (phaseMod?.modifyClickGain) {
 
   if (wipeBtn) {
     wipeBtn.onclick = async () => {
-      ai.markActive();
-      markInput();
-      feedback(true);
-
-      const ok = ui.confirmAction(
+      const ok = window.confirm(
         saves.isSignedIn()
           ? "WIPE deletes your CLOUD save + guest local.\n\nProceed?"
           : "WIPE deletes your guest local save.\n\nProceed?"
@@ -503,7 +334,9 @@ if (phaseMod?.modifyClickGain) {
 
       saves.wipeLocal();
       if (saves.isSignedIn()) {
-        try { await saves.wipeCloud(); } catch {}
+        try {
+          await saves.wipeCloud();
+        } catch {}
       }
       location.reload();
     };
@@ -512,698 +345,130 @@ if (phaseMod?.modifyClickGain) {
   if (riteBtn) {
     riteBtn.onclick = async () => {
       if (!canRite(state)) return;
-
       ai.markActive();
       markInput();
-      feedback(true);
-
       const g = prestigeGain(state);
-      const ok = ui.confirmAction(`RITE resets this build.\nYou gain +${g} relics.\n\nProceed?`);
-      if (!ok) return;
-
       doRite(state);
-      touch();
-      derived = recompute(state);
-      setPhase(state.phase, { silent: true });
-
-      ui.pushLog("log", "SYS", `RITE COMPLETE. +${g} RELICS.`);
-      ui.pushLog("comms", "OPS", "We keep the residue. We pretend it’s control.");
-
-      renderAll();
-      try { await saves.writeCloudState(state, true); } catch {}
-      ai.invokeEdge(state, "rite", "MOTHERLINE");
-    };
-  }
-
-  if (fbBtn) {
-    fbBtn.onclick = () => {
-      ai.markActive();
-      markInput();
-      feedback(false);
-      feedbackOn = !feedbackOn;
-      fbBtn.textContent = feedbackOn ? "FEEDBACK" : "FB OFF";
+      ui.popup("CONTROL", `RITE COMPLETE. +${g} RELICS RETAINED.`);
+      ui.pushLog("log", "SYS", `RITE: +${g} RELICS.`);
+      recomputeAndRender();
+      try {
+        await saves.writeCloudState(state, true);
+      } catch {}
     };
   }
 
   if (helpBtn) {
     helpBtn.onclick = () => {
-      ai.markActive();
-      markInput();
-      ui.openManual();
+      ui.popup("MANUAL", "Phase plugins live in /js/phases/. Add phase2.js, phase3.js, etc.");
     };
+  }
+
+  if (aiBtn) {
+    aiBtn.onclick = () => setAiEnabled(!state.meta.aiEnabled);
   }
 
   if (userChip) {
     userChip.onclick = () => {
-      ai.markActive();
-      markInput();
-      ui.openUsernameEditor(state.profile.name || "GUEST", async (name) => {
-        const next = (name || "").trim().slice(0, 18);
-        state.profile.name = (next ? next : "GUEST").toUpperCase();
-
-        ui.popup("OPS", `Copy that, ${state.profile.name}.`);
-        ui.pushLog("comms", "OPS", `Alright ${esc(state.profile.name)}. Keep it steady.`);
-
-        touch();
-        derived = recompute(state);
-        renderAll();
-
-        try { await saves.writeCloudState(state, true); } catch {}
-      });
-    };
-  }
-
-  // ----------------------------
-  // Onboarding (unchanged)
-  // ----------------------------
-  const ONBOARD_KEY = "sygn1l_onboarded_v1";
-
-  function shouldShowOnboard() {
-    if (localStorage.getItem(ONBOARD_KEY)) return false;
-    if (saves.isSignedIn()) return false;
-
-    const local = saves.loadLocal?.();
-    const hasMeaningful = local && (Number(local.total) > 50 || Number(local.signal) > 50);
-    return !hasMeaningful;
-  }
-
-  function forceUsernamePrompt(from = "CONTROL") {
-    ui.popup(from, "Callsign required. Tap USER to register.");
-    try { ui.$("userChip")?.click?.(); } catch {}
-  }
-
-  function showOnboard() {
-    const card = ui.$("onboardCard");
-    if (!card) return;
-
-    const steps = [
-      `CONTROL: Ice Station Relay is live. Welcome, Operative <b>${esc(state.profile.name || "GUEST")}</b>.<br><br>Before Array contact, we need your credentials.`,
-      `Enter your <b>EMAIL</b> in the ACCOUNT panel.<br>It binds your work to the cloud archive.`,
-      `Set a <b>PASSWORD</b>.<br>Short is fine. Forgotten is fatal.`,
-      `Tap <b>USER: …</b> and set your <b>USERNAME</b>.<br>Control prefers callsigns. The void prefers patterns.`
-    ];
-
-    let i = 0;
-    const stepEl = ui.$("onboardStep");
-    const textEl = ui.$("onboardText");
-    const nextBtn = ui.$("onboardNext");
-    const skipBtn = ui.$("onboardSkip");
-
-    const setStep = () => {
-      if (stepEl) stepEl.textContent = `STEP ${i + 1}/${steps.length}`;
-      if (textEl) textEl.innerHTML = steps[i];
-
-      if (i === 1) ui.$("email")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-      if (i === 2) ui.$("pass")?.scrollIntoView?.({ behavior: "smooth", block: "center" });
-    };
-
-    card.style.display = "";
-    setStep();
-
-    if (nextBtn) {
-      nextBtn.onclick = () => {
-        feedback(false);
-
-        if (i === steps.length - 1) {
-          if ((state.profile.name || "GUEST").toUpperCase() === "GUEST") {
-            forceUsernamePrompt("CONTROL");
-            return;
-          }
-          card.style.display = "none";
-          localStorage.setItem(ONBOARD_KEY, "1");
-          ui.popup("CONTROL", "Clearance granted. Proceed carefully.");
-          return;
-        }
-
-        i++;
-        setStep();
-      };
-    }
-
-    if (skipBtn) {
-      skipBtn.onclick = () => {
-        feedback(false);
-        card.style.display = "none";
-        localStorage.setItem(ONBOARD_KEY, "1");
-      };
-    }
-  }
-
-  function updateOnboardVisibility() {
-    const card = ui.$("onboardCard");
-    if (!card) return;
-
-    if (saves.isSignedIn()) {
-      localStorage.setItem(ONBOARD_KEY, "1");
-      card.style.display = "none";
-      return;
-    }
-
-    if (shouldShowOnboard()) showOnboard();
-    else card.style.display = "none";
-  }
-
-  // ----------------------------
-  // Auth UI (unchanged)
-  // ----------------------------
-  const emailEl = ui.$("email");
-  const passEl = ui.$("pass");
-
-  const signUpBtn = ui.$("signUpBtn");
-  const signInBtn = ui.$("signInBtn");
-  const signOutBtn = ui.$("signOutBtn");
-  const whoBtn = ui.$("whoBtn");
-
-  function setAuthUI({ signedIn, userId }) {
-    const authStatus = ui.$("authStatus");
-    if (authStatus) authStatus.textContent = signedIn ? "STATUS: SIGNED IN" : "STATUS: NOT SIGNED IN";
-
-    if (signOutBtn) signOutBtn.disabled = !signedIn;
-
-    const syncChip = ui.$("syncChip");
-    if (syncChip) syncChip.textContent = signedIn ? "SYNC: CLOUD" : "SYNC: GUEST";
-
-    if (signedIn && userId) ui.pushLog("log", "SYS", `SIGNED IN (${userId.slice(0, 4)}…${userId.slice(-4)}).`);
-  }
-
-  async function onAuthChange(info) {
-    setAuthUI(info);
-
-    if (info.signedIn) {
-      try {
-        const res = await saves.syncOnSignIn(state);
-        if (res.cloudLoaded) {
-          loadIntoState(res.cloudLoaded);
-          ui.pushLog("log", "SYS", "CLOUD SAVE LOADED (REPLACING GUEST RUN).");
-          ui.popup("SYS", "Cloud state loaded.");
-        } else {
-          ui.pushLog("log", "SYS", "NO CLOUD SAVE FOUND. CREATED ONE FROM CURRENT RUN.");
-        }
-
-        await saveNow(true);
-        setAiEnabled(state.meta.aiEnabled !== false);
-
-        derived = recompute(state);
-
-        // ✅ use setPhase so phase module hooks run after cloud load
-        setPhase(state.phase, { silent: true });
-        renderAll();
-
-        if ((state.profile.name || "GUEST").toUpperCase() === "GUEST") {
-          forceUsernamePrompt("CONTROL");
-        }
-
-        await checkDevAndMaybeInject();
-        updateOnboardVisibility();
-      } catch (e) {
-        ui.pushLog("log", "SYS", "CLOUD SYNC FAILED: " + esc(e?.message || e));
-        ui.$("syncChip").textContent = "SYNC: CLOUD (ERR)";
-      }
-    } else {
-      removeDevPanel();
-      updateOnboardVisibility();
-      setAiEnabled(state.meta.aiEnabled !== false);
-    }
-  }
-
-  if (signUpBtn) {
-    signUpBtn.onclick = async () => {
-      ai.markActive();
-      const email = (emailEl?.value || "").trim();
-      const pass = passEl?.value || "";
-      if (!email || !pass) return alert("Enter email + password.");
-      try {
-        await saves.signUp(email, pass);
-        alert("Signed up. Now press SIGN IN.");
-      } catch (e) {
-        alert(e?.message || String(e));
-      }
-    };
-  }
-
-  if (signInBtn) {
-    signInBtn.onclick = async () => {
-      ai.markActive();
-      const email = (emailEl?.value || "").trim();
-      const pass = passEl?.value || "";
-      if (!email || !pass) return alert("Enter email + password.");
-      try {
-        await saves.signIn(email, pass);
-      } catch (e) {
-        alert(e?.message || String(e));
-      }
-    };
-  }
-
-  if (signOutBtn) {
-    signOutBtn.onclick = async () => {
-      ai.markActive();
-      const ok = ui.confirmAction("Sign out? (Cloud save remains safe.)");
-      if (!ok) return;
-      try {
-        await saves.signOut();
-      } catch (e) {
-        alert(e?.message || String(e));
-      }
-    };
-  }
-
-  if (whoBtn) {
-    whoBtn.onclick = async () => {
-      ai.markActive();
-      try {
-        const uid = await saves.getUserId();
-        alert(uid ? `UID: ${uid}` : "Not signed in.");
-      } catch {
-        alert("Not signed in.");
-      }
-    };
-  }
-
-  // ----------------------------
-  // DEV PANEL + SNAPSHOTS
-  // ----------------------------
-  const PHASE_SNAPSHOTS = {
-    1: { phase: 1, total: 80, signal: 40, corruption: 0.02, build: 1, relics: 0, up: { dish: 2, scan: 0, probes: 0, auto: 0, stabil: 0, relicAmp: 0 } },
-    2: { phase: 2, total: 720, signal: 220, corruption: 0.08, build: 1, relics: 0, up: { dish: 7, scan: 2, probes: 1, auto: 0, stabil: 0, relicAmp: 0 } },
-    3: { phase: 3, total: 2400, signal: 650, corruption: 0.18, build: 1, relics: 0, up: { dish: 13, scan: 4, probes: 2, auto: 2, stabil: 0, relicAmp: 0 } },
-    4: { phase: 4, total: 10_200, signal: 1500, corruption: 0.42, build: 1, relics: 0, up: { dish: 26, scan: 8, probes: 4, auto: 5, stabil: 1, relicAmp: 0 } },
-    5: { phase: 5, total: 13_400, signal: 2800, corruption: 0.55, build: 1, relics: 3, up: { dish: 32, scan: 10, probes: 5, auto: 7, stabil: 2, relicAmp: 1 } },
-    6: { phase: 6, total: 42_000, signal: 8200, corruption: 0.78, build: 2, relics: 12, up: { dish: 60, scan: 14, probes: 8, auto: 14, stabil: 4, relicAmp: 3 } }
-  };
-
-  const DEV_SNAP_KEY = "sygn1l_dev_snaps_v1";
-  const loadDevSnaps = () => {
-    try { return JSON.parse(localStorage.getItem(DEV_SNAP_KEY) || "{}"); }
-    catch { return {}; }
-  };
-  const saveDevSnaps = (snaps) => {
-    try { localStorage.setItem(DEV_SNAP_KEY, JSON.stringify(snaps)); } catch {}
-  };
-
-  function removeDevPanel() {
-    document.getElementById("devPanel")?.remove();
-  }
-
-  function captureDevSnapshot(slot = 1) {
-    const snaps = loadDevSnaps();
-    snaps[String(slot)] = {
-      build: state.build,
-      relics: state.relics,
-      signal: state.signal,
-      total: state.total,
-      corruption: state.corruption,
-      phase: state.phase,
-      up: { ...state.up }
-    };
-    saveDevSnaps(snaps);
-  }
-
-  async function applyPhaseSnapshot(ph) {
-    const snap = PHASE_SNAPSHOTS[clamp(Number(ph) || 1, 1, 6)];
-    if (!snap) return;
-
-    const keepName = (state.profile?.name || "GUEST").toUpperCase().slice(0, 18);
-    const keepAi = state.meta.aiEnabled !== false;
-
-    state.build = snap.build;
-    state.relics = snap.relics;
-    state.signal = snap.signal;
-    state.total = snap.total;
-    state.corruption = snap.corruption;
-
-    // ✅ FIX: actually set the snapshot phase
-    setPhase(snap.phase, { silent: true });
-
-    state.up = {
-      dish: snap.up.dish || 0,
-      scan: snap.up.scan || 0,
-      probes: snap.up.probes || 0,
-      auto: snap.up.auto || 0,
-      stabil: snap.up.stabil || 0,
-      relicAmp: snap.up.relicAmp || 0
-    };
-
-    state.profile.name = keepName;
-    state.meta.lastAiAtMs = 0;
-    state.meta.lastAmbientAtMs = 0;
-    state.meta.aiEnabled = keepAi;
-
-    touch();
-    derived = recompute(state);
-    renderAll();
-
-    try { await saves.writeCloudState(state, true); } catch {}
-  }
-
-  async function applyCapturedSnapshot(slot = 1) {
-    const snaps = loadDevSnaps();
-    const snap = snaps[String(slot)];
-    if (!snap) return false;
-
-    setPhase(clamp(Number(snap.phase) || 1, 1, PHASES.length), { silent: true });
-
-    state.build = snap.build;
-    state.relics = snap.relics;
-    state.signal = snap.signal;
-    state.total = snap.total;
-    state.corruption = snap.corruption;
-    state.up = { ...state.up, ...snap.up };
-
-    touch();
-    derived = recompute(state);
-    renderAll();
-
-    try { await saves.writeCloudState(state, true); } catch {}
-    return true;
-  }
-
-  async function checkDevAndMaybeInject() {
-    try {
-      const hasConfig =
-        (DEV_MASTER_UID && DEV_MASTER_UID.trim()) || (DEV_MASTER_EMAIL && DEV_MASTER_EMAIL.trim());
-      if (!hasConfig) return;
-
-      if (!saves?.supabase || !saves.isSignedIn()) return;
-
-      const { data } = await saves.supabase.auth.getUser();
-      const u = data?.user;
-      if (!u) return;
-
-      const okUid = DEV_MASTER_UID && DEV_MASTER_UID.trim() && u.id === DEV_MASTER_UID.trim();
-      const okEmail =
-        DEV_MASTER_EMAIL &&
-        DEV_MASTER_EMAIL.trim() &&
-        String(u.email || "").toLowerCase() === DEV_MASTER_EMAIL.trim().toLowerCase();
-
-      if (!okUid && !okEmail) return;
-
-      injectDevPanel();
-    } catch {}
-  }
-
-  function injectDevPanel() {
-    if (document.getElementById("devPanel")) return;
-
-    const wrap = document.querySelector(".wrap");
-    if (!wrap) return;
-
-    const card = document.createElement("section");
-    card.className = "card";
-    card.id = "devPanel";
-    card.innerHTML = `
-      <div class="hd">
-        <div>DEV CONSOLE</div>
-        <div class="muted">MASTER ACCESS</div>
-      </div>
-      <div class="pad">
-        <div class="muted" style="margin-bottom:10px">Phase snapshot load (testing only)</div>
-
-        <div class="grid2" style="grid-template-columns: repeat(3, 1fr);">
-          <button data-ph="1">P1</button>
-          <button data-ph="2">P2</button>
-          <button data-ph="3">P3</button>
-          <button data-ph="4">P4</button>
-          <button data-ph="5">P5</button>
-          <button data-ph="6">P6</button>
-        </div>
-
-        <div style="height:10px"></div>
-
-        <div class="grid2">
-          <button id="devAddSignal">+10K SIGNAL</button>
-          <button id="devClearCorr">CLEAR CORRUPTION</button>
-        </div>
-
-        <div style="height:10px"></div>
-
-        <div class="muted" style="margin-bottom:10px">Captured snapshots (local only)</div>
-
-        <div class="grid2">
-          <button id="devCap1">CAPTURE SLOT 1</button>
-          <button id="devLoad1">LOAD SLOT 1</button>
-        </div>
-        <div class="grid2">
-          <button id="devCap2">CAPTURE SLOT 2</button>
-          <button id="devLoad2">LOAD SLOT 2</button>
-        </div>
-
-        <div style="height:10px"></div>
-
-        <div class="grid2">
-          <button id="devAddRelics">+10 RELICS</button>
-          <button id="devHide">HIDE DEV</button>
-        </div>
-      </div>
-    `;
-    wrap.prepend(card);
-
-    card.querySelectorAll("button[data-ph]").forEach((btn) => {
-      btn.onclick = async () => {
-        ai.markActive();
-        feedback(false);
-        const ph = Number(btn.getAttribute("data-ph")) || 1;
-        await applyPhaseSnapshot(ph);
-        ui.popup("SYS", `DEV: PHASE ${clamp(ph, 1, 6)} SNAPSHOT LOADED`);
-        ui.pushLog("log", "SYS", `DEV SNAPSHOT: PHASE ${clamp(ph, 1, 6)} LOADED.`);
-      };
-    });
-
-    card.querySelector("#devAddSignal").onclick = async () => {
-      ai.markActive();
-      feedback(false);
-      state.signal += 10_000;
-      state.total += 10_000;
+      const current = state.profile?.name || "GUEST";
+      const next = (prompt("USERNAME (max 18)", current) || "").trim().slice(0, 18);
+      if (!next) return;
+      state.profile.name = next.toUpperCase();
       touch();
-      derived = recompute(state);
-      renderAll();
-      try { await saves.writeCloudState(state, true); } catch {}
-      ui.popup("SYS", "DEV: +10K SIGNAL");
-    };
-
-    card.querySelector("#devClearCorr").onclick = async () => {
-      ai.markActive();
-      markInput();
-      feedback(false);
-      state.corruption = 0;
-      touch();
-      derived = recompute(state);
-      renderAll();
-      try { await saves.writeCloudState(state, true); } catch {}
-      ui.popup("SYS", "DEV: CORRUPTION CLEARED");
-    };
-
-    card.querySelector("#devCap1").onclick = () => {
-      ai.markActive();
-      markInput();
-      feedback(false);
-      captureDevSnapshot(1);
-      ui.popup("SYS", "DEV: SNAPSHOT CAPTURED (SLOT 1)");
-      ui.pushLog("log", "SYS", "DEV SNAPSHOT: CAPTURED SLOT 1.");
-    };
-
-    card.querySelector("#devLoad1").onclick = async () => {
-      ai.markActive();
-      markInput();
-      feedback(false);
-      const ok = await applyCapturedSnapshot(1);
-      ui.popup("SYS", ok ? "DEV: SNAPSHOT LOADED (SLOT 1)" : "DEV: SLOT 1 EMPTY");
-      if (ok) ui.pushLog("log", "SYS", "DEV SNAPSHOT: LOADED SLOT 1.");
-    };
-
-    card.querySelector("#devCap2").onclick = () => {
-      ai.markActive();
-      markInput();
-      feedback(false);
-      captureDevSnapshot(2);
-      ui.popup("SYS", "DEV: SNAPSHOT CAPTURED (SLOT 2)");
-      ui.pushLog("log", "SYS", "DEV SNAPSHOT: CAPTURED SLOT 2.");
-    };
-
-    card.querySelector("#devLoad2").onclick = async () => {
-      ai.markActive();
-      markInput();
-      feedback(false);
-      const ok = await applyCapturedSnapshot(2);
-      ui.popup("SYS", ok ? "DEV: SNAPSHOT LOADED (SLOT 2)" : "DEV: SLOT 2 EMPTY");
-      if (ok) ui.pushLog("log", "SYS", "DEV SNAPSHOT: LOADED SLOT 2.");
-    };
-
-    card.querySelector("#devAddRelics").onclick = async () => {
-      ai.markActive();
-      markInput();
-      feedback(false);
-      state.relics += 10;
-      touch();
-      derived = recompute(state);
-      renderAll();
-      try { await saves.writeCloudState(state, true); } catch {}
-      ui.popup("SYS", "DEV: +10 RELICS");
-    };
-
-    card.querySelector("#devHide").onclick = () => {
-      ai.markActive();
-      markInput();
-      feedback(false);
-      removeDevPanel();
+      recomputeAndRender();
+      saveNow(false).catch(() => {});
     };
   }
 
   // ----------------------------
-  // Boot narrative
+  // Auth wiring (keep Supabase features)
   // ----------------------------
-  function bootNarrative() {
-    const log = ui.$("log");
-    if (log && log.children.length) return;
-      ui.narrative("ICE STATION RELAY ONLINE. SENSORS REPORT STRUCTURED NOISE.", 3200);
-  ui.pushLog("log", "SYS", "SYGN1L ONLINE. SILENCE IS UNPROCESSED DATA.");
-  ui.pushLog("comms", "OPS", "Ping the void so we can get a baseline.");
-
-
-  }
-
-  // ----------------------------
-  // Main loop
-  // ----------------------------
-  let last = performance.now();
-  let hudAcc = 0;
-  let upgradesAcc = 0;
-  let autosaveAcc = 0;
-
-function loop(t) {
-  const dt = Math.min(0.05, (t - last) / 1000);
-  last = t;
-
-  // ✅ ACTIVE PLAY TIMER (counts only after recent input)
-  const activeWindowMs = 12_000; // 12s since last input = still "active"
-  const since = nowMs() - (state.meta.lastInputAtMs || 0);
-  const isActive = (state.meta.lastInputAtMs || 0) > 0 && since <= activeWindowMs;
-
-  if (isActive) {
-    state.meta.activePlaySec = (state.meta.activePlaySec || 0) + dt;
-  }
-
-  derived = recompute(state);
-
-  // passive gain...
-
-    // passive gain
-    if (derived.sps > 0) {
-      const g = derived.sps * dt;
-      state.signal += g;
-      state.total += g;
-    }
-
-    // auto gain
-    const autoPerSec = autoGainPerSec(state, derived);
-    if (autoPerSec > 0) {
-      const g = autoPerSec * dt;
-      state.signal += g;
-      state.total += g;
-    }
-
-    // corruption
-    corruptionTick(state, dt);
-
-    // phase from total
-    syncPhaseFromTotal();
-
-    // ✅ NEW: per-phase tick hook
-    try {
-      const cfg = getPhaseConfig(state.phase);
-      cfg?.onTick?.(state, derived, dt, getCtx());
-    } catch {}
-
-    // scope visual
-    scope.tick(dt, t, { total: state.total, bw: derived.bw, corruption: state.corruption });
-
-    // AI ambient check
-    ai.maybeAmbient(state);
-
-    // HUD render throttled
-    hudAcc += dt;
-    if (hudAcc >= 0.10) {
-      hudAcc = 0;
-      ui.renderHUD(state, derived, saves.isSignedIn() ? "SYNC: CLOUD" : "SYNC: GUEST");
-    }
-
-    // Upgrades list render throttled
-    upgradesAcc += dt;
-    if (upgradesAcc >= 0.25) {
-      upgradesAcc = 0;
-
-      const phaseCfg = getPhaseConfig(state.phase);
-      const upgradesForPhase = filterUpgradesForPhase(UPGRADES, phaseCfg, state);
-
-      ui.renderUpgrades({
-        state,
-        upgrades: upgradesForPhase,
-        canBuy: (u) => canBuy(state, u),
-        getCost: (u) => cost(state, u),
-        getLevel: (id) => lvl(state, id),
-        onBuy: async (u) => {
-          if (!canBuy(state, u)) return;
-          buyUpgrade(state, u);
-          touch();
-          derived = recompute(state);
-          renderAll();
-          try { await saves.writeCloudState(state, false); } catch {}
-          if (Math.random() < 0.18) ai.invokeEdge(state, "buy_" + u.id, "OPS");
-        }
-      });
-    }
-
-    // autosave heartbeat
-    autosaveAcc += dt;
-    if (autosaveAcc >= 2.5) {
-      autosaveAcc = 0;
-      touch();
-      saves.saveLocal(state);
-      if (saves.isSignedIn()) {
-        saves.saveCloud(state, false).catch(() => {});
-      }
-    }
-
-    requestAnimationFrame(loop);
-  }
-
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") {
-      saveNow(true).catch(() => {});
+  saves.wireAuthUI({
+    emailEl: ui.$("email"),
+    passEl: ui.$("pass"),
+    signUpBtn: ui.$("signUpBtn"),
+    signInBtn: ui.$("signInBtn"),
+    signOutBtn: ui.$("signOutBtn"),
+    whoBtn: ui.$("whoBtn"),
+    authStatusEl: ui.$("authStatus"),
+    onSignedIn: async () => {
+      ui.pushLog("log", "SYS", "SIGNED IN.");
+      // Prefer cloud if present
+      const cloud = await saves.loadCloud();
+      if (cloud) loadIntoState(cloud);
+      await setPhase(state.phase, { silent: true });
+      applyOfflineEarnings();
+      recomputeAndRender();
+      await saveNow(false);
+    },
+    onSignedOut: () => {
+      ui.pushLog("log", "SYS", "SIGNED OUT.");
+      recomputeAndRender();
     }
   });
 
   // ----------------------------
-  // START
+  // Boot
   // ----------------------------
-  try {
-    const local = saves.loadLocal();
-    if (local) loadIntoState(local);
+  (async () => {
+    // Load guest/local immediately
+    loadIntoState(saves.loadLocal());
+    setAiEnabled(state.meta.aiEnabled);
 
+    // If signed in, load cloud (non-blocking)
+    if (saves.isSignedIn()) {
+      try {
+        const cloud = await saves.loadCloud();
+        if (cloud) loadIntoState(cloud);
+      } catch {}
+    }
+
+    ui.applyPhaseUI(state.phase);
+    await setPhase(state.phase, { silent: true });
     applyOfflineEarnings();
+    recomputeAndRender();
+    await saveNow(false);
+  })();
 
-    derived = recompute(state);
+  // ----------------------------
+  // Main loop
+  // ----------------------------
+  let last = nowMs();
+  let lastRender = 0;
+  function frame() {
+    const t = nowMs();
+    const dt = Math.min(0.25, (t - last) / 1000);
+    last = t;
 
-    // ✅ ensure phase hooks + CSS are applied at boot
-    setPhase(state.phase, { silent: true });
+    // Active play clock (only counts when interacting)
+    const active = t - (state.meta.lastInputAtMs || 0) < 8000;
+    if (active) state.meta.activePlaySec += dt;
 
-    setAiEnabled(state.meta.aiEnabled !== false);
+    // Passive gain
+    const g = autoGainPerSec(state, derived) * dt;
+    if (g > 0) {
+      state.signal += g;
+      state.total += g;
+    }
 
-    bootNarrative();
-    renderAll();
-    updateOnboardVisibility();
+    // Corruption tick
+    state.corruption = corruptionTick(state, derived, dt);
 
-    saves
-      .initAuth(onAuthChange)
-      .then(async () => {
-        await checkDevAndMaybeInject();
-        requestAnimationFrame(loop);
-      })
-      .catch((e) => {
-        showFatal(e?.message || e);
-        requestAnimationFrame(loop);
-      });
-  } catch (e) {
-    showFatal(e?.message || e);
+    // Phase tick hook
+    const mod = currentPhaseModule();
+    try {
+      mod?.tick?.(api, dt);
+    } catch (e) {
+      ui.pushLog("log", "SYS", `PHASE TICK ERROR: ${e?.message || e}`);
+    }
+
+    // Render throttling: UI updates at most ~4fps unless something marked dirty.
+    if (dirty || t - lastRender > 250) {
+      recomputeAndRender();
+      lastRender = t;
+    }
+
+    requestAnimationFrame(frame);
   }
+  requestAnimationFrame(frame);
 })();
