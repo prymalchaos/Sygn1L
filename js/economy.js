@@ -121,36 +121,46 @@ function clickScale(probesLv) {
 // Derived stats
 // ----------------------------
 export function recompute(state) {
-  const probesLv = lvl(state, "probes");
-  const click = 1 + probesLv;
+  // base click power
+  let click = 1 + lvl(state, "probes");
 
-  // Bandwidth
-  const bwScan  = Math.pow(1.10, lvl(state, "scan"));
+  // stretch goals
+  const lensLv = lvl(state, "lens");   // bandwidth booster
+  const relayLv = lvl(state, "relay"); // auto scaling booster
+  const burstLv = lvl(state, "burst"); // click booster
+  const overLv = lvl(state, "over");   // global multiplier
+
+  // Global multiplier (expensive, worth it)
+  // Mild exponential so it feels huge without instantly breaking numbers
+  const globalMult = Math.pow(1.22, overLv);
+
+  // Click boost from BURST CAP
+  // Exponential-ish feel, but controlled
+  click *= (1 + 0.65 * burstLv) * Math.pow(1.08, burstLv);
+
+  // Bandwidth: scan exponential + relic amp linear + lens exponential-ish
+  const bwScan = Math.pow(1.10, lvl(state, "scan"));
   const bwRelic = 1 + 0.08 * lvl(state, "relicAmp");
+  const bwLens = Math.pow(1.18, lensLv); // BIG boost per level
+  const bw = bwScan * bwRelic * bwLens * globalMult;
 
-  // ✅ NEW stretch upgrades
-  const bwLens  = Math.pow(1.35, lvl(state, "lens"));      // chunky BW booster
-  const global  = Math.pow(1.22, lvl(state, "over"));      // global multiplier
-
-  const bw = bwScan * bwRelic * bwLens * global;
-
-  // Passive
+  // Base passive gain
   const sps = (lvl(state, "dish") * 1.0) * bw;
 
-  // Auto rate
+  // Auto pings per second (synergy w probes) + relay scaling
   const autoLv = lvl(state, "auto");
-  const relayLv = lvl(state, "relay");
+  const relayMult = Math.pow(1.20, relayLv); // "scales harder"
   const autoRate =
     autoLv > 0
-      ? (autoLv * 0.65 * (1 + 0.15 * probesLv) * (1 + 0.40 * relayLv))
+      ? (autoLv * 0.65 * (1 + 0.15 * lvl(state, "probes"))) * relayMult * globalMult
       : 0;
 
-  // Click multiplier (burst cap)
-  const burst = Math.pow(1.30, lvl(state, "burst"));
+  // Also apply global to click output (bw already has it, but clickGain multiplies click*bw)
+  // If you prefer global to affect everything, leave bw as-is and also scale click:
+  click *= globalMult;
 
-  return { click: click * burst, bw, sps, autoRate };
+  return { click, bw, sps, autoRate };
 }
-
 // ----------------------------
 // Corruption model
 // ----------------------------
