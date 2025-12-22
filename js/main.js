@@ -210,6 +210,7 @@ function setPhase(n, { silent = false } = {}) {
 
   // Base phase UI (title/status/subtitle/objective/etc)
   ui.applyPhaseUI(next);
+  ui.narrative(`PHASE ${next} LINK STABLE. ${PHASES[next - 1]?.sub || ""}`.trim(), 3200);
 
   // Phase module plugin (root/js/phases/phaseX.js via PHASE_MODULES map)
   phaseMod = PHASE_MODULES?.[next] || null;
@@ -438,6 +439,7 @@ function sonarPingSound(intensity = 1) {
       markInput();
       feedback(false);
             scope.ping?.(1, 2.2, 1.6);
+            ui.narrative("PING EMITTED. ECHO RECEIVED. ARRAY RESPONSE: NON-RANDOM.", 1800);
 
 sonarPingSound(1 + Math.min(1, (state.corruption || 0) * 1.5));
 
@@ -1044,9 +1046,11 @@ if (phaseMod?.modifyClickGain) {
   function bootNarrative() {
     const log = ui.$("log");
     if (log && log.children.length) return;
-    ui.pushLog("log", "SYS", "SYGN1L ONLINE. SILENCE IS UNPROCESSED DATA.");
-    ui.pushLog("comms", "OPS", "Ping the void so we can get a baseline.");
-    ui.popup("OPS", "Tap PING VOID, then buy DISH to start passive gain.");
+      ui.narrative("ICE STATION RELAY ONLINE. SENSORS REPORT STRUCTURED NOISE.", 3200);
+  ui.pushLog("log", "SYS", "SYGN1L ONLINE. SILENCE IS UNPROCESSED DATA.");
+  ui.pushLog("comms", "OPS", "Ping the void so we can get a baseline.");
+
+
   }
 
   // ----------------------------
