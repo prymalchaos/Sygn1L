@@ -344,7 +344,10 @@ ai = createAI({
       ai.markActive();
       feedback(false);
 
-      const g = clickGain(state, derived);
+      let g = clickGain(state, derived);
+if (phaseMod?.modifyClickGain) {
+  try { g = phaseMod.modifyClickGain(g, { state, derived }); } catch {}
+}
       state.signal += g;
       state.total += g;
 
