@@ -599,6 +599,134 @@ html[data-phase="1"] .pop{
   background: rgba(0,0,0,.86);
 }
     
+    /* =========================================================
+   PHASE VISUALS (via <html data-phase="...">)
+   Phase 1: Nostromo-ish green CRT console
+   ========================================================= */
+
+/* Base per-phase tokens */
+:root{
+  --crtGreen: rgba(57,255,106,0.12);
+  --crtGreen2: rgba(57,255,106,0.06);
+  --crtLine: rgba(57,255,106,0.08);
+  --crtText: rgba(223,255,232,0.92);
+  --crtShadow: 0 14px 34px rgba(0,0,0,.78);
+}
+
+/* PHASE 1 hook */
+html[data-phase="1"] body{
+  background:
+    radial-gradient(900px 600px at 60% 10%, rgba(57,255,106,.12), transparent 60%),
+    radial-gradient(700px 520px at 15% 30%, rgba(0,0,0,.35), transparent 60%),
+    linear-gradient(180deg, #020404, #040707);
+}
+
+/* Make scanlines feel more “CRT”, less “Instagram filter” */
+html[data-phase="1"] .fx.scanlines{
+  opacity: .20;
+  mix-blend-mode: screen;
+  filter: contrast(1.05) brightness(1.05);
+}
+
+/* Add subtle phosphor grain + glow halo in Phase 1 */
+html[data-phase="1"] body::after{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:0;
+  background:
+    radial-gradient(900px 700px at 50% 40%, rgba(57,255,106,.08), transparent 65%),
+    repeating-linear-gradient(
+      to bottom,
+      rgba(255,255,255,.018),
+      rgba(255,255,255,.018) 1px,
+      rgba(0,0,0,0) 3px,
+      rgba(0,0,0,0) 6px
+    );
+  opacity:.55;
+  mix-blend-mode: screen;
+}
+
+/* Cards become more “industrial console plate” */
+html[data-phase="1"] .card{
+  border: 1px solid rgba(57,255,106,.18);
+  box-shadow: var(--crtShadow);
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.70), rgba(0,0,0,.40)),
+    radial-gradient(1200px 800px at 50% 0%, rgba(57,255,106,.08), transparent 60%);
+}
+html[data-phase="1"] .card::after{
+  box-shadow:
+    inset 0 0 0 1px rgba(57,255,106,.06),
+    inset 0 0 26px rgba(0,0,0,.65);
+}
+
+/* Header strip: more panel-y */
+html[data-phase="1"] .hd{
+  background:
+    linear-gradient(180deg, rgba(57,255,106,.10), rgba(0,0,0,0));
+  border-bottom: 1px solid rgba(57,255,106,.14);
+}
+
+/* Buttons: squarer, “terminal key” vibe */
+html[data-phase="1"] button{
+  border-radius: 8px;
+  border: 1px solid rgba(57,255,106,.18);
+  background:
+    linear-gradient(180deg, rgba(57,255,106,.08), rgba(0,0,0,.35));
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.04),
+    0 10px 18px rgba(0,0,0,.45);
+}
+html[data-phase="1"] button:hover{
+  box-shadow:
+    0 0 18px rgba(57,255,106,.18),
+    inset 0 0 0 1px rgba(57,255,106,.10);
+}
+html[data-phase="1"] button:active{
+  transform: translateY(1px);
+  filter: brightness(0.98);
+}
+
+/* Big “PING” should feel like a main console key */
+html[data-phase="1"] .big{
+  border-radius: 10px;
+  letter-spacing: .18em;
+  background:
+    linear-gradient(180deg, rgba(57,255,106,.16), rgba(0,0,0,.42));
+  box-shadow:
+    inset 0 0 0 1px rgba(57,255,106,.18),
+    0 14px 30px rgba(0,0,0,.55);
+}
+
+/* Chips: more like status LEDs */
+html[data-phase="1"] .chip{
+  border: 1px solid rgba(57,255,106,.14);
+  background: rgba(0,0,0,.44);
+}
+html[data-phase="1"] .dot{
+  box-shadow: 0 0 22px rgba(57,255,106,.38);
+}
+
+/* Text: slight CRT bloom */
+html[data-phase="1"] body,
+html[data-phase="1"] .stat .v,
+html[data-phase="1"] .muted{
+  text-shadow: 0 0 10px rgba(57,255,106,.10);
+}
+
+/* Scope: make it look like a little embedded monitor */
+html[data-phase="1"] .scopeWrap{
+  border: 1px solid rgba(57,255,106,.16);
+  background: rgba(0,0,0,.46);
+}
+html[data-phase="1"] canvas#scope{
+  background:
+    radial-gradient(500px 120px at 40% 40%, rgba(57,255,106,.10), transparent 70%),
+    rgba(0,0,0,.28);
+}
+    
   </style>
 </head>
 
