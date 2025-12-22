@@ -34,6 +34,16 @@ function playUIClick() {
   src.start();
 }
 
+document.addEventListener("click", (e) => {
+  // Only react to real UI buttons
+  const btn = e.target.closest("button, .btn");
+  if (!btn) return;
+
+  // Ignore disabled buttons
+  if (btn.disabled) return;
+
+  playUIClick();
+});
 
 export function createUI() {
   const $ = (id) => document.getElementById(id);
