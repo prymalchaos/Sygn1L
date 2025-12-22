@@ -31,6 +31,19 @@ export function fmt(n) {
   return n.toFixed(n < 10 ? 2 : n < 100 ? 1 : 0) + units[u];
 }
 
+export function fmtFull(n) {
+  const x = Number(n || 0);
+  if (!isFinite(x)) return "0";
+
+  // Whole numbers → commas
+  if (Math.abs(x) >= 1) {
+    return Math.floor(x).toLocaleString("en-US");
+  }
+
+  // Very small numbers → keep precision
+  return x.toFixed(2);
+}
+
 /** canonical default state (ONLY persist things inside this object) */
 export function defaultState() {
   const now = Date.now();
