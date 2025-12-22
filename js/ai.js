@@ -4,7 +4,7 @@
 // - Max once per cooldown for AI calls
 // - Ambient human message on its own cooldown
 // - NEVER fires if user is AFK
-// - Uses canonical state.timers fields ONLY
+// - Supports BOTH legacy state.timers and new state.meta fields
 // - One sentence messages
 
 import { esc } from "./state.js";
@@ -25,17 +25,62 @@ export function createAI({
   // ----------------------------
   // Activity tracking (AFK gate)
   // ----------------------------
-  function markActive() { lastActionAt = Date.now(); }
+  function markActive() {
+    lastActionAt = Date.now();
+  }
   window.addEventListener("pointerdown", markActive, { passive: true });
   window.addEventListener("keydown", markActive, { passive: true });
 
   function isActive() {
-    return (Date.now() - lastActionAt) <= activeWindowMs;
+    return Date.now() - lastActionAt <= activeWindowMs;
   }
 
   function setChip(text) {
     const el = $("aiChip");
     if (el) el.textContent = text;
+  }
+
+  // ----------------------------
+  // State schema helpers (compat)
+  // ----------------------------
+  function ensureTimers(state) {
+    if (!state) return;
+    if (!state.timers || typeof state.timers !== "object") {
+      state.timers = { lastAiAt: 0, lastAmbientAt: 0 };
+    } else {
+      if (typeof state.timers.lastAiAt !== "number") state.timers.lastAiAt = Number(state.timers.lastAiAt || 0);
+      if (typeof state.timers.lastAmbientAt !== "number") state.timers.lastAmbientAt = Number(state.timers.lastAmbientAt || 0);
+    }
+    if (!state.meta || typeof state.meta !== "object") {
+      state.meta = { updatedAtMs: 0, lastAiAtMs: 0, lastAmbientAtMs: 0, aiEnabled: true };
+    } else {
+      if (typeof state.meta.updatedAtMs !== "number") state.meta.updatedAtMs = Number(state.meta.updatedAtMs || 0);
+      if (typeof state.meta.lastAiAtMs !== "number") state.meta.lastAiAtMs = Number(state.meta.lastAiAtMs || 0);
+      if (typeof state.meta.lastAmbientAtMs !== "number") state.meta.lastAmbientAtMs = Number(state.meta.lastAmbientAtMs || 0);
+    }
+  }
+
+  function getLastAiAt(state) {
+    // prefer new schema, fall back to legacy
+    const v = Number(state?.meta?.lastAiAtMs ?? state?.timers?.lastAiAt ?? 0);
+    return isFinite(v) ? v : 0;
+  }
+  function setLastAiAt(state, now) {
+    ensureTimers(state);
+    state.timers.lastAiAt = now;      // legacy mirror
+    state.meta.lastAiAtMs = now;      // new canonical
+    state.meta.updatedAtMs = now;
+  }
+
+  function getLastAmbientAt(state) {
+    const v = Number(state?.meta?.lastAmbientAtMs ?? state?.timers?.lastAmbientAt ?? 0);
+    return isFinite(v) ? v : 0;
+  }
+  function setLastAmbientAt(state, now) {
+    ensureTimers(state);
+    state.timers.lastAmbientAt = now; // legacy mirror
+    state.meta.lastAmbientAtMs = now; // new canonical
+    state.meta.updatedAtMs = now;
   }
 
   // ----------------------------
@@ -68,13 +113,15 @@ export function createAI({
   // AI invocation gate
   // ----------------------------
   function canInvoke(state) {
+    ensureTimers(state);
+
     if (!enabled) return false;
     if (!saves?.isSignedIn?.()) return false;
     if (!saves?.supabase) return false;
     if (!isActive()) return false;
 
     const now = Date.now();
-    const last = Number(state?.timers?.lastAiAt || 0);
+    const last = getLastAiAt(state);
     if (now - last < aiCooldownMs) return false;
 
     return true;
@@ -87,13 +134,14 @@ export function createAI({
     if (!canInvoke(state)) return false;
 
     const now = Date.now();
-    state.timers.lastAiAt = now;
-    state.meta.updatedAtMs = now;
+    setLastAiAt(state, now);
 
     setChip("AI: …");
 
     // Persist immediately to prevent cross-tab spam
-    try { await saves.writeCloudState(state, true); } catch {}
+    try {
+      await saves.writeCloudState(state, true);
+    } catch {}
 
     try {
       const payload = {
@@ -107,19 +155,16 @@ export function createAI({
         corruption: Number((state.corruption || 0).toFixed(3))
       };
 
-      const { data, error } =
-        await saves.supabase.functions.invoke(edgeFunction, { body: payload });
-
+      const { data, error } = await saves.supabase.functions.invoke(edgeFunction, { body: payload });
       if (error) throw error;
 
-      const who =
-        (data?.who || speakerHint || "COMMS").toString().slice(0, 18);
+      const who = (data?.who || speakerHint || "COMMS").toString().slice(0, 18);
 
-      const text =
-        ((data?.text || "")
+      const text = (
+        (data?.text || "")
           .toString()
-          .split(/(?<=[.!?])\s+/)[0] || "…")
-          .slice(0, 160);
+          .split(/(?<=[.!?])\s+/)[0] || "…"
+      ).slice(0, 160);
 
       ui.popup(who, text);
       ui.pushLog("comms", who, esc(text));
@@ -136,12 +181,14 @@ export function createAI({
   // Ambient human comms gate
   // ----------------------------
   function canAmbient(state) {
+    ensureTimers(state);
+
     if (!enabled) return false;
     if (!saves?.isSignedIn?.()) return false;
     if (!isActive()) return false;
 
     const now = Date.now();
-    const last = Number(state?.timers?.lastAmbientAt || 0);
+    const last = getLastAmbientAt(state);
     if (now - last < ambientCooldownMs) return false;
 
     return true;
@@ -154,12 +201,10 @@ export function createAI({
     if (!canAmbient(state)) return false;
 
     const now = Date.now();
-    state.timers.lastAmbientAt = now;
-    state.meta.updatedAtMs = now;
+    setLastAmbientAt(state, now);
 
     const n = state.profile?.name || "GUEST";
-    const msg =
-      HUMAN[Math.floor(Math.random() * HUMAN.length)](n).slice(0, 140);
+    const msg = HUMAN[Math.floor(Math.random() * HUMAN.length)](n).slice(0, 140);
 
     ui.popup("OPS", msg);
     ui.pushLog("comms", "OPS", esc(msg));
@@ -170,7 +215,9 @@ export function createAI({
       await invokeEdge(state, "ambient", "OPS");
     }
 
-    try { await saves.writeCloudState(state, false); } catch {}
+    try {
+      await saves.writeCloudState(state, false);
+    } catch {}
     return true;
   }
 
