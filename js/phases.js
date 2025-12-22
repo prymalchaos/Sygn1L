@@ -9,7 +9,8 @@ export function getPhaseConfig(phaseNum) {
   // For now, Phase 1 is "starter set".
   const configs = {
     1: {
-      allowedUpgrades: ["dish", "scan", "probes"], // keep Phase 1 tight
+      // inside Phase 1 config
+allowed: ["dish", "scan", "probes", "auto", "stabil", "relicAmp"] // keep Phase 1 tight
       onEnter: null,
       onTick: null
     }
