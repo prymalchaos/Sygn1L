@@ -309,6 +309,14 @@ ai = createAI({
 
   let feedbackOn = true;
   let audioCtx = null;
+async function ensureAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === "suspended") {
+    try { await audioCtx.resume(); } catch {}
+  }
+  return audioCtx;
+}
+
 
   function haptic(ms = 10) {
     if (!feedbackOn) return false;
@@ -346,6 +354,7 @@ function sonarPingSound(intensity = 1) {
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const ctx = audioCtx;
+    if (ctx.state === "suspended") ctx.resume?.();
 
     const now = ctx.currentTime;
     const dur = 0.9; // total "audible" feel
@@ -428,24 +437,27 @@ function sonarPingSound(intensity = 1) {
   }
 }
 
-  function feedback(strong = false) {
-    const ok = strong ? haptic(18) : haptic(10);
-    if (!ok) clickSound();
-  }
+  async function feedback(strong = false) {
+  if (!feedbackOn) return;
+  // haptics are nice, but they should NOT suppress audio
+  try { strong ? haptic(18) : haptic(10); } catch {}
+  await ensureAudio();
+  clickSound();
+}
 
   if (pingBtn) {
     pingBtn.onclick = async () => {
       ai.markActive();
       markInput();
-      feedback(false);
-            scope.ping?.(1, 2.2, 1.6);
-            ui.narrative("PING EMITTED. ECHO RECEIVED. ARRAY RESPONSE: NON-RANDOM.", 1800);
+
+// PING: no generic chirp, we want sonar
+try { haptic(10); } catch {}
+await ensureAudio();
+
+scope.ping?.(1, 2.2, 1.6);
+ui.narrative("PING EMITTED. ECHO RECEIVED. ARRAY RESPONSE: NON-RANDOM.", 1800);
 
 sonarPingSound(1 + Math.min(1, (state.corruption || 0) * 1.5));
-
-if (audioCtx && audioCtx.state === "suspended") {
-  try { await audioCtx.resume(); } catch {}
-}
 
       let g = clickGain(state, derived);
 if (phaseMod?.modifyClickGain) {
