@@ -20,7 +20,9 @@ import {
 import { createUI } from "./ui.js";
 import { createScope } from "./scope.js";
 import { createAI } from "./ai.js";
-import { createPhaseController } from "./phases/index.js";
+
+// ✅ NEW: Phase module layer
+import { getPhaseConfig, filterUpgradesForPhase } from "./phases.js";
 
 (() => {
   // ----------------------------
@@ -132,7 +134,10 @@ import { createPhaseController } from "./phases/index.js";
     }
 
     state.profile.name = (state.profile.name || "GUEST").toUpperCase().slice(0, 18);
-    state.phase = clamp(Number(state.phase) || 1, 1, 6);
+
+    // ✅ FIX: don’t hard clamp to 6 (future-proof for phase 7)
+    state.phase = clamp(Number(state.phase) || 1, 1, PHASES.length);
+
     state.corruption = clamp(Number(state.corruption) || 0, 0, 1);
   }
 
@@ -178,51 +183,71 @@ import { createPhaseController } from "./phases/index.js";
   }
 
   // ----------------------------
-  // Phase + render
+  // Phase engine
   // ----------------------------
+  let _currentPhase = state.phase;
+
+  function getCtx() {
+    return { ui, saves, ai, setPhase, showFatal };
+  }
 
   function setPhase(n, { silent = false } = {}) {
-    const prev = state.phase;
     const next = clamp(Number(n) || 1, 1, PHASES.length);
+    if (state.phase === next) {
+      // Still ensure CSS/UI stays consistent if called redundantly
+      document.documentElement.dataset.phase = String(next);
+      ui.applyPhaseUI(next);
+      return;
+    }
 
+    const prev = state.phase;
     state.phase = next;
 
     // CSS hook for per-phase visuals
     document.documentElement.dataset.phase = String(next);
 
-    // Paint phase text/colors/etc
-    ui.applyPhaseUI(next);
+    // Phase module hooks
+    try {
+      const prevCfg = getPhaseConfig(prev);
+      prevCfg?.onExit?.(state, derived, getCtx());
+    } catch {}
 
-    // Phase enter hook
-    const mod = currentPhaseModule();
-    if (prev !== next && typeof mod?.onEnter === "function") {
-      try { mod.onEnter({ ui, state, prev }); } catch {}
-    }
+    ui.applyPhaseUI(next);
 
     if (!silent) {
       ui.pushLog("log", "SYS", `PHASE ${next} ENGAGED.`);
     }
+
+    try {
+      const nextCfg = getPhaseConfig(next);
+      nextCfg?.onEnter?.(state, derived, getCtx());
+    } catch {}
+
+    _currentPhase = next;
   }
 
-function syncPhaseFromTotal() {
-  const ph = phaseForTotal(state.total);
-  if (state.phase !== ph.n) {
-    setPhase(ph.n);
+  function syncPhaseFromTotal() {
+    // still uses economy thresholds, but phase modules can later override this if needed
+    const ph = phaseForTotal(state.total);
+    if (state.phase !== ph.n) setPhase(ph.n);
   }
-}
 
+  // ----------------------------
+  // Render
+  // ----------------------------
   function renderAll() {
     syncPhaseFromTotal();
-    ui.applyPhaseUI(state.phase);
 
     const syncText = saves.isSignedIn() ? "SYNC: CLOUD" : "SYNC: GUEST";
     ui.renderHUD(state, derived, syncText);
 
-      const mod = currentPhaseModule();
+    // ✅ NEW: phase-gated upgrades
+    const phaseCfg = getPhaseConfig(state.phase);
+    const upgradesForPhase = filterUpgradesForPhase(UPGRADES, phaseCfg, state);
 
     ui.renderUpgrades({
       state,
-      upgrades: mod.filterUpgrades(UPGRADES, state),
+      upgrades: upgradesForPhase,
       canBuy: (u) => canBuy(state, u),
       getCost: (u) => cost(state, u),
       getLevel: (id) => lvl(state, id),
@@ -234,16 +259,10 @@ function syncPhaseFromTotal() {
         derived = recompute(state);
         renderAll();
 
-        // light save
-        try {
-          await saves.writeCloudState(state, false);
-        } catch {}
+        try { await saves.writeCloudState(state, false); } catch {}
 
-        // occasional AI flavor on buys (via edge)
         if (Math.random() < 0.18) {
-          try {
-            await ai.invokeEdge(state, "buy_" + u.id, "OPS");
-          } catch {}
+          try { await ai.invokeEdge(state, "buy_" + u.id, "OPS"); } catch {}
         }
       }
     });
@@ -268,13 +287,6 @@ function syncPhaseFromTotal() {
     if (btn) btn.textContent = on ? "AI COMMS" : "AI OFF";
   }
 
-  const phases = createPhaseController();
-
-  function currentPhaseModule() {
-    return phases.get(state.phase);
-  }
-
-
   // ----------------------------
   // Controls wiring
   // ----------------------------
@@ -284,7 +296,7 @@ function syncPhaseFromTotal() {
   const riteBtn = ui.$("riteBtn");
   const helpBtn = ui.$("helpBtn");
   const userChip = ui.$("userChip");
-  const fbBtn = ui.$("fbBtn"); // still exists, but feedback is UI/UX only now
+  const fbBtn = ui.$("fbBtn");
 
   let feedbackOn = true;
   let audioCtx = null;
@@ -329,25 +341,17 @@ function syncPhaseFromTotal() {
       ai.markActive();
       feedback(false);
 
-      // pure economy click gain
       const g = clickGain(state, derived);
       state.signal += g;
       state.total += g;
 
-      // small corruption kick per manual tap (keeps tension)
-            const mod = currentPhaseModule();
-      const add = Number(mod?.corruption?.perPing ?? 0.00055);
-      const cap = Number(mod?.corruption?.cap ?? 1);
-      state.corruption = clamp((state.corruption || 0) + add, 0, cap);
+      state.corruption = clamp((state.corruption || 0) + 0.00055, 0, 1);
 
       touch();
       derived = recompute(state);
       renderAll();
 
-      try {
-        await saves.writeCloudState(state, false);
-      } catch {}
-
+      try { await saves.writeCloudState(state, false); } catch {}
       if (Math.random() < 0.08) ai.invokeEdge(state, "ping", "OPS");
     };
   }
@@ -379,9 +383,7 @@ function syncPhaseFromTotal() {
 
       saves.wipeLocal();
       if (saves.isSignedIn()) {
-        try {
-          await saves.wipeCloud();
-        } catch {}
+        try { await saves.wipeCloud(); } catch {}
       }
       location.reload();
     };
@@ -407,10 +409,7 @@ function syncPhaseFromTotal() {
       ui.pushLog("comms", "OPS", "We keep the residue. We pretend it’s control.");
 
       renderAll();
-      try {
-        await saves.writeCloudState(state, true);
-      } catch {}
-
+      try { await saves.writeCloudState(state, true); } catch {}
       ai.invokeEdge(state, "rite", "MOTHERLINE");
     };
   }
@@ -445,15 +444,13 @@ function syncPhaseFromTotal() {
         derived = recompute(state);
         renderAll();
 
-        try {
-          await saves.writeCloudState(state, true);
-        } catch {}
+        try { await saves.writeCloudState(state, true); } catch {}
       });
     };
   }
 
   // ----------------------------
-  // Onboarding (uses the existing HTML card)
+  // Onboarding (unchanged)
   // ----------------------------
   const ONBOARD_KEY = "sygn1l_onboarded_v1";
 
@@ -468,9 +465,7 @@ function syncPhaseFromTotal() {
 
   function forceUsernamePrompt(from = "CONTROL") {
     ui.popup(from, "Callsign required. Tap USER to register.");
-    try {
-      ui.$("userChip")?.click?.();
-    } catch {}
+    try { ui.$("userChip")?.click?.(); } catch {}
   }
 
   function showOnboard() {
@@ -545,7 +540,7 @@ function syncPhaseFromTotal() {
   }
 
   // ----------------------------
-  // Auth UI
+  // Auth UI (unchanged)
   // ----------------------------
   const emailEl = ui.$("email");
   const passEl = ui.$("pass");
@@ -582,12 +577,12 @@ function syncPhaseFromTotal() {
         }
 
         await saveNow(true);
-
-        // AI enabled state persists in meta
         setAiEnabled(state.meta.aiEnabled !== false);
 
         derived = recompute(state);
-        ui.applyPhaseUI(state.phase);
+
+        // ✅ use setPhase so phase module hooks run after cloud load
+        setPhase(state.phase, { silent: true });
         renderAll();
 
         if ((state.profile.name || "GUEST").toUpperCase() === "GUEST") {
@@ -603,7 +598,6 @@ function syncPhaseFromTotal() {
     } else {
       removeDevPanel();
       updateOnboardVisibility();
-      // still allow AI toggle UI, but ai.js requires signed in to actually fire
       setAiEnabled(state.meta.aiEnabled !== false);
     }
   }
@@ -676,16 +670,11 @@ function syncPhaseFromTotal() {
 
   const DEV_SNAP_KEY = "sygn1l_dev_snaps_v1";
   const loadDevSnaps = () => {
-    try {
-      return JSON.parse(localStorage.getItem(DEV_SNAP_KEY) || "{}");
-    } catch {
-      return {};
-    }
+    try { return JSON.parse(localStorage.getItem(DEV_SNAP_KEY) || "{}"); }
+    catch { return {}; }
   };
   const saveDevSnaps = (snaps) => {
-    try {
-      localStorage.setItem(DEV_SNAP_KEY, JSON.stringify(snaps));
-    } catch {}
+    try { localStorage.setItem(DEV_SNAP_KEY, JSON.stringify(snaps)); } catch {}
   };
 
   function removeDevPanel() {
@@ -718,7 +707,9 @@ function syncPhaseFromTotal() {
     state.signal = snap.signal;
     state.total = snap.total;
     state.corruption = snap.corruption;
-    setPhase(state.phase, { silent: true });
+
+    // ✅ FIX: actually set the snapshot phase
+    setPhase(snap.phase, { silent: true });
 
     state.up = {
       dish: snap.up.dish || 0,
@@ -736,12 +727,9 @@ function syncPhaseFromTotal() {
 
     touch();
     derived = recompute(state);
-    ui.applyPhaseUI(state.phase);
     renderAll();
 
-    try {
-      await saves.writeCloudState(state, true);
-    } catch {}
+    try { await saves.writeCloudState(state, true); } catch {}
   }
 
   async function applyCapturedSnapshot(slot = 1) {
@@ -749,24 +737,20 @@ function syncPhaseFromTotal() {
     const snap = snaps[String(slot)];
     if (!snap) return false;
 
-    await applyPhaseSnapshot(clamp(Number(snap.phase) || 1, 1, 6));
+    setPhase(clamp(Number(snap.phase) || 1, 1, PHASES.length), { silent: true });
 
     state.build = snap.build;
     state.relics = snap.relics;
     state.signal = snap.signal;
     state.total = snap.total;
     state.corruption = snap.corruption;
-    state.phase = clamp(Number(snap.phase) || 1, 1, 6);
     state.up = { ...state.up, ...snap.up };
 
     touch();
     derived = recompute(state);
-    ui.applyPhaseUI(state.phase);
     renderAll();
 
-    try {
-      await saves.writeCloudState(state, true);
-    } catch {}
+    try { await saves.writeCloudState(state, true); } catch {}
     return true;
   }
 
@@ -850,21 +834,17 @@ function syncPhaseFromTotal() {
     `;
     wrap.prepend(card);
 
-    // Phase snapshot load
     card.querySelectorAll("button[data-ph]").forEach((btn) => {
       btn.onclick = async () => {
         ai.markActive();
         feedback(false);
-
         const ph = Number(btn.getAttribute("data-ph")) || 1;
         await applyPhaseSnapshot(ph);
-
         ui.popup("SYS", `DEV: PHASE ${clamp(ph, 1, 6)} SNAPSHOT LOADED`);
         ui.pushLog("log", "SYS", `DEV SNAPSHOT: PHASE ${clamp(ph, 1, 6)} LOADED.`);
       };
     });
 
-    // Cheats
     card.querySelector("#devAddSignal").onclick = async () => {
       ai.markActive();
       feedback(false);
@@ -979,18 +959,21 @@ function syncPhaseFromTotal() {
     }
 
     // corruption
-       const mod = currentPhaseModule();
-    const tickMult = Number(mod?.corruption?.tickMult ?? 1);
-    corruptionTick(state, dt * tickMult);
-    try { mod.postTickClamp(state); } catch {}
+    corruptionTick(state, dt);
 
     // phase from total
     syncPhaseFromTotal();
 
+    // ✅ NEW: per-phase tick hook
+    try {
+      const cfg = getPhaseConfig(state.phase);
+      cfg?.onTick?.(state, derived, dt, getCtx());
+    } catch {}
+
     // scope visual
     scope.tick(dt, t, { total: state.total, bw: derived.bw, corruption: state.corruption });
 
-    // AI ambient check (lightweight, internal cooldown)
+    // AI ambient check
     ai.maybeAmbient(state);
 
     // HUD render throttled
@@ -1004,9 +987,13 @@ function syncPhaseFromTotal() {
     upgradesAcc += dt;
     if (upgradesAcc >= 0.25) {
       upgradesAcc = 0;
+
+      const phaseCfg = getPhaseConfig(state.phase);
+      const upgradesForPhase = filterUpgradesForPhase(UPGRADES, phaseCfg, state);
+
       ui.renderUpgrades({
         state,
-        upgrades: UPGRADES,
+        upgrades: upgradesForPhase,
         canBuy: (u) => canBuy(state, u),
         getCost: (u) => cost(state, u),
         getLevel: (id) => lvl(state, id),
@@ -1022,7 +1009,7 @@ function syncPhaseFromTotal() {
       });
     }
 
-    // autosave heartbeat (local always, cloud throttled by saves.js)
+    // autosave heartbeat
     autosaveAcc += dt;
     if (autosaveAcc >= 2.5) {
       autosaveAcc = 0;
@@ -1046,26 +1033,22 @@ function syncPhaseFromTotal() {
   // START
   // ----------------------------
   try {
-    // Load local first
     const local = saves.loadLocal();
     if (local) loadIntoState(local);
 
-    // Apply offline earnings before first render
     applyOfflineEarnings();
 
-    // Apply phase UI immediately
     derived = recompute(state);
-    ui.applyPhaseUI(state.phase);
 
-    // AI enabled state
+    // ✅ ensure phase hooks + CSS are applied at boot
+    setPhase(state.phase, { silent: true });
+
     setAiEnabled(state.meta.aiEnabled !== false);
 
-    // Narrative + initial render
     bootNarrative();
     renderAll();
     updateOnboardVisibility();
 
-    // Auth boot
     saves
       .initAuth(onAuthChange)
       .then(async () => {
