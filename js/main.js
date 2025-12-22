@@ -314,6 +314,7 @@ async function ensureAudio() {
   if (audioCtx.state === "suspended") {
     try { await audioCtx.resume(); } catch {}
   }
+  sonarPingSound(1);
   return audioCtx;
 }
 
@@ -438,11 +439,7 @@ function sonarPingSound(intensity = 1) {
 }
 
   async function feedback(strong = false) {
-  if (!feedbackOn) return;
-  // haptics are nice, but they should NOT suppress audio
-  try { strong ? haptic(18) : haptic(10); } catch {}
-  await ensureAudio();
-  clickSound();
+  haptic(strong ? 18 : 10);
 }
 
   if (pingBtn) {
