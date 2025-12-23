@@ -193,7 +193,7 @@ export function createDevTools({ ui, saves }) {
           if (!ok) return;
           try {
             delSave.disabled = true;
-            await saves.adminInvoke("delete_save", { id: uid });
+            await saves.adminInvoke("delete_save", { id: await fetchUsers();
             ui.popup("DEV", "Save row deleted.");
           } catch (e) {
             ui.popup("DEV", `Delete save failed: ${e?.message || e}`, { level: "danger" });
@@ -214,6 +214,7 @@ export function createDevTools({ ui, saves }) {
             delUser.disabled = true;
             await saves.adminInvoke("delete_user", { id: uid });
             row.remove();
+            await fetchUsers();
             ui.popup("DEV", "User deleted.");
           } catch (e) {
             ui.popup("DEV", `Delete failed: ${e?.message || e}`, { level: "danger" });
