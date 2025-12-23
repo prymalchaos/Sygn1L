@@ -116,6 +116,10 @@ import { createAudio } from "./core/audio.js";
   };
 
   let derived = recompute(state);
+  // HUD: "SIGNAL/SEC" (top readout)
+const phaseSps = Number(state?.phaseData?._p1_sps ?? 0) || 0;
+const autoSps = autoGainPerSec(state, derived) || 0;
+derived.displaySps = (derived.sps || 0) + autoSps + phaseSps;
   const nowMs = () => Date.now();
   const touch = () => (state.meta.updatedAtMs = nowMs());
   const markInput = () => {
