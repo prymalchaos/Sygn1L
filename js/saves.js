@@ -99,13 +99,39 @@ export function createSaves() {
   // Expected Edge Function name: "sygn1l-admin"
   // This is optional; in production this can be missing.
   // ----------------------------
-  async function adminInvoke(op, payload = {}) {
+    async function adminInvoke(op, payload = {}) {
     if (!supabase) throw new Error("Supabase missing");
     if (!supabase.functions?.invoke) throw new Error("Supabase functions unavailable");
+
     const { data, error } = await supabase.functions.invoke("sygn1l-admin", {
-      body: { op, ...payload }
+      body: { op, ...payload },
     });
-    if (error) throw error;
+
+    if (error) {
+      // Supabase v2: FunctionsHttpError includes a Response in error.context
+      let body = null;
+      try {
+        if (error?.context?.json) body = await error.context.json();
+      } catch {}
+
+      const status =
+        error?.context?.status ||
+        error?.status ||
+        body?.status ||
+        body?.code ||
+        "?";
+
+      // Prefer the function's own message if present
+      const msg =
+        body?.error
+          ? `Admin ${op} failed (${status}): ${body.error}`
+          : `Admin ${op} failed (${status}): ${error.message}`;
+
+      // Include extra detail if available
+      const extra = body?.extra ? `\nExtra: ${JSON.stringify(body.extra)}` : "";
+      throw new Error(msg + extra);
+    }
+
     return data;
   }
 
