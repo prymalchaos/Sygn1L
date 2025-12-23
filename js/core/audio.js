@@ -63,6 +63,28 @@ export function createAudio() {
     buses.music.gain.value = settings.musicMuted ? 0 : 1;
 
     registerBuiltIns();
+
+    // iOS/Safari can keep old pages alive via bfcache during refresh/back/forward,
+    // which can leave looping music playing while the new page starts its own.
+    // When the page is being hidden/unloaded, hard-stop all active sounds.
+    if (!ensureCtx._boundLifecycle) {
+      ensureCtx._boundLifecycle = true;
+      window.addEventListener(
+        "pagehide",
+        () => {
+          try {
+            for (const [_, inst] of active) {
+              try { inst.stop({ fadeOut: 0.03 }); } catch {}
+            }
+            active.clear();
+          } catch {}
+
+          // Best-effort suspend to reduce battery/CPU.
+          try { ctx?.suspend?.(); } catch {}
+        },
+        { passive: true }
+      );
+    }
     return ctx;
   }
 
