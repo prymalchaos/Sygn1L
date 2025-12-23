@@ -73,6 +73,7 @@ import { createAudio } from "./core/audio.js";
   const ui = createUI();
   const styles = createStyleManager();
   const audio = createAudio();
+  audio.installGlobalButtonSounds({ pingSelector: "#ping" });
   // Global UI sounds: all buttons click "chik", ping button gets sonar.
   audio.attachGlobalButtonSounds({ pingId: "ping" });
   const dev = createDevTools({ ui, saves });
