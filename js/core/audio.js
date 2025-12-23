@@ -18,6 +18,9 @@ export function createAudio() {
 
   const registry = new Map(); // name -> { factory, bus }
   const active = new Map(); // name -> instance
+  // Guards against overlapping async starts (e.g., two play() calls while a buffer is still loading).
+  // Without this, two in-flight play() calls can both start audio and only the latest gets tracked.
+  const playToken = new Map(); // name -> integer token
   const bufferCache = new Map(); // url -> AudioBuffer
 
   let settings = {
@@ -165,6 +168,12 @@ export function createAudio() {
     const entry = registry.get(key);
     if (!entry) return null;
 
+    // Each call gets a token. If another play() for the same key starts while this one
+    // is still loading/initialising, the older one will self-cancel and not leave
+    // a "ghost" loop playing in the background.
+    const token = (playToken.get(key) || 0) + 1;
+    playToken.set(key, token);
+
     await unlock();
     ensureCtx();
 
@@ -200,6 +209,13 @@ export function createAudio() {
           : null;
 
     if (!inst) return null;
+
+    // If a newer play() has started since we began, immediately stop this one.
+    if (playToken.get(key) !== token) {
+      try { inst.stop({ fadeOut: 0.02 }); } catch {}
+      return null;
+    }
+
     active.set(key, inst);
     return inst;
   }
