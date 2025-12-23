@@ -231,8 +231,11 @@ function ensurePhase1HUD(api) {
   styles.add(
     "p1-ui",
     `
-    html[data-phase='1'] .p1VizRow{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px; }
-    @media(max-width:520px){ html[data-phase='1'] .p1VizRow{ grid-template-columns:1fr; } }
+    /* Keep the two scopes on one horizontal row even on mobile.
+       If space is tight, allow sideways scroll rather than stacking. */
+    html[data-phase='1'] .p1VizRow{ display:flex; gap:14px; margin-top:12px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    html[data-phase='1'] .p1VizRow > .scopeWrap{ flex:0 0 min(520px, 100%); }
+    html[data-phase='1'] .p1VizRow::-webkit-scrollbar{ height:8px; }
 
     html[data-phase='1'] .scopeWrap{ border-radius:14px; }
     html[data-phase='1'] .p1OscWrap, html[data-phase='1'] .scopeWrap{ overflow:hidden; }
@@ -483,6 +486,11 @@ export default {
     const { ui, audio, state } = api;
 
     const d = ensurePhaseData(api);
+
+    // Runtime-only renderer handles must never persist across refresh.
+    // If they were accidentally serialized in an older save, force-reset here.
+    d._osc = null;
+    d._bars = null;
     if (!d.startAtMs) d.startAtMs = Date.now();
 
     ui.monitor("ARCTIC SKYWATCH ONLINE. SWF DIRECTIVE: POINT DISH INTO THE BLACK.");
@@ -672,6 +680,11 @@ export default {
 
   tick(api, dt) {
     const d = ensurePhaseData(api);
+
+    // Defensive: if older saves accidentally persisted these as plain objects,
+    // they block initialisation and the canvases look "dead" after refresh.
+    if (d._osc && typeof d._osc.draw !== "function") d._osc = null;
+    if (d._bars && typeof d._bars.draw !== "function") d._bars = null;
 
     // ----------------------------
     // Phase-local autosave
