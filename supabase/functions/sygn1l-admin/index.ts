@@ -112,7 +112,9 @@ serve(async (req) => {
   try {
     const url = Deno.env.get("SUPABASE_URL");
     // Supabase blocks custom secrets with SUPABASE_ prefix, so we use SERVICE_ROLE_KEY
-    const serviceKey = Deno.env.get("SERVICE_ROLE_KEY");
+    const serviceKey =
+  Deno.env.get("SERVICE_ROLE_KEY") ||
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     const masterEmail = Deno.env.get("SYGN1L_MASTER_EMAIL"); // recommended
     const masterUserId = Deno.env.get("SYGN1L_MASTER_USER_ID"); // optional
