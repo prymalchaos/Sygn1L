@@ -1,4 +1,5 @@
 // /js/main.js
+
 // Streamlined entry point.
 // Goal: keep "core" stable, push gameplay into /js/phases/phaseX.js plugins.
 
@@ -24,11 +25,10 @@ import { createUI } from "./ui.js";
 import { createScope } from "./scope.js";
 import { createAI } from "./ai.js";
 
-import { createAudio } from "./core/audio.js";
-
 import { createStyleManager } from "./core/styleManager.js";
 import { createPhaseRuntime } from "./core/phaseRuntime.js";
 import { createDevTools } from "./core/dev.js";
+import { createAudio } from "./core/audio.js";
 
 (() => {
   // ----------------------------
@@ -72,13 +72,10 @@ import { createDevTools } from "./core/dev.js";
   const saves = createSaves();
   const ui = createUI();
   const styles = createStyleManager();
-  const dev = createDevTools({ ui, saves });
-
-  // Audio (SFX + Music)
-  // Centralized audio system used by core + phase plugins.
   const audio = createAudio();
-  // Global UI button sounds: all buttons click, ping gets sonar.
-  audio.installGlobalButtonSounds({ pingSelector: "#ping" });
+  // Global UI sounds: all buttons click "chik", ping button gets sonar.
+  audio.attachGlobalButtonSounds({ pingId: "ping" });
+  const dev = createDevTools({ ui, saves });
 
   // Scope
   const scopeCanvas = document.getElementById("scope");
@@ -134,13 +131,6 @@ import { createDevTools } from "./core/dev.js";
     ui.pushLog("log", "SYS", on ? "AI ENABLED." : "AI DISABLED.");
   }
 
-  // Ensure the audio context is unlocked on the first real user interaction
-  // (required by iOS Safari + most mobile browsers).
-  const unlockAudioOnce = () => audio.unlock().catch(() => {});
-  window.addEventListener("pointerdown", unlockAudioOnce, { once: true });
-  window.addEventListener("keydown", unlockAudioOnce, { once: true });
-
-
   // ----------------------------
   // Phase runtime
   // ----------------------------
@@ -148,8 +138,8 @@ import { createDevTools } from "./core/dev.js";
   const api = {
     ui,
     styles,
-    saves,
     audio,
+    saves,
     ai,
     state,
     get derived() {
@@ -468,19 +458,15 @@ import { createDevTools } from "./core/dev.js";
     }
 
     // Corruption tick
-    // Corruption tick (in-place)
-corruptionTick(state, dt);
+    state.corruption = corruptionTick(state, derived, dt);
 
-// ✅ Scope tick (animates the canvas)
-scope.tick(dt, t, { total: state.total, bw: derived.bw, corruption: state.corruption });
-
-// Phase tick hook
-const mod = currentPhaseModule();
-try {
-  mod?.tick?.(api, dt);
-} catch (e) {
-  ui.pushLog("log", "SYS", `PHASE TICK ERROR: ${e?.message || e}`);
-}
+    // Phase tick hook
+    const mod = currentPhaseModule();
+    try {
+      mod?.tick?.(api, dt);
+    } catch (e) {
+      ui.pushLog("log", "SYS", `PHASE TICK ERROR: ${e?.message || e}`);
+    }
 
     // Render throttling: UI updates at most ~4fps unless something marked dirty.
     if (dirty || t - lastRender > 250) {
