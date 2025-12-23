@@ -20,6 +20,37 @@ export function createSaves() {
   // ----------------------------
   // Local (guest)
   // ----------------------------
+
+  // Strip runtime-only fields that should never be persisted (canvas renderers, DOM refs, etc.)
+  // This prevents "vanishing" visuals after refresh where a truthy but non-functional object
+  // blocks re-initialisation (e.g., Phase 1 _osc/_bars renderers).
+  function sanitizeStateForSave(state) {
+    if (!state || typeof state !== "object") return state;
+
+    const out = { ...state };
+
+    // Phase data is the main risk area: phases often stash non-serializable helpers.
+    if (out.phaseData && typeof out.phaseData === "object") {
+      const clean = {};
+      for (const [k, v] of Object.entries(out.phaseData)) {
+        if (!v || typeof v !== "object") {
+          clean[k] = v;
+          continue;
+        }
+        const bucket = {};
+        for (const [kk, vv] of Object.entries(v)) {
+          // Convention: any key starting with '_' is runtime-only.
+          if (String(kk).startsWith("_")) continue;
+          if (typeof vv === "function") continue;
+          bucket[kk] = vv;
+        }
+        clean[k] = bucket;
+      }
+      out.phaseData = clean;
+    }
+
+    return out;
+  }
   function loadLocal() {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (!raw) return null;
@@ -32,7 +63,7 @@ export function createSaves() {
 
   function saveLocal(state) {
     try {
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(state));
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(sanitizeStateForSave(state)));
       return true;
     } catch {
       return false;
@@ -170,7 +201,7 @@ export function createSaves() {
 
     const payload = {
       player_id: _userId,
-      state,
+      state: sanitizeStateForSave(state),
       updated_at: new Date().toISOString()
     };
 

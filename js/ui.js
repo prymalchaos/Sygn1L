@@ -6,44 +6,8 @@
 import { esc, fmt, fmtFull } from "./state.js";
 import { PHASES, corruptionLabel, prestigeGain, canRite } from "./economy.js";
 
-let audioCtx = null;
-let clickBuffer = null;
-let audioUnlocked = false;
-
-async function initAudio() {
-  if (audioCtx) return;
-
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-  const res = await fetch("audio/ui_click.wav"); // adjust path if needed
-  const arr = await res.arrayBuffer();
-  clickBuffer = await audioCtx.decodeAudioData(arr);
-}
-
-function playUIClick() {
-  if (!window.__audioCtx || !window.__uiClickBuffer) return;
-  if (window.__audioCtx.state !== "running") return;
-
-  const src = window.__audioCtx.createBufferSource();
-  src.buffer = window.__uiClickBuffer;
-
-  const gain = window.__audioCtx.createGain();
-  gain.gain.value = 0.25;
-
-  src.connect(gain).connect(window.__audioCtx.destination);
-  src.start();
-}
-
-document.addEventListener("click", (e) => {
-  // Only react to real UI buttons
-  const btn = e.target.closest("button, .btn");
-  if (!btn) return;
-
-  // Ignore disabled buttons
-  if (btn.disabled) return;
-
-  playUIClick();
-});
+// NOTE: All sound (button clicks, pings, music) is handled by /js/core/audio.js.
+// UI remains purely DOM + rendering.
 
 export function createUI() {
   const $ = (id) => document.getElementById(id);

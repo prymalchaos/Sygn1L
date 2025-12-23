@@ -240,7 +240,12 @@ import { createAudio } from "./core/audio.js";
     dt = Math.min(dt, OFFLINE_CAP_SEC);
 
     derived = recompute(state);
-    const gain = derived.sps * dt;
+    // Match the on-screen/real passive gain sources (core + automation + phase-local).
+    const phaseBucket = state?.phaseData?.[state.phase];
+    const phaseSps = Number(phaseBucket?._p1_sps ?? 0) || 0;
+    const autoSps = Number(autoGainPerSec(state, derived) || 0) || 0;
+    const displaySps = (Number(derived.sps || 0) || 0) + autoSps + phaseSps;
+    const gain = displaySps * dt;
     if (gain <= 0) return;
 
     state.signal += gain;
@@ -276,6 +281,16 @@ import { createAudio } from "./core/audio.js";
 
   function recomputeAndRender() {
     derived = recompute(state);
+
+    // "Signal/sec" display should reflect *actual* passive gain sources:
+    // - core derived.sps
+    // - automation layer (autoGainPerSec)
+    // - phase-local passive (e.g., Phase 1's _p1_sps)
+    // Phase-local SPS is stored under state.phaseData[phaseId].
+    const phaseBucket = state?.phaseData?.[state.phase];
+    const phaseSps = Number(phaseBucket?._p1_sps ?? 0) || 0;
+    const autoSps = Number(autoGainPerSec(state, derived) || 0) || 0;
+    derived.displaySps = (Number(derived.sps || 0) || 0) + autoSps + phaseSps;
 
     // Control layout tweaks (space-saving)
     // Hide PING once you're out of the early-game tutorial band.
