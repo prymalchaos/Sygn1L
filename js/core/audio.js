@@ -4,6 +4,24 @@
 // - Provides simple `play(name)` interface for core + phase plugins.
 // - Default sounds are procedural (no asset files required).
 
+const settingsKey = "sygn1l_audio_settings";
+
+let settings = {
+  sfxMuted: false,
+  musicMuted: false
+};
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(settingsKey));
+    if (s) settings = { ...settings, ...s };
+  } catch {}
+}
+
+function saveSettings() {
+  localStorage.setItem(settingsKey, JSON.stringify(settings));
+}
+
 export function createAudio() {
   let ctx = null;
   let master = null;
