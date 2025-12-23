@@ -150,6 +150,7 @@ serve(async (req) => {
     }
 
     const op = getOp(body);
+console.log(`[sygn1l-admin] op=${op} caller=${callerEmail} (${callerId})`);
     if (!op) return err("Missing op", 400);
 
     const isMaster =
