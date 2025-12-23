@@ -1,5 +1,4 @@
 // /js/main.js
-
 // Streamlined entry point.
 // Goal: keep "core" stable, push gameplay into /js/phases/phaseX.js plugins.
 
@@ -25,10 +24,11 @@ import { createUI } from "./ui.js";
 import { createScope } from "./scope.js";
 import { createAI } from "./ai.js";
 
+import { createAudio } from "./core/audio.js";
+
 import { createStyleManager } from "./core/styleManager.js";
 import { createPhaseRuntime } from "./core/phaseRuntime.js";
 import { createDevTools } from "./core/dev.js";
-import { createAudio } from "./core/audio.js";
 
 (() => {
   // ----------------------------
@@ -72,11 +72,13 @@ import { createAudio } from "./core/audio.js";
   const saves = createSaves();
   const ui = createUI();
   const styles = createStyleManager();
-  const audio = createAudio();
-  audio.installGlobalButtonSounds({ pingSelector: "#ping" });
-  // Global UI sounds: all buttons click "chik", ping button gets sonar.
-audio.installGlobalButtonSounds({ pingSelector: "#ping" });
   const dev = createDevTools({ ui, saves });
+
+  // Audio (SFX + Music)
+  // Centralized audio system used by core + phase plugins.
+  const audio = createAudio();
+  // Global UI button sounds: all buttons click, ping gets sonar.
+  audio.installGlobalButtonSounds({ pingSelector: "#ping" });
 
   // Scope
   const scopeCanvas = document.getElementById("scope");
@@ -132,6 +134,13 @@ audio.installGlobalButtonSounds({ pingSelector: "#ping" });
     ui.pushLog("log", "SYS", on ? "AI ENABLED." : "AI DISABLED.");
   }
 
+  // Ensure the audio context is unlocked on the first real user interaction
+  // (required by iOS Safari + most mobile browsers).
+  const unlockAudioOnce = () => audio.unlock().catch(() => {});
+  window.addEventListener("pointerdown", unlockAudioOnce, { once: true });
+  window.addEventListener("keydown", unlockAudioOnce, { once: true });
+
+
   // ----------------------------
   // Phase runtime
   // ----------------------------
@@ -139,8 +148,8 @@ audio.installGlobalButtonSounds({ pingSelector: "#ping" });
   const api = {
     ui,
     styles,
-    audio,
     saves,
+    audio,
     ai,
     state,
     get derived() {
@@ -459,15 +468,19 @@ audio.installGlobalButtonSounds({ pingSelector: "#ping" });
     }
 
     // Corruption tick
-    state.corruption = corruptionTick(state, derived, dt);
+    // Corruption tick (in-place)
+corruptionTick(state, dt);
 
-    // Phase tick hook
-    const mod = currentPhaseModule();
-    try {
-      mod?.tick?.(api, dt);
-    } catch (e) {
-      ui.pushLog("log", "SYS", `PHASE TICK ERROR: ${e?.message || e}`);
-    }
+// ✅ Scope tick (animates the canvas)
+scope.tick(dt, t, { total: state.total, bw: derived.bw, corruption: state.corruption });
+
+// Phase tick hook
+const mod = currentPhaseModule();
+try {
+  mod?.tick?.(api, dt);
+} catch (e) {
+  ui.pushLog("log", "SYS", `PHASE TICK ERROR: ${e?.message || e}`);
+}
 
     // Render throttling: UI updates at most ~4fps unless something marked dirty.
     if (dirty || t - lastRender > 250) {
