@@ -47,6 +47,15 @@ function ping(strength = 1, freqHz = 2.2, durationSec = 1.6) {
     sig.phase = 0;
   }
 
+  // iOS/Safari sometimes restores pages from bfcache where canvas dimensions
+  // come back as 0 until a paint. Re-resize on pageshow/visibility.
+  function nudgeResizeSoon() {
+    // next frame tends to have correct layout metrics
+    requestAnimationFrame(() => {
+      try { resize(); } catch {}
+    });
+  }
+
   // small deterministic hash noise
   function rand01(seed) {
     seed = (seed ^ 0x6d2b79f5) >>> 0;
@@ -163,6 +172,11 @@ function ping(strength = 1, freqHz = 2.2, durationSec = 1.6) {
 
   // public tick API
   function tick(dt, tMs, { total, bw, corruption }) {
+    // If layout changed (or page restored), make sure the canvas is correctly sized.
+    if (!sw || !sh || canvasEl.width === 0 || canvasEl.height === 0) {
+      try { resize(); } catch {}
+    }
+
     // --- advance ping clock / auto-clear
     if (pingA > 0) {
       pingT += dt;
@@ -177,6 +191,11 @@ function ping(strength = 1, freqHz = 2.2, durationSec = 1.6) {
   // init
   resize();
   window.addEventListener("resize", resize, { passive: true });
+
+  window.addEventListener("pageshow", nudgeResizeSoon, { passive: true });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) nudgeResizeSoon();
+  }, { passive: true });
 
 return { resize, tick, ping };
 }
