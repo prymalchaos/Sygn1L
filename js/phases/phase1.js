@@ -20,13 +20,21 @@ export default {
       html[data-phase='1'] #ping.afford{ filter: drop-shadow(0 0 10px rgba(90,255,170,.20)); }
     `);
 
-    // Ambient loop (phase-owned). Upload: /audio/Apollo.mp3
+    // Ambient loop (phase-owned). Target: /audio/Apollo.mp3
+    // NOTE: Some hosts (GitHub Pages, Linux servers) are case-sensitive.
+    // We try the requested casing first, then fall back to the repo's current file casing.
     // This stays fully self-contained: phases can own music without touching core.
     audio.register(
       "phase1_apollo",
       async (a) => {
-        const buf = await a.loadBuffer("audio/Apollo.mp3");
-        return a.loopingSource(buf, { bus: "music", gain: 0.18, fadeIn: 2.0 });
+        let buf;
+        try {
+          buf = await a.loadBuffer("audio/Apollo.mp3");
+        } catch {
+          buf = await a.loadBuffer("audio/apollo.mp3");
+        }
+        // Ambient: ~50% volume, gentle fade-in.
+        return a.loopingSource(buf, { bus: "music", gain: 0.5, fadeIn: 2.0 });
       },
       { bus: "music" }
     );
