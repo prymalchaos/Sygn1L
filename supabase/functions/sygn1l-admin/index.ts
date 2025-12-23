@@ -1,5 +1,6 @@
 // test
 
+
 // supabase/functions/sygn1l-admin/index.ts
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -13,16 +14,24 @@ type Body =
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...corsHeaders },
   });
 }
 
 function err(message: string, status = 400) {
   return json({ error: message }, status);
 }
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 serve(async (req) => {
   try {
+if (req.method === "OPTIONS") {
+  return new Response("ok", { headers: corsHeaders });
+}
     const url = Deno.env.get("SUPABASE_URL");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const masterEmail = Deno.env.get("SYGN1L_MASTER_EMAIL"); // optional
