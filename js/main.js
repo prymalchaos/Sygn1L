@@ -402,6 +402,10 @@ import { createAudio } from "./core/audio.js";
       // Prefer cloud if present
       const cloud = await saves.loadCloud();
       if (cloud) loadIntoState(cloud);
+
+      // If the player just signed in during Phase 0 onboarding, advance to gameplay.
+      if (state.phase === 0) state.phase = 1;
+
       await setPhase(state.phase, { silent: true });
       applyOfflineEarnings();
       recomputeAndRender();
@@ -451,14 +455,20 @@ import { createAudio } from "./core/audio.js";
     if (active) state.meta.activePlaySec += dt;
 
     // Passive gain
-    const g = autoGainPerSec(state, derived) * dt;
+    // Base passive is derived.sps; autoGainPerSec is the auto routine layer.
+    const g = (derived.sps + autoGainPerSec(state, derived)) * dt;
     if (g > 0) {
       state.signal += g;
       state.total += g;
     }
 
-    // Corruption tick
-    state.corruption = corruptionTick(state, derived, dt);
+    // Corruption tick (mutates state in-place)
+    corruptionTick(state, dt);
+
+    // Scope tick (visual only)
+    try {
+      scope.tick?.(dt, t, { total: state.total, bw: derived.bw, corruption: state.corruption });
+    } catch {}
 
     // Phase tick hook
     const mod = currentPhaseModule();
