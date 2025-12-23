@@ -34,40 +34,40 @@ const P1_BUFFS = [
     id: "p1_filter",
     name: "BANDPASS FILTER",
     unlock: 20,
-    base: 25,
-    mult: 2.10,
+    base: 28,     // was 25
+    mult: 2.05,   // slightly softer ramp early
     desc: "Cleaner returns. +12% ping gain. +18% Sync growth. +0.50 signal/sec."
   },
   {
     id: "p1_gain",
     name: "CRYO AMP",
-    unlock: 90,
+    unlock: 80,   // was 90 (so it appears sooner)
     base: 160,
-    mult: 2.25,
+    mult: 2.18,
     desc: "More power in the dark. +28% ping gain. +1.40 signal/sec. Slightly aggravates corruption."
   },
   {
     id: "p1_cancel",
     name: "NOISE CANCELLER",
-    unlock: 420,
-    base: 1200,
-    mult: 2.35,
+    unlock: 300,  // was 420
+    base: 1100,
+    mult: 2.25,
     desc: "Suppresses corruption pressure in Phase 1. +0.90 signal/sec."
   },
   {
     id: "p1_lock",
     name: "HARMONIC LOCK",
-    unlock: 3200,
-    base: 12000,
-    mult: 2.40,
+    unlock: 2200, // was 3200
+    base: 10500,
+    mult: 2.35,
     desc: "Synergy engine. Multiplies passive signal/sec and Sync growth per other buff owned."
   },
   {
     id: "p1_bias",
     name: "QUANTUM PHASE BIAS",
-    unlock: 22000,
-    base: 120000,
-    mult: 2.55,
+    unlock: 15000, // was 22000
+    base: 95000,
+    mult: 2.45,
     desc: "Surf the static. Converts corruption into extra passive signal + Sync momentum."
   }
 ];
