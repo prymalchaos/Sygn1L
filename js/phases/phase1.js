@@ -34,7 +34,7 @@ const P1_BUFFS = [
     unlock: 20,
     base: 20,
     mult: 2.15,
-    desc: "Cleaner returns. +10% ping gain. +15% Sync growth."
+    desc: "Cleaner returns. +10% ping gain. +15% Sync growth. +0.18 signal/sec."
   },
   {
     id: "p1_gain",
@@ -42,7 +42,7 @@ const P1_BUFFS = [
     unlock: 80,
     base: 120,
     mult: 2.25,
-    desc: "More power in the dark. +25% ping gain. Slightly aggravates corruption."
+    desc: "More power in the dark. +25% ping gain. +0.40 signal/sec. Slightly aggravates corruption."
   },
   {
     id: "p1_cancel",
@@ -50,7 +50,7 @@ const P1_BUFFS = [
     unlock: 350,
     base: 900,
     mult: 2.35,
-    desc: "Reduces corruption pressure in Phase 1."
+    desc: "Reduces corruption pressure in Phase 1. +0.12 signal/sec."
   },
   {
     id: "p1_lock",
@@ -58,7 +58,7 @@ const P1_BUFFS = [
     unlock: 2500,
     base: 8000,
     mult: 2.4,
-    desc: "Synergy engine. Sync growth increases for each other buff owned."
+    desc: "Synergy engine. Boosts passive signal/sec and Sync growth per other buff owned."
   },
   {
     id: "p1_bias",
@@ -66,7 +66,7 @@ const P1_BUFFS = [
     unlock: 18000,
     base: 90000,
     mult: 2.55,
-    desc: "Surf the static. Converts some corruption into Sync momentum."
+    desc: "Surf the static. Converts some corruption into passive signal + Sync momentum."
   }
 ];
 
@@ -489,15 +489,19 @@ export default {
     // Music
     ensureSingleMusic(audio);
     if (audio?.register) {
-      audio.register(MUSIC_KEY, async (a) => {
-        let buf;
-        try {
-          buf = await a.loadBuffer(MUSIC_SRC_PRIMARY);
-        } catch {
-          buf = await a.loadBuffer(MUSIC_SRC_FALLBACK);
-        }
-        return a.loopingSource(buf, { bus: "music", gain: 0.5, fadeIn: 2.0 });
-      }, { bus: "music" });
+      audio.register(
+        MUSIC_KEY,
+        async (a) => {
+          let buf;
+          try {
+            buf = await a.loadBuffer(MUSIC_SRC_PRIMARY);
+          } catch {
+            buf = await a.loadBuffer(MUSIC_SRC_FALLBACK);
+          }
+          return a.loopingSource(buf, { bus: "music", gain: 0.5, fadeIn: 2.0 });
+        },
+        { bus: "music" }
+      );
     }
     audio?.play?.(MUSIC_KEY, { fadeIn: 2.0 });
 
@@ -595,10 +599,51 @@ export default {
     // Only run the "win condition" once the return is acquired.
     if (d.pings >= 20) syncTick(api, dt);
 
+    // ----------------------------
+    // Phase 1 passive gain: buffs introduce visible "signal/sec" takeoff.
+    // (Keeps phase design local; no core system edits.)
+    // ----------------------------
+    if (d.pings >= 20 && !d.complete) {
+      const f = lvl(api.state, "p1_filter");
+      const g = lvl(api.state, "p1_gain");
+      const n = lvl(api.state, "p1_cancel");
+      const h = lvl(api.state, "p1_lock");
+      const q = lvl(api.state, "p1_bias");
+
+      // Base passive gain is deliberately tiny until buffs exist.
+      let sps = 0.01;
+
+      // Early buffs: clear, noticeable bumps.
+      sps += 0.18 * f;
+      sps += 0.40 * g;
+      sps += 0.12 * n;
+
+      // Harmonic Lock multiplies passive gain based on how many other buffs you have.
+      const owned = (f > 0) + (g > 0) + (n > 0) + (lvl(api.state, "p1_lock") > 0) + (q > 0);
+      sps *= 1 + 0.22 * h * Math.max(0, owned - 1);
+
+      // Corruption fights the takeoff
+      const corr = clamp(api.state.corruption || 0, 0, 1);
+      sps *= 1 - 0.40 * corr;
+
+      // Quantum Bias: convert some corruption into extra passive signal.
+      if (q > 0) sps += 0.28 * q * corr;
+
+      // A little coherence kick as synchronicity rises.
+      sps *= 1 + 0.30 * clamp(d.sync, 0, 1);
+
+      // Apply
+      const delta = Math.max(0, sps) * dt;
+      api.state.signal = (api.state.signal || 0) + delta;
+      api.state.total = (api.state.total || 0) + delta;
+
+      // Cache for UI/debug (optional)
+      d._p1_sps = sps;
+    }
+
     // Phase-owned corruption relief (Noise Canceller)
     const cancelLv = lvl(api.state, "p1_cancel");
     if (cancelLv > 0) {
-      // Small but meaningful over long sessions.
       api.state.corruption = clamp((api.state.corruption || 0) - 0.0000024 * cancelLv * dt, 0, 1);
     }
 
@@ -608,12 +653,17 @@ export default {
     // Timer (starts at first return)
     const elapsed = d.pings >= 20 ? (tNow - (d.startAtMs || tNow)) / 1000 : 0;
     const chip = document.getElementById("p1TimerChip");
-    if (chip) chip.textContent = d.complete ? `DONE ${fmtTime((d.endAtMs - d.startAtMs) / 1000)}` : `T+ ${fmtTime(elapsed)}`;
+    if (chip)
+      chip.textContent = d.complete
+        ? `DONE ${fmtTime((d.endAtMs - d.startAtMs) / 1000)}`
+        : `T+ ${fmtTime(elapsed)}`;
 
     // Sync HUD
     const syncPct = clamp(d.sync, 0, 1) * 100;
-    document.getElementById("p1OscLabel") && (document.getElementById("p1OscLabel").textContent = `SYNC: ${syncPct.toFixed(0)}%`);
-    document.getElementById("p1SyncMeta") && (document.getElementById("p1SyncMeta").textContent = `${syncPct.toFixed(1)}%`);
+    document.getElementById("p1OscLabel") &&
+      (document.getElementById("p1OscLabel").textContent = `SYNC: ${syncPct.toFixed(0)}%`);
+    document.getElementById("p1SyncMeta") &&
+      (document.getElementById("p1SyncMeta").textContent = `${syncPct.toFixed(1)}%`);
     const fill = document.getElementById("p1SyncFill");
     if (fill) fill.style.width = `${syncPct.toFixed(2)}%`;
 
@@ -639,8 +689,14 @@ export default {
     // Completion hints in monitor
     if (!d.complete) {
       if (d.pings < 20) api.ui.monitor(`SCANNING… ${d.pings}/20 PINGS`);
-      else if (d.sync < 0.30) api.ui.monitor(`RETURN ACQUIRED. SEEK COHERENCE. SYNC ${syncPct.toFixed(1)}%`);
-      else api.ui.monitor(`CORRUPTION PUSHBACK DETECTED. HOLD THE LINE. SYNC ${syncPct.toFixed(1)}%`);
+      else if (d.sync < 0.30)
+        api.ui.monitor(
+          `RETURN ACQUIRED. SEEK COHERENCE. SYNC ${syncPct.toFixed(1)}%  •  +${(d._p1_sps || 0).toFixed(2)}/s`
+        );
+      else
+        api.ui.monitor(
+          `CORRUPTION PUSHBACK DETECTED. HOLD THE LINE. SYNC ${syncPct.toFixed(1)}%  •  +${(d._p1_sps || 0).toFixed(2)}/s`
+        );
     }
   }
 };
