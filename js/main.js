@@ -116,10 +116,6 @@ import { createAudio } from "./core/audio.js";
   };
 
   let derived = recompute(state);
-  // HUD: "SIGNAL/SEC" (top readout)
-const phaseSps = Number(state?.phaseData?._p1_sps ?? 0) || 0;
-const autoSps = autoGainPerSec(state, derived) || 0;
-derived.displaySps = (derived.sps || 0) + autoSps + phaseSps;
   const nowMs = () => Date.now();
   const touch = () => (state.meta.updatedAtMs = nowMs());
   const markInput = () => {
@@ -237,6 +233,18 @@ derived.displaySps = (derived.sps || 0) + autoSps + phaseSps;
 
   function recomputeAndRender() {
     derived = recompute(state);
+
+    // ------------------------------------------------------------
+    // HUD: "SIGNAL/SEC" (top readout)
+    // ------------------------------------------------------------
+    // The core economy has a base passive (derived.sps) plus an auto layer.
+    // Some phases (e.g. Phase 1) also add phase-local passive gain.
+    // That phase value is stored on state.phaseData (currently: _p1_sps).
+    // We compute a single "display" SPS so the header readout matches what
+    // the player is actually earning.
+    const phaseSps = Number(state?.phaseData?._p1_sps ?? 0) || 0;
+    const autoSps = autoGainPerSec(state, derived) || 0;
+    derived.displaySps = (derived.sps || 0) + autoSps + phaseSps;
 
     // Control layout tweaks (space-saving)
     // Hide PING once you're out of the early-game tutorial band.
