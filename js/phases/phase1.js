@@ -1,6 +1,7 @@
 // /js/phases/phase1.js
 // PHASE 1: EXPLORATION
 // Localised phase gameplay: buffs, synchronicity meter, extra CRT scopes, timer + replay.
+// Adds: Phase-local passive gain, phase-local autosave, and phase-local AI comms triggers.
 
 import { clamp, fmt } from "../state.js";
 import { lvl } from "../economy.js";
@@ -25,50 +26,85 @@ function ensureSingleMusic(audio) {
 
 // ----------------------------
 // Phase 1 Buffs (phase-owned upgrade list)
-// Uses the existing upgrade UI + purchase pipeline, but IDs are phase-specific.
+// Costs ramp exponentially.
+// Buffs are intentionally impactful on passive gain so the player feels "takeoff".
 // ----------------------------
 const P1_BUFFS = [
   {
     id: "p1_filter",
     name: "BANDPASS FILTER",
     unlock: 20,
-    base: 20,
-    mult: 2.15,
-    desc: "Cleaner returns. +10% ping gain. +15% Sync growth. +0.18 signal/sec."
+    base: 25,
+    mult: 2.10,
+    desc: "Cleaner returns. +12% ping gain. +18% Sync growth. +0.50 signal/sec."
   },
   {
     id: "p1_gain",
     name: "CRYO AMP",
-    unlock: 80,
-    base: 120,
+    unlock: 90,
+    base: 160,
     mult: 2.25,
-    desc: "More power in the dark. +25% ping gain. +0.40 signal/sec. Slightly aggravates corruption."
+    desc: "More power in the dark. +28% ping gain. +1.40 signal/sec. Slightly aggravates corruption."
   },
   {
     id: "p1_cancel",
     name: "NOISE CANCELLER",
-    unlock: 350,
-    base: 900,
+    unlock: 420,
+    base: 1200,
     mult: 2.35,
-    desc: "Reduces corruption pressure in Phase 1. +0.12 signal/sec."
+    desc: "Suppresses corruption pressure in Phase 1. +0.90 signal/sec."
   },
   {
     id: "p1_lock",
     name: "HARMONIC LOCK",
-    unlock: 2500,
-    base: 8000,
-    mult: 2.4,
-    desc: "Synergy engine. Boosts passive signal/sec and Sync growth per other buff owned."
+    unlock: 3200,
+    base: 12000,
+    mult: 2.40,
+    desc: "Synergy engine. Multiplies passive signal/sec and Sync growth per other buff owned."
   },
   {
     id: "p1_bias",
     name: "QUANTUM PHASE BIAS",
-    unlock: 18000,
-    base: 90000,
+    unlock: 22000,
+    base: 120000,
     mult: 2.55,
-    desc: "Surf the static. Converts some corruption into passive signal + Sync momentum."
+    desc: "Surf the static. Converts corruption into extra passive signal + Sync momentum."
   }
 ];
+
+// ----------------------------
+// Phase data
+// ----------------------------
+function ensurePhaseData(api) {
+  api.state.phaseData ||= {};
+  api.state.phaseData[PHASE_ID] ||= {
+    pings: 0,
+    sync: 0,
+    complete: false,
+    startAtMs: Date.now(),
+    endAtMs: 0,
+    bestTimeSec: 0,
+
+    // local render + telemetry cache
+    _p1_sps: 0,
+    _osc: null,
+    _bars: null,
+
+    // phase-local autosave + comms timers (so we don't touch core)
+    _autosaveAccum: 0,
+    _cloudSaveAccum: 0,
+    _commsAccum: 0,
+    _aiPulseAccum: 0
+  };
+  return api.state.phaseData[PHASE_ID];
+}
+
+function fmtTime(sec) {
+  const s = Math.max(0, Math.floor(sec));
+  const mm = String(Math.floor(s / 60)).padStart(2, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
 
 // ----------------------------
 // Phase 1 DOM + renderers
@@ -76,7 +112,6 @@ const P1_BUFFS = [
 function ensurePhase1HUD(api) {
   const { ui, styles } = api;
 
-  // Create: scope row (existing array scope + new osc), then thin bar.
   const headerPad = document.querySelector("header.card .pad");
   const scopeWrap = document.querySelector(".scopeWrap");
   if (!headerPad || !scopeWrap) return;
@@ -84,7 +119,6 @@ function ensurePhase1HUD(api) {
   // Avoid double-inserting on re-enter.
   if (document.getElementById("p1Osc")) return;
 
-  // Row container
   const row = document.createElement("div");
   row.id = "p1VizRow";
   row.className = "p1VizRow";
@@ -108,7 +142,7 @@ function ensurePhase1HUD(api) {
   `;
   row.appendChild(osc);
 
-  // Sync bar (full width, thin)
+  // Sync bar + spectrum bars
   const bar = document.createElement("div");
   bar.className = "p1SyncBar";
   bar.innerHTML = `
@@ -117,6 +151,9 @@ function ensurePhase1HUD(api) {
       <div class="p1SyncMeta" id="p1SyncMeta">0.0%</div>
     </div>
     <div class="p1Bar"><div class="p1Fill" id="p1SyncFill"></div></div>
+    <div class="p1SpsRow">
+      <span class="chip p1Chip" id="p1SpsChip">P1 +0.00/s</span>
+    </div>
     <canvas id="p1Bars"></canvas>
   `;
   headerPad.insertBefore(bar, document.getElementById("ping"));
@@ -133,7 +170,6 @@ function ensurePhase1HUD(api) {
     );
     if (!ok) return;
 
-    // Reset run state
     const d = ensurePhaseData(api);
     d.pings = 0;
     d.sync = 0;
@@ -146,12 +182,10 @@ function ensurePhase1HUD(api) {
       if (api.state.up && b.id in api.state.up) api.state.up[b.id] = 0;
     }
 
-    // Reset key resources for a fair time trial
     api.state.signal = 0;
     api.state.total = 0;
     api.state.corruption = 0;
 
-    // UI
     replay.style.display = "none";
     ui.popup("OPS", "Phase 1 reset. Beat your best time.");
     ui.pushLog("log", "SYS", "PHASE 1 REPLAY INITIATED.");
@@ -169,15 +203,12 @@ function ensurePhase1HUD(api) {
     chipHost.appendChild(chip);
   }
 
-  // Phase-owned styles
   styles.add(
     "p1-ui",
     `
-    /* Phase 1 layout: two CRT scopes in a row */
     html[data-phase='1'] .p1VizRow{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:12px; }
     @media(max-width:520px){ html[data-phase='1'] .p1VizRow{ grid-template-columns:1fr; } }
 
-    /* CRT vibe: rounded corners, scanlines, subtle bloom */
     html[data-phase='1'] .scopeWrap{ border-radius:14px; }
     html[data-phase='1'] .p1OscWrap, html[data-phase='1'] .scopeWrap{ overflow:hidden; }
 
@@ -207,11 +238,12 @@ function ensurePhase1HUD(api) {
     html[data-phase='1'] .p1Bar{ height:10px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.06); margin-top:8px; }
     html[data-phase='1'] .p1Fill{ height:100%; width:0%; background:linear-gradient(90deg, rgba(57,255,106,.25), rgba(88,255,174,.90)); box-shadow:0 0 18px rgba(57,255,106,.18); }
 
+    html[data-phase='1'] .p1SpsRow{ margin-top:8px; display:flex; justify-content:flex-end; }
+    html[data-phase='1'] .p1Chip{ font-size:11px; opacity:.92; }
+
     html[data-phase='1'] canvas#p1Osc{ display:block; width:100%; height:84px; }
     html[data-phase='1'] canvas#p1Bars{ display:block; width:100%; height:34px; margin-top:8px; opacity:.92; }
 
-    /* Make PING feel more alive */
-    html[data-phase='1'] #ping{ transform:translateZ(0); }
     html[data-phase='1'] #ping.afford{ filter: drop-shadow(0 0 10px rgba(90,255,170,.20)); }
   `
   );
@@ -220,46 +252,20 @@ function ensurePhase1HUD(api) {
 function teardownPhase1HUD(api) {
   api.styles.remove("p1-ui");
 
-  // Put the original scopeWrap back where it was: just before PING.
   const scopeWrap = document.querySelector(".scopeWrap");
   const headerPad = document.querySelector("header.card .pad");
   const ping = document.getElementById("ping");
   if (scopeWrap && headerPad && ping) {
-    // If it's currently inside p1VizRow, move it back.
     const row = document.getElementById("p1VizRow");
     if (row && row.contains(scopeWrap)) {
       headerPad.insertBefore(scopeWrap, ping);
     }
   }
 
-  // Remove injected DOM
   document.getElementById("p1VizRow")?.remove();
   document.querySelector(".p1SyncBar")?.remove();
   document.getElementById("p1Replay")?.remove();
   document.getElementById("p1TimerChip")?.remove();
-}
-
-// ----------------------------
-// Phase data
-// ----------------------------
-function ensurePhaseData(api) {
-  api.state.phaseData ||= {};
-  api.state.phaseData[PHASE_ID] ||= {
-    pings: 0,
-    sync: 0,
-    complete: false,
-    startAtMs: Date.now(),
-    endAtMs: 0,
-    bestTimeSec: 0
-  };
-  return api.state.phaseData[PHASE_ID];
-}
-
-function fmtTime(sec) {
-  const s = Math.max(0, Math.floor(sec));
-  const mm = String(Math.floor(s / 60)).padStart(2, "0");
-  const ss = String(s % 60).padStart(2, "0");
-  return `${mm}:${ss}`;
 }
 
 // ----------------------------
@@ -286,16 +292,13 @@ function createOscRenderer(canvas) {
   function draw(t, sync, corr) {
     if (!w || !h) return;
 
-    // Background
     ctx.fillStyle = "rgb(0,0,0)";
     ctx.fillRect(0, 0, w, h);
 
-    // CRT bloom border
     ctx.strokeStyle = "rgba(60,255,120,0.18)";
     ctx.lineWidth = Math.max(1, 1 * dpr);
     ctx.strokeRect(Math.floor(0.5 * dpr), Math.floor(0.5 * dpr), w - Math.floor(1 * dpr), h - Math.floor(1 * dpr));
 
-    // Lissajous that becomes a circle as sync -> 1
     const s = clamp(sync, 0, 1);
     const c = clamp(corr, 0, 1);
 
@@ -304,7 +307,7 @@ function createOscRenderer(canvas) {
     const r = Math.min(w, h) * 0.34;
 
     const jitter = (1 - s) * (0.55 + 0.65 * c);
-    const a = 1 + 2.8 * (1 - s); // frequency ratio stabilises to 1
+    const a = 1 + 2.8 * (1 - s);
     const b = 1;
 
     ctx.beginPath();
@@ -325,7 +328,6 @@ function createOscRenderer(canvas) {
     ctx.lineWidth = Math.max(1, 1.25 * dpr);
     ctx.stroke();
 
-    // Little centre dot when nearing completion
     if (s > 0.92) {
       ctx.fillStyle = "rgba(88,255,174,0.9)";
       ctx.beginPath();
@@ -372,11 +374,8 @@ function createBarsRenderer(canvas) {
     for (let i = 0; i < bins; i++) {
       const x = i * (bw + gap);
 
-      // Chaotic early, steadier late
       const chaos = (Math.sin(t * 0.006 + i * 0.9) + Math.sin(t * 0.002 + i * 1.7)) * 0.5;
       const noise = (0.5 + 0.5 * chaos) * (1 - s) * (0.65 + 0.7 * c);
-
-      // A subtle "plateau" emerges as sync rises
       const plateau = 0.22 + 0.55 * s;
 
       const v = clamp(plateau + noise, 0.05, 1);
@@ -386,7 +385,6 @@ function createBarsRenderer(canvas) {
       ctx.fillRect(x, h - barH, bw, barH);
     }
 
-    // Top shine
     ctx.fillStyle = "rgba(255,255,255,0.04)";
     ctx.fillRect(0, 0, w, Math.floor(1 * dpr));
   }
@@ -398,57 +396,44 @@ function createBarsRenderer(canvas) {
 
 // ----------------------------
 // Synchronicity math (Phase 1 win condition)
-// - Early: reaching ~30% is fairly easy.
-// - Late: corruption pressure ramps after 30%, making the last stretch a fight.
-// - Goal: roughly "tens of minutes" of engaged play without buffs; faster with smart buffs.
 // ----------------------------
 function syncTick(api, dt) {
   const d = ensurePhaseData(api);
-
   if (d.complete) return;
 
   const s = clamp(d.sync, 0, 1);
   const corr = clamp(api.state.corruption || 0, 0, 1);
 
-  // Buff levels
   const f = lvl(api.state, "p1_filter");
   const g = lvl(api.state, "p1_gain");
   const n = lvl(api.state, "p1_cancel");
   const h = lvl(api.state, "p1_lock");
   const q = lvl(api.state, "p1_bias");
 
-  // "Signal pressure": big numbers help but with heavy diminishing returns.
   const sig = Math.max(0, api.state.signal || 0);
-  const signalPressure = clamp(Math.log10(sig + 10) / 7.5, 0, 1); // 0..1-ish
+  const signalPressure = clamp(Math.log10(sig + 10) / 7.2, 0, 1);
 
-  // Growth: base + signalPressure, then buff multipliers
-  let growth = (0.00072 + 0.0009 * signalPressure);
+  let growth = (0.00074 + 0.00100 * signalPressure);
 
-  // Buff multipliers (gentle, stackable)
-  growth *= 1 + 0.15 * f;
-  growth *= 1 + 0.22 * h * (0.15 + 0.10 * (f > 0) + 0.10 * (g > 0) + 0.10 * (n > 0) + 0.10 * (q > 0));
+  growth *= 1 + 0.18 * f;
 
-  // Corruption reduces growth, but doesn't delete it.
+  // Harmonic Lock: scales better now (so late-game can actually finish)
+  const owned =
+    (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
+  growth *= 1 + 0.30 * h * Math.max(0, owned - 1);
+
   growth *= 1 - 0.55 * corr;
 
-  // Drag ramps aggressively after 30%.
   const post30 = Math.max(0, s - 0.30);
   let drag = 0.00020 + 0.00210 * post30 * post30;
-
-  // Corruption adds extra drag.
   drag *= 0.55 + 1.15 * corr;
+  drag *= 1 - clamp(0.22 * n, 0, 0.65);
 
-  // Noise Canceller reduces drag.
-  drag *= 1 - clamp(0.18 * n, 0, 0.60);
-
-  // Quantum Bias turns some corruption into forward motion (high-skill, high-variance).
-  // It can't fully cancel drag, but it lets you "ride the static".
-  const surf = q > 0 ? (0.00014 * q * corr) : 0;
+  const surf = q > 0 ? (0.00016 * q * corr) : 0;
 
   const ds = (growth - drag + surf) * dt;
   d.sync = clamp(s + ds, 0, 1);
 
-  // Completion
   if (d.sync >= 1) {
     d.complete = true;
     d.endAtMs = Date.now();
@@ -461,9 +446,9 @@ function syncTick(api, dt) {
     api.ui.popup("CONTROL", `SYNCHRONICITY ACHIEVED. TIME: ${fmtTime(timeSec)}. BEST: ${best}.`);
     api.ui.pushLog("log", "SYS", `PHASE 1 COMPLETE. TIME ${fmtTime(timeSec)}.`);
 
-    // Show replay
     const replayBtn = document.getElementById("p1Replay");
     if (replayBtn) replayBtn.style.display = "";
+    api.touch();
   }
 }
 
@@ -486,7 +471,6 @@ export default {
 
     ensurePhase1HUD(api);
 
-    // Music
     ensureSingleMusic(audio);
     if (audio?.register) {
       audio.register(
@@ -511,6 +495,12 @@ export default {
       if (!(b.id in state.up)) state.up[b.id] = 0;
     }
 
+    // Prime phase-local timers
+    d._autosaveAccum = 0;
+    d._cloudSaveAccum = 0;
+    d._commsAccum = 0;
+    d._aiPulseAccum = 0;
+
     api.touch();
   },
 
@@ -521,8 +511,6 @@ export default {
   },
 
   filterUpgrades(_upgrades, api) {
-    // Phase 1 is exploration: show the phase-owned buff set only.
-    // Buffs are hidden until the player acquires the first return (20 pings).
     const d = ensurePhaseData(api);
     if (d.pings < 20) return [];
     return P1_BUFFS;
@@ -531,7 +519,6 @@ export default {
   modifyClickGain(base, api) {
     const d = ensurePhaseData(api);
 
-    // The first 20 pings are a "scan" ritual: fixed gain so it feels deliberate.
     if (d.pings < 20) return 1;
 
     let g = base;
@@ -541,11 +528,9 @@ export default {
     const lockLv = lvl(api.state, "p1_lock");
     const biasLv = lvl(api.state, "p1_bias");
 
-    // Pure gain
-    g *= 1 + 0.10 * filterLv;
-    g *= 1 + 0.25 * gainLv;
+    g *= 1 + 0.12 * filterLv;
+    g *= 1 + 0.28 * gainLv;
 
-    // Synergy: Harmonic Lock rewards combining buffs.
     const owned =
       (lvl(api.state, "p1_filter") > 0) +
       (lvl(api.state, "p1_gain") > 0) +
@@ -553,12 +538,11 @@ export default {
       (lvl(api.state, "p1_lock") > 0) +
       (lvl(api.state, "p1_bias") > 0);
 
-    g *= 1 + 0.06 * lockLv * Math.max(0, owned - 1);
+    g *= 1 + 0.08 * lockLv * Math.max(0, owned - 1);
 
-    // Quantum Bias: a little extra click gain when corruption is present.
     if (biasLv > 0) {
       const c = clamp(api.state.corruption || 0, 0, 1);
-      g *= 1 + 0.10 * biasLv * c;
+      g *= 1 + 0.12 * biasLv * c;
     }
 
     return g;
@@ -568,40 +552,69 @@ export default {
     const d = ensurePhaseData(api);
     d.pings++;
 
-    // Micro-narrative beats
+    // Mark activity for comms gating (phase-local, no core changes)
+    api.ai?.markActive?.();
+
     if (d.pings === 1) api.ui.popup("SWF", "Ping the void. Count your returns.");
-    if (d.pings === 10) api.ui.pushLog("comms", "CONTROL", "Echo jitter detected. Keep scanning.");
+    if (d.pings === 10) api.ui.pushLog("comms", "OPS", "Echo jitter detected. Keep scanning.");
 
     if (d.pings === 20) {
-      // "Return" acquired: set up a baseline 20 signal if the player somehow has less.
       api.state.signal = Math.max(api.state.signal, 20);
       api.state.total = Math.max(api.state.total, 20);
 
       api.ui.popup("CONTROL", "Return acquired. Buffs are now available.");
-      api.ui.pushLog("log", "SYS", "RETURN SIGNAL LOCKED. BUFF PROTOCOLS UNSEALED.");
+      api.ui.pushLog("comms", "CONTROL", "RETURN SIGNAL LOCKED. BUFF PROTOCOLS UNSEALED.");
 
-      // Start the run timer on first return, so the time trial is apples-to-apples.
       d.startAtMs = Date.now();
-
       api.touch();
+
+      // Force-save right when the run begins so refresh doesn't zero you
+      try {
+        api.saves?.saveLocal?.(api.state);
+      } catch {}
+      try {
+        api.saves?.writeCloudState?.(api.state, false);
+      } catch {}
     }
 
-    // Cryo Amp tradeoff: makes pings irritate corruption slightly more.
+    // Cryo Amp tradeoff: slightly increases corruption per ping
     const gainLv = lvl(api.state, "p1_gain");
     if (gainLv > 0) {
-      api.state.corruption = clamp((api.state.corruption || 0) + 0.00008 * gainLv, 0, 1);
+      api.state.corruption = clamp((api.state.corruption || 0) + 0.00010 * gainLv, 0, 1);
     }
   },
 
   tick(api, dt) {
     const d = ensurePhaseData(api);
 
-    // Only run the "win condition" once the return is acquired.
+    // ----------------------------
+    // Phase-local autosave (fixes "refresh reset")
+    // ----------------------------
+    d._autosaveAccum += dt;
+    d._cloudSaveAccum += dt;
+
+    // Local save every 6 seconds (fast, reliable)
+    if (d._autosaveAccum >= 6) {
+      d._autosaveAccum = 0;
+      api.touch(); // keeps offline earnings sane too
+      try {
+        api.saves?.saveLocal?.(api.state);
+      } catch {}
+    }
+
+    // Cloud save occasionally if signed in (respects internal throttling)
+    if (d._cloudSaveAccum >= 20) {
+      d._cloudSaveAccum = 0;
+      try {
+        api.saves?.writeCloudState?.(api.state, false);
+      } catch {}
+    }
+
+    // Win condition only after the return is acquired
     if (d.pings >= 20) syncTick(api, dt);
 
     // ----------------------------
-    // Phase 1 passive gain: buffs introduce visible "signal/sec" takeoff.
-    // (Keeps phase design local; no core system edits.)
+    // Phase 1 passive gain (buff-driven takeoff)
     // ----------------------------
     if (d.pings >= 20 && !d.complete) {
       const f = lvl(api.state, "p1_filter");
@@ -610,47 +623,67 @@ export default {
       const h = lvl(api.state, "p1_lock");
       const q = lvl(api.state, "p1_bias");
 
-      // Base passive gain is deliberately tiny until buffs exist.
-      let sps = 0.01;
+      // Baseline tiny hum so the meter isn't dead
+      let sps = 0.04;
 
-      // Early buffs: clear, noticeable bumps.
-      sps += 0.18 * f;
-      sps += 0.40 * g;
-      sps += 0.12 * n;
+      // Strong early takeoff (what you asked for)
+      sps += 0.50 * f;
+      sps += 1.40 * g;
+      sps += 0.90 * n;
 
-      // Harmonic Lock multiplies passive gain based on how many other buffs you have.
-      const owned = (f > 0) + (g > 0) + (n > 0) + (lvl(api.state, "p1_lock") > 0) + (q > 0);
-      sps *= 1 + 0.22 * h * Math.max(0, owned - 1);
+      // Harmonic Lock multiplies passive gain based on other buffs owned
+      const owned = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
+      sps *= 1 + 0.34 * h * Math.max(0, owned - 1);
 
       // Corruption fights the takeoff
       const corr = clamp(api.state.corruption || 0, 0, 1);
-      sps *= 1 - 0.40 * corr;
+      sps *= 1 - 0.38 * corr;
 
-      // Quantum Bias: convert some corruption into extra passive signal.
-      if (q > 0) sps += 0.28 * q * corr;
+      // Quantum Bias converts some corruption into extra passive signal
+      if (q > 0) sps += 0.55 * q * corr;
 
-      // A little coherence kick as synchronicity rises.
-      sps *= 1 + 0.30 * clamp(d.sync, 0, 1);
+      // Coherence kick as synch rises (feels like "locking in")
+      sps *= 1 + 0.42 * clamp(d.sync, 0, 1);
 
-      // Apply
       const delta = Math.max(0, sps) * dt;
       api.state.signal = (api.state.signal || 0) + delta;
       api.state.total = (api.state.total || 0) + delta;
 
-      // Cache for UI/debug (optional)
       d._p1_sps = sps;
     }
 
-    // Phase-owned corruption relief (Noise Canceller)
+    // Phase-owned corruption relief
     const cancelLv = lvl(api.state, "p1_cancel");
     if (cancelLv > 0) {
-      api.state.corruption = clamp((api.state.corruption || 0) - 0.0000024 * cancelLv * dt, 0, 1);
+      api.state.corruption = clamp((api.state.corruption || 0) - 0.0000030 * cancelLv * dt, 0, 1);
     }
 
-    // Update HUD: timer + sync widgets
+    // ----------------------------
+    // Phase-local AI comms (fixes "never seen a single message")
+    // Notes: your AI system requires signed-in + active.
+    // ----------------------------
+    d._commsAccum += dt;
+    d._aiPulseAccum += dt;
+
+    // Ambient human comms roughly every 45–75s while active
+    if (d._commsAccum >= 55) {
+      d._commsAccum = 0;
+      api.ai?.maybeAmbient?.(api.state);
+    }
+
+    // Occasional AI “CONTROL/SWF” injections during key moments
+    if (d._aiPulseAccum >= 75) {
+      d._aiPulseAccum = 0;
+      if (d.pings >= 20 && d.sync < 0.35) api.ai?.invokeEdge?.(api.state, "phase1_early", "CONTROL");
+      else if (d.sync >= 0.35 && d.sync < 0.85) api.ai?.invokeEdge?.(api.state, "phase1_mid", "OPS");
+      else if (d.sync >= 0.85 && !d.complete) api.ai?.invokeEdge?.(api.state, "phase1_final", "SWF");
+    }
+
+    // ----------------------------
+    // HUD updates
+    // ----------------------------
     const tNow = Date.now();
 
-    // Timer (starts at first return)
     const elapsed = d.pings >= 20 ? (tNow - (d.startAtMs || tNow)) / 1000 : 0;
     const chip = document.getElementById("p1TimerChip");
     if (chip)
@@ -658,20 +691,22 @@ export default {
         ? `DONE ${fmtTime((d.endAtMs - d.startAtMs) / 1000)}`
         : `T+ ${fmtTime(elapsed)}`;
 
-    // Sync HUD
     const syncPct = clamp(d.sync, 0, 1) * 100;
-    document.getElementById("p1OscLabel") &&
-      (document.getElementById("p1OscLabel").textContent = `SYNC: ${syncPct.toFixed(0)}%`);
-    document.getElementById("p1SyncMeta") &&
-      (document.getElementById("p1SyncMeta").textContent = `${syncPct.toFixed(1)}%`);
+    const oscLabel = document.getElementById("p1OscLabel");
+    if (oscLabel) oscLabel.textContent = `SYNC: ${syncPct.toFixed(0)}%`;
+
+    const meta = document.getElementById("p1SyncMeta");
+    if (meta) meta.textContent = `${syncPct.toFixed(1)}%`;
+
     const fill = document.getElementById("p1SyncFill");
     if (fill) fill.style.width = `${syncPct.toFixed(2)}%`;
 
-    // Render the extra canvases
+    const spsChip = document.getElementById("p1SpsChip");
+    if (spsChip) spsChip.textContent = `P1 +${(d._p1_sps || 0).toFixed(2)}/s`;
+
     const oscCanvas = document.getElementById("p1Osc");
     const barsCanvas = document.getElementById("p1Bars");
 
-    // Cache renderers on the phaseData object so we don't rebuild them every tick.
     if (!d._osc && oscCanvas) d._osc = createOscRenderer(oscCanvas);
     if (!d._bars && barsCanvas) d._bars = createBarsRenderer(barsCanvas);
 
@@ -679,24 +714,19 @@ export default {
     d._osc?.draw?.(tNow, d.sync, corr);
     d._bars?.draw?.(tNow, d.sync, corr);
 
-    // Keep PING button glowing when buffs become available
     const pingBtn = document.getElementById("ping");
     if (pingBtn) {
       if (d.pings < 20) pingBtn.classList.add("afford");
       else pingBtn.classList.remove("afford");
     }
 
-    // Completion hints in monitor
+    // Monitor text
     if (!d.complete) {
       if (d.pings < 20) api.ui.monitor(`SCANNING… ${d.pings}/20 PINGS`);
       else if (d.sync < 0.30)
-        api.ui.monitor(
-          `RETURN ACQUIRED. SEEK COHERENCE. SYNC ${syncPct.toFixed(1)}%  •  +${(d._p1_sps || 0).toFixed(2)}/s`
-        );
+        api.ui.monitor(`RETURN ACQUIRED. SEEK COHERENCE. SYNC ${syncPct.toFixed(1)}%  •  P1 +${(d._p1_sps || 0).toFixed(2)}/s`);
       else
-        api.ui.monitor(
-          `CORRUPTION PUSHBACK DETECTED. HOLD THE LINE. SYNC ${syncPct.toFixed(1)}%  •  +${(d._p1_sps || 0).toFixed(2)}/s`
-        );
+        api.ui.monitor(`CORRUPTION PUSHBACK DETECTED. HOLD THE LINE. SYNC ${syncPct.toFixed(1)}%  •  P1 +${(d._p1_sps || 0).toFixed(2)}/s`);
     }
   }
 };
