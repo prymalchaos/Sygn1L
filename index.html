@@ -668,8 +668,28 @@ html[data-phase="1"] .pop{
   </div>
   <div class="pad">
     <div class="muted" id="onboardText" style="font-size:13px; line-height:1.65;"></div>
+
+    <!-- Onboarding Auth (revealed at final step) -->
+    <div id="onboardAuth" style="display:none; margin-top:12px;">
+      <input class="texty" id="onboardEmail" placeholder="EMAIL" inputmode="email" autocomplete="email" />
+      <div style="height:10px"></div>
+      <input class="texty" id="onboardPass" placeholder="PASSWORD" type="password" autocomplete="current-password" />
+      <div style="height:10px"></div>
+      <input class="texty" id="onboardName" placeholder="USERNAME (OPTIONAL)" autocomplete="nickname" />
+      <div style="height:10px"></div>
+      <div class="grid2">
+        <button id="onboardCreate">CREATE</button>
+        <button id="onboardLogin">LOGIN</button>
+      </div>
+      <div style="height:10px"></div>
+      <button id="onboardGuest" style="width:100%;">CONTINUE AS GUEST</button>
+      <div class="muted" style="margin-top:10px; font-size:11px; line-height:1.4;">
+        If CREATE asks for email confirmation, you'll stay in guest mode until you confirm.
+      </div>
+    </div>
+
     <div style="height:12px"></div>
-    <div class="grid2">
+    <div class="grid2" id="onboardNav">
       <button id="onboardNext">ACK / NEXT</button>
       <button id="onboardSkip">SKIP</button>
     </div>
@@ -799,6 +819,7 @@ html[data-phase="1"] .pop{
         <div class="muted">Email/password for cross-device cloud saves.</div>
       </div>
       <div class="pad">
+        <div class="muted" id="authStatus" style="margin-bottom:10px; letter-spacing:.12em; font-size:11px;">GUEST</div>
         <input class="texty" id="email" placeholder="EMAIL" inputmode="email" autocomplete="email" />
         <div style="height:10px"></div>
         <input class="texty" id="pass" placeholder="PASSWORD" type="password" autocomplete="current-password" />
