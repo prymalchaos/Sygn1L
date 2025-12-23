@@ -15,6 +15,45 @@ const MUSIC_KEY = "phase1_apollo";
 const MUSIC_SRC_PRIMARY = "audio/Apollo.mp3";
 const MUSIC_SRC_FALLBACK = "audio/apollo.mp3"; // case-sensitive hosting fallback
 
+// ----------------------------
+// Phase 1 Scripted Comms (no AI cooldown)
+// Fires human-written character messages on game events.
+// ----------------------------
+const P1_CAST = {
+  OPS: "OPS",
+  CONTROL: "CONTROL",
+  SWF: "SWF // PRIVATE",
+  TECH: "FACILITY TECH"
+};
+
+function p1Say(api, from, text) {
+  api.ui.pushLog("comms", from, text);
+}
+
+// picks a random line but only once per trigger
+function pick(lines) {
+  return lines[Math.floor(Math.random() * lines.length)];
+}
+
+function ensureCommsFlags(d) {
+  d._p1_comms ||= {
+    began: false,
+    firstPing: false,
+    ping10: false,
+    gotReturn: false,
+    firstBuff: false,
+    hit30: false,
+    hit60: false,
+    hit85: false,
+    corr25: false,
+    corr50: false,
+    reminderIdle: 0
+  };
+  return d._p1_comms;
+}
+
+
+
 function ensureSingleMusic(audio) {
   const prevKey = window.__sygn1l_currentMusicKey;
   if (prevKey && prevKey !== MUSIC_KEY && audio?.stop) {
@@ -266,6 +305,28 @@ function teardownPhase1HUD(api) {
   document.querySelector(".p1SyncBar")?.remove();
   document.getElementById("p1Replay")?.remove();
   document.getElementById("p1TimerChip")?.remove();
+}
+
+// Scripted intro comms
+const d = ensurePhaseData(api);
+const f = ensureCommsFlags(d);
+if (!f.began) {
+  f.began = true;
+  p1Say(api, P1_CAST.SWF, pick([
+    "You are cleared for SkyWatch Directive BLACKOUT. No external disclosure. Ever.",
+    "Directive BLACKOUT is active. You didn’t hear that from me.",
+    "Private channel only. Point the dish at the designated void-sector. Do not improvise."
+  ]));
+  p1Say(api, P1_CAST.CONTROL, pick([
+    "Your job is simple: scan the region until we get a return. Start with the PING system.",
+    "Begin the sweep. Use PING to probe the void. We need a return pattern to lock onto.",
+    "Initiate scan. Tap PING repeatedly. We’re listening for anything that answers back."
+  ]));
+  p1Say(api, P1_CAST.OPS, pick([
+    "Goal: get a return. Once we have it, you can deploy buffs to build signal passively.",
+    "Watch your signal. First we find something… then we stabilize it into synchronicity.",
+    "This phase is exploration: find the return, then turn chaos into a clean lock."
+  ]));
 }
 
 // ----------------------------
@@ -551,6 +612,39 @@ export default {
   onPing(api) {
     const d = ensurePhaseData(api);
     d.pings++;
+    const flags = ensureCommsFlags(d);
+
+if (!flags.firstPing) {
+  flags.firstPing = true;
+  p1Say(api, P1_CAST.CONTROL, pick([
+    "That’s it. Keep pinging. We need enough samples to detect a return.",
+    "Good. Don’t stop. A single ping tells us nothing. We need a sequence.",
+    "Hold tempo. The return won’t show itself until we’ve built a baseline."
+  ]));
+}
+
+if (d.pings === 10 && !flags.ping10) {
+  flags.ping10 = true;
+  p1Say(api, P1_CAST.TECH, pick([
+    "Dish is steady. Your waveform is ugly, but that’s expected this early.",
+    "I’m seeing faint echo smear. That’s not wind. Keep scanning.",
+    "Signal chain is stable. If anything answers, we’ll know."
+  ]));
+}
+
+if (d.pings === 20 && !flags.gotReturn) {
+  flags.gotReturn = true;
+  p1Say(api, P1_CAST.CONTROL, pick([
+    "Return acquired. Now you build momentum. Buy a buff and let signal grow on its own.",
+    "There. That’s our hook. Use buffs to increase signal/sec, then push synchronicity to 100%.",
+    "We’ve got a return pattern. Next step: upgrades. Let the system start breathing."
+  ]));
+  p1Say(api, P1_CAST.OPS, pick([
+    "Pro tip: buffs multiply each other. Don’t just buy the cheapest. Buy what stacks.",
+    "Once your passive gain is online, stop mashing and start planning.",
+    "Your hands did the scan. Now your brain does the build."
+  ]));
+}
 
     // Mark activity for comms gating (phase-local, no core changes)
     api.ai?.markActive?.();
@@ -692,6 +786,93 @@ export default {
         : `T+ ${fmtTime(elapsed)}`;
 
     const syncPct = clamp(d.sync, 0, 1) * 100;
+    
+    const flags = ensureCommsFlags(d);
+const s = clamp(d.sync, 0, 1);
+const corr = clamp(api.state.corruption || 0, 0, 1);
+
+// First buff purchased
+if (!flags.firstBuff && d.pings >= 20) {
+  const owned =
+    (lvl(api.state, "p1_filter") > 0) +
+    (lvl(api.state, "p1_gain") > 0) +
+    (lvl(api.state, "p1_cancel") > 0) +
+    (lvl(api.state, "p1_lock") > 0) +
+    (lvl(api.state, "p1_bias") > 0);
+  if (owned >= 1) {
+    flags.firstBuff = true;
+    p1Say(api, P1_CAST.OPS, pick([
+      "There it is. You should see signal/sec tick up now. Let it climb, then add synergy.",
+      "Nice. Passive gain is online. Next goal: get stable enough to push past 30% sync.",
+      "Good buy. Now the system starts paying you back."
+    ]));
+  }
+}
+
+// Sync milestones
+if (s >= 0.30 && !flags.hit30) {
+  flags.hit30 = true;
+  p1Say(api, P1_CAST.CONTROL, pick([
+    "30% sync. Easy part’s over. Corruption will start fighting your climb.",
+    "You’ve stabilized the echo. From here, it pushes back. Choose upgrades carefully.",
+    "You’re in the threshold. Now it becomes a contest, not a scan."
+  ]));
+}
+
+if (s >= 0.60 && !flags.hit60) {
+  flags.hit60 = true;
+  p1Say(api, P1_CAST.OPS, pick([
+    "60% sync. If your passive gain is weak, you’ll stall. Stack synergies now.",
+    "Halfway is a trap. Add a multiplier buff or you’ll plateau.",
+    "Good progress. Now you need momentum, not clicks."
+  ]));
+}
+
+if (s >= 0.85 && !flags.hit85) {
+  flags.hit85 = true;
+  p1Say(api, P1_CAST.SWF, pick([
+    "Do not stop. Do not get curious. Lock it. Finish it.",
+    "If you’re seeing patterns… ignore them. Get to 100%.",
+    "You are close. Complete the lock. That’s an order."
+  ]));
+}
+
+// Corruption alerts
+if (corr >= 0.25 && !flags.corr25) {
+  flags.corr25 = true;
+  p1Say(api, P1_CAST.TECH, pick([
+    "Corruption’s rising. Noise Canceller will help. Or you’ll feel the drag.",
+    "Static pressure climbing. If you stall, it’ll be because of corruption.",
+    "Your return is dirty. Clean it or it’ll fight your sync."
+  ]));
+}
+
+if (corr >= 0.50 && !flags.corr50) {
+  flags.corr50 = true;
+  p1Say(api, P1_CAST.CONTROL, pick([
+    "Corruption is now a primary threat. Mitigate it or your climb will collapse.",
+    "You’re deep in the smear. Stop brute forcing. Build smarter.",
+    "This is where players stall. Control corruption and keep your passive gain high."
+  ]));
+}
+
+// Gentle reminder every ~90s after return if player seems stuck
+if (d.pings >= 20 && !d.complete) {
+  flags.reminderIdle += dt;
+  if (flags.reminderIdle >= 90) {
+    flags.reminderIdle = 0;
+
+    // “stuck” heuristic: sync low-ish + passive low-ish
+    const p1sps = d._p1_sps || 0;
+    if (s < 0.45 && p1sps < 1.2) {
+      p1Say(api, P1_CAST.OPS, pick([
+        "If it feels slow, it’s your passive gain. Buy something that boosts signal/sec.",
+        "You’re still in manual mode. Turn on passive gain and let time work for you.",
+        "Try a synergy pick. One multiplier can beat three small upgrades."
+      ]));
+    }
+  }
+}
     const oscLabel = document.getElementById("p1OscLabel");
     if (oscLabel) oscLabel.textContent = `SYNC: ${syncPct.toFixed(0)}%`;
 
