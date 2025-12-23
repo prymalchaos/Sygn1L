@@ -76,29 +76,48 @@ import { createAudio } from "./core/audio.js";
   // Global UI sounds: all buttons click "chik", ping button gets sonar.
  audio.installGlobalButtonSounds({ pingSelector: "#ping" });
 
-  // Audio toggles (SFX / Music)
-  // Note: unlock() loads persisted settings; resume may fail until first user gesture (that's fine).
+  // ----------------------------
+  // Audio mute toggles (SFX / MUSIC)
+  // Robust: uses event delegation so it survives UI re-renders.
+  // ----------------------------
   audio.unlock().catch(() => {});
-  const sfxBtn = document.getElementById("sfxMuteBtn");
-  const musicBtn = document.getElementById("musicMuteBtn");
-  const syncAudioButtons = () => {
-    const s = audio.getAudioSettings();
-    if (sfxBtn) sfxBtn.textContent = s.sfxMuted ? "SFX: OFF" : "SFX: ON";
-    if (musicBtn) musicBtn.textContent = s.musicMuted ? "MUSIC: OFF" : "MUSIC: ON";
-  };
+
+  function syncAudioButtons() {
+    const s = audio.getAudioSettings?.() || { sfxMuted: false, musicMuted: false };
+    const sfxBtn = document.getElementById("sfxMuteBtn");
+    const musicBtn = document.getElementById("musicMuteBtn");
+
+    if (sfxBtn) {
+      sfxBtn.textContent = s.sfxMuted ? "SFX: OFF" : "SFX: ON";
+      sfxBtn.setAttribute("aria-pressed", String(!s.sfxMuted));
+      sfxBtn.dataset.state = s.sfxMuted ? "off" : "on";
+    }
+    if (musicBtn) {
+      musicBtn.textContent = s.musicMuted ? "MUSIC: OFF" : "MUSIC: ON";
+      musicBtn.setAttribute("aria-pressed", String(!s.musicMuted));
+      musicBtn.dataset.state = s.musicMuted ? "off" : "on";
+    }
+  }
+
+  // One click handler for both buttons, even if the UI later replaces the nodes.
+  document.addEventListener("click", (e) => {
+    const sfx = e.target?.closest?.("#sfxMuteBtn");
+    if (sfx) {
+      e.preventDefault();
+      audio.toggleSFX?.();
+      syncAudioButtons();
+      return;
+    }
+    const mus = e.target?.closest?.("#musicMuteBtn");
+    if (mus) {
+      e.preventDefault();
+      audio.toggleMusic?.();
+      syncAudioButtons();
+    }
+  });
+
+  // Initial state (pulls from localStorage once AudioContext is created).
   syncAudioButtons();
-  if (sfxBtn) {
-    sfxBtn.addEventListener("click", () => {
-      audio.toggleSFX();
-      syncAudioButtons();
-    });
-  }
-  if (musicBtn) {
-    musicBtn.addEventListener("click", () => {
-      audio.toggleMusic();
-      syncAudioButtons();
-    });
-  }
   const dev = createDevTools({ ui, saves });
 
   // Scope
@@ -264,6 +283,9 @@ import { createAudio } from "./core/audio.js";
 
     const syncText = saves.isSignedIn() ? "SYNC: CLOUD" : "SYNC: GUEST";
     ui.renderHUD(state, derived, syncText);
+
+    // HUD re-renders can replace the mute buttons; keep labels/state in sync.
+    syncAudioButtons();
 
     const upgrades = upgradesForPhase();
     ui.renderUpgrades({
