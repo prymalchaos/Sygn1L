@@ -129,7 +129,7 @@ export function createUI() {
 
   function renderHUD(state, derived, syncText) {
     setSmartNumber($("signal"), state.signal);
-    setSmartNumber($("sps"), derived.sps);
+    setSmartNumber($("sps"), (derived && (derived.displaySps ?? derived.sps)) || 0);
 
     if ($("buildChip")) $("buildChip").textContent = "BUILD: " + state.build;
     if ($("relicChip")) $("relicChip").textContent = "RELICS: " + state.relics;
