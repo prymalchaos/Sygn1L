@@ -129,6 +129,8 @@ export function createUI() {
 
   function renderHUD(state, derived, syncText) {
     setSmartNumber($("signal"), state.signal);
+    // Prefer a precomputed "display" SPS if provided by the core loop.
+    // Falls back to the core economy SPS.
     setSmartNumber($("sps"), (derived && (derived.displaySps ?? derived.sps)) || 0);
 
     if ($("buildChip")) $("buildChip").textContent = "BUILD: " + state.build;
