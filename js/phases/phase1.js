@@ -20,10 +20,10 @@ const MUSIC_SRC_FALLBACK = "audio/apollo.mp3"; // case-sensitive hosting fallbac
 // Fires human-written character messages on game events.
 // ----------------------------
 const P1_CAST = {
-  OPS: "OPS",
-  CONTROL: "CONTROL",
-  SWF: "SWF // PRIVATE",
-  TECH: "FACILITY TECH"
+  OPS: "MORRIS HARDY // OPS",
+  CONTROL: "MOTHER // CONTROL",
+  SWF: "DYSON GREEN // SWF (PRIVATE)",
+  TECH: "ALICE CHEN // TECH"
 };
 
 function p1Say(api, from, text) {
@@ -310,22 +310,32 @@ function teardownPhase1HUD(api) {
 // Scripted intro comms
 const d = ensurePhaseData(api);
 const f = ensureCommsFlags(d);
+
 if (!f.began) {
   f.began = true;
+
   p1Say(api, P1_CAST.SWF, pick([
-    "You are cleared for SkyWatch Directive BLACKOUT. No external disclosure. Ever.",
-    "Directive BLACKOUT is active. You didn’t hear that from me.",
-    "Private channel only. Point the dish at the designated void-sector. Do not improvise."
+    "You are operating under SkyWatch Faction authority. Keep this channel clean. No narrative. No curiosity.",
+    "Directive BLACKOUT is active. Do your work. Do not ask what the work is for.",
+    "This facility does not exist in writing. Neither do you, if you mishandle this."
   ]));
+
   p1Say(api, P1_CAST.CONTROL, pick([
-    "Your job is simple: scan the region until we get a return. Start with the PING system.",
-    "Begin the sweep. Use PING to probe the void. We need a return pattern to lock onto.",
-    "Initiate scan. Tap PING repeatedly. We’re listening for anything that answers back."
+    "Arctic SkyWatch: online. Task begins now. Use PING to sample the designated region until a return pattern forms.",
+    "Begin scan protocol. PING the void. We require twenty clean samples to confirm a return.",
+    "Steady cadence. PING is your probe. Twenty returns establishes lock conditions."
   ]));
+
   p1Say(api, P1_CAST.OPS, pick([
-    "Goal: get a return. Once we have it, you can deploy buffs to build signal passively.",
-    "Watch your signal. First we find something… then we stabilize it into synchronicity.",
-    "This phase is exploration: find the return, then turn chaos into a clean lock."
+    "Alright, scientist. First job: hit PING until we get a return. Then you buy buffs and let the rig do the heavy lifting.",
+    "We poke the dark. Dark pokes back. Twenty pings gets us a return, then upgrades turn effort into momentum.",
+    "Try not to speedrun finger cramps. Get the return, then feed the machine with buffs."
+  ]));
+
+  p1Say(api, P1_CAST.TECH, pick([
+    "Dish is stable. Atmospherics are quiet… which usually means something else is loud.",
+    "I’ll watch the waveform. You just keep the pings consistent. Patterns don’t like impatience.",
+    "If the return is real, it’ll start repeating. Repetition is how ghosts and signals announce themselves."
   ]));
 }
 
@@ -612,37 +622,47 @@ export default {
   onPing(api) {
     const d = ensurePhaseData(api);
     d.pings++;
-    const flags = ensureCommsFlags(d);
+  const flags = ensureCommsFlags(d);
 
 if (!flags.firstPing) {
   flags.firstPing = true;
   p1Say(api, P1_CAST.CONTROL, pick([
-    "That’s it. Keep pinging. We need enough samples to detect a return.",
-    "Good. Don’t stop. A single ping tells us nothing. We need a sequence.",
-    "Hold tempo. The return won’t show itself until we’ve built a baseline."
+    "Acknowledged. Continue. One ping is noise. A sequence becomes evidence.",
+    "Good. Maintain cadence. We are constructing a baseline from nothing.",
+    "Proceed. Repeat PING until a return can be distinguished from static."
   ]));
 }
 
 if (d.pings === 10 && !flags.ping10) {
   flags.ping10 = true;
   p1Say(api, P1_CAST.TECH, pick([
-    "Dish is steady. Your waveform is ugly, but that’s expected this early.",
-    "I’m seeing faint echo smear. That’s not wind. Keep scanning.",
-    "Signal chain is stable. If anything answers, we’ll know."
+    "I’m seeing smear on the edges of the trace. Not wind. Not power. Something… answering late.",
+    "There’s a wobble that shouldn’t be there. Either the dish is haunted, or you’re close. I’m betting close.",
+    "The noise floor is doing a little dance. That’s either interference… or a hello."
+  ]));
+  p1Say(api, P1_CAST.OPS, pick([
+    "Halfway to a return. Keep tapping. We just need enough samples that the void can’t pretend it’s innocent.",
+    "Ten down. Ten to go. Then you can stop poking it and start farming it.",
+    "Good. Don’t drift. Consistency is how you catch a liar."
   ]));
 }
 
 if (d.pings === 20 && !flags.gotReturn) {
   flags.gotReturn = true;
   p1Say(api, P1_CAST.CONTROL, pick([
-    "Return acquired. Now you build momentum. Buy a buff and let signal grow on its own.",
-    "There. That’s our hook. Use buffs to increase signal/sec, then push synchronicity to 100%.",
-    "We’ve got a return pattern. Next step: upgrades. Let the system start breathing."
+    "Return acquired. Phase objective shifts. Deploy buffs to increase signal/sec, then drive synchronicity to completion.",
+    "Return confirmed. You may now apply upgrades. Allow passive gain to build momentum.",
+    "We have a hook. Now we stabilize it. Buffs will convert time into signal. Pursue synchronicity."
   ]));
   p1Say(api, P1_CAST.OPS, pick([
-    "Pro tip: buffs multiply each other. Don’t just buy the cheapest. Buy what stacks.",
-    "Once your passive gain is online, stop mashing and start planning.",
-    "Your hands did the scan. Now your brain does the build."
+    "There it is. Now buy your first buff and watch the meter start walking by itself.",
+    "Congrats. You found the thread. Now don’t yank it, weave it. Upgrades first, panic later.",
+    "Cool. This is where you stop mashing and start engineering."
+  ]));
+  p1Say(api, P1_CAST.SWF, pick([
+    "Return recognized. Your continued employment depends on what you do next: complete the lock.",
+    "You have what we needed. Do not create an incident by improvising.",
+    "Proceed to synchronicity. Do not share observations. Do not record interpretations."
   ]));
 }
 
@@ -786,6 +806,127 @@ if (d.pings === 20 && !flags.gotReturn) {
         : `T+ ${fmtTime(elapsed)}`;
 
     const syncPct = clamp(d.sync, 0, 1) * 100;
+    
+    const flags = ensureCommsFlags(d);
+
+// First buff purchased
+if (!flags.firstBuff && d.pings >= 20) {
+  const owned =
+    (lvl(api.state, "p1_filter") > 0) +
+    (lvl(api.state, "p1_gain") > 0) +
+    (lvl(api.state, "p1_cancel") > 0) +
+    (lvl(api.state, "p1_lock") > 0) +
+    (lvl(api.state, "p1_bias") > 0);
+
+  if (owned >= 1) {
+    flags.firstBuff = true;
+    p1Say(api, P1_CAST.OPS, pick([
+      "There. Hear that? That’s the sound of not doing everything yourself. Signal/sec is online.",
+      "Good. Now the machine earns while you think. Stack buffs that multiply, not just add.",
+      "Nice. Now stop feeding it crumbs. Build a pipeline."
+    ]));
+    p1Say(api, P1_CAST.TECH, pick([
+      "Waveform looks… less angry. Buffs are smoothing the return. Keep going.",
+      "Okay, that helped. The trace is still skittish, but it’s got a rhythm now.",
+      "If this were a campfire story, this is the part where the wind stops. I don’t love it."
+    ]));
+  }
+}
+
+// Sync milestones
+if (s >= 0.30 && !flags.hit30) {
+  flags.hit30 = true;
+  p1Say(api, P1_CAST.CONTROL, pick([
+    "Synchronicity at thirty percent. Threshold crossed. Expect increased resistance from corruption.",
+    "Thirty percent achieved. From this point, stability requires strategy. Continue.",
+    "We are no longer searching. We are aligning. Maintain momentum."
+  ]));
+  p1Say(api, P1_CAST.OPS, pick([
+    "30%: tutorial’s over. Now it fights back. Don’t let your passive gain sag.",
+    "You’re in the zone where people stall and blame the universe. Buy smarter.",
+    "Good pace. Keep it. Corruption will start punching above its weight now."
+  ]));
+}
+
+if (s >= 0.60 && !flags.hit60) {
+  flags.hit60 = true;
+  p1Say(api, P1_CAST.OPS, pick([
+    "60%: this is the plateau cliff. If you’re not stacking synergies, you’re hiking in flip-flops.",
+    "Halfway is a trap. One multiplier beats three tiny boosts. Act accordingly.",
+    "If it slows here, it’s not bad luck. It’s your build."
+  ]));
+  p1Say(api, P1_CAST.TECH, pick([
+    "The trace is trying to become a circle. It’s… weirdly satisfying. Also ominous.",
+    "I’m seeing the oscillation tighten. Like it knows where it wants to be.",
+    "If this thing starts syncing with the facility clock, I’m unplugging something."
+  ]));
+}
+
+if (s >= 0.85 && !flags.hit85) {
+  flags.hit85 = true;
+  p1Say(api, P1_CAST.SWF, pick([
+    "You are approaching a sensitive threshold. Finish the lock. Do not linger.",
+    "If you experience… anomalies, you will ignore them and proceed.",
+    "Do not celebrate early. Complete the task. Then we will discuss whether you are permitted to remember it."
+  ]));
+  p1Say(api, P1_CAST.CONTROL, pick([
+    "Eighty-five percent. Final approach. Keep corruption contained and maintain signal momentum.",
+    "Near-lock conditions. Continue until full synchronicity is achieved.",
+    "Hold course. Complete alignment."
+  ]));
+}
+
+// Corruption alerts
+if (corr >= 0.25 && !flags.corr25) {
+  flags.corr25 = true;
+  p1Say(api, P1_CAST.TECH, pick([
+    "Corruption is climbing. It’s like static with intent. You’ll feel it in the drag.",
+    "Quarter corruption. The trace is getting… spiteful. Noise Canceller helps.",
+    "I don’t want to anthropomorphize it, but it’s acting like it’s annoyed."
+  ]));
+  p1Say(api, P1_CAST.OPS, pick([
+    "Corruption’s up. Don’t brute force it. Mitigate it or outrun it, your call.",
+    "If signal growth feels sticky, that’s corruption chewing the edges. Fix it.",
+    "Keep the machine fed, but don’t pour fuel into a leak."
+  ]));
+}
+
+if (corr >= 0.50 && !flags.corr50) {
+  flags.corr50 = true;
+  p1Say(api, P1_CAST.CONTROL, pick([
+    "Corruption at fifty percent. Primary threat. Stabilize or progress will degrade.",
+    "High corruption. Apply countermeasures immediately.",
+    "Warning: corruption dominance approaching. Maintain control."
+  ]));
+  p1Say(api, P1_CAST.SWF, pick([
+    "You will not allow contamination to propagate beyond this phase. Understood?",
+    "If you cannot control it, you will contain it. Failure is not an option we budgeted for.",
+    "You are accountable for what you wake."
+  ]));
+}
+
+// Gentle reminder every ~90s after return if player seems stuck
+if (d.pings >= 20 && !d.complete) {
+  flags.reminderIdle += dt;
+
+  if (flags.reminderIdle >= 90) {
+    flags.reminderIdle = 0;
+
+    const p1sps = d._p1_sps || 0;
+    if (s < 0.45 && p1sps < 1.2) {
+      p1Say(api, P1_CAST.OPS, pick([
+        "If you’re still clicking for rent money, your passive gain is underbuilt. Fix it.",
+        "Buy something that boosts signal/sec. Let time do the boring work.",
+        "You’re allowed to stop mashing. That’s what buffs are for."
+      ]));
+      p1Say(api, P1_CAST.CONTROL, pick([
+        "Recommendation: increase passive gain. Maintain cadence. Continue scan-to-lock protocol.",
+        "Adjust strategy. Passive accumulation is required to progress efficiently.",
+        "Upgrade to sustain momentum."
+      ]));
+    }
+  }
+}
     
     const flags = ensureCommsFlags(d);
 const s = clamp(d.sync, 0, 1);
