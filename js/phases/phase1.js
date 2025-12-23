@@ -1,5 +1,58 @@
 // /js/phases/phase1.js
-// Placeholder gameplay phase. Intentionally small.
+// Placeholder gameplay phase. Intentionally // --- Phase 1 ambient music (single-instance safe) ----------------------------
+
+const PHASE1_MUSIC_KEY = "phase1_apollo";
+const PHASE1_MUSIC_SRC_PRIMARY = "audio/Apollo.mp3";
+const PHASE1_MUSIC_SRC_FALLBACK = "audio/apollo.mp3"; // case-sensitive hosting fallback
+
+function phase1EnsureSingleMusicInstance() {
+  // Stop whatever music another phase (or a previous run) left playing
+  const prevKey = window.__sygn1l_currentMusicKey;
+  if (prevKey && prevKey !== PHASE1_MUSIC_KEY && window.audio?.stop) {
+    audio.stop(prevKey, { fadeOut: 0.25 });
+  }
+
+  // Defensive: stop our own key too (handles double-enter / soft refresh weirdness)
+  if (window.audio?.stop) {
+    audio.stop(PHASE1_MUSIC_KEY, { fadeOut: 0.05 });
+  }
+
+  window.__sygn1l_currentMusicKey = PHASE1_MUSIC_KEY;
+}
+
+// --- in your Phase1 object ---------------------------------------------------
+// Replace your existing enter()/exit() with these:
+
+enter() {
+  phase1EnsureSingleMusicInstance();
+
+  if (window.audio?.register) {
+    audio.register(PHASE1_MUSIC_KEY, {
+      src: PHASE1_MUSIC_SRC_PRIMARY,
+      fallbackSrc: PHASE1_MUSIC_SRC_FALLBACK,
+      loop: true,
+      gain: 0.5,      // ~50% volume
+      bus: "music"    // keep it ambient / music channel
+    });
+  }
+
+  if (window.audio?.play) {
+    audio.play(PHASE1_MUSIC_KEY, { fadeIn: 2.0 });
+  }
+},
+
+exit() {
+  if (window.audio?.stop) {
+    audio.stop(PHASE1_MUSIC_KEY, { fadeOut: 1.0 });
+  }
+
+  if (window.__sygn1l_currentMusicKey === PHASE1_MUSIC_KEY) {
+    window.__sygn1l_currentMusicKey = null;
+  }
+},
+
+
+
 
 export default {
   id: 1,
