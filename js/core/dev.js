@@ -1,16 +1,38 @@
 // /js/core/dev.js
-// Robust-ish dev mode that doesn't pollute gameplay code.
-// Adds: Admin user browser (search/pagination), delete user, delete save-only, bulk delete.
+// Dev tools + Admin user manager (master-only server-side).
+// Uses saves.adminInvoke if available, otherwise tries saves.supabase.functions.invoke.
 
 export function createDevTools({ ui, saves }) {
-  let enabled = false;
-
   function isEnabled() {
     const url = new URL(location.href);
-    if (url.searchParams.get("dev") === "1") return true;
-    // You can also flip this in console: localStorage.sygn1lDev='1'
-    if (localStorage.getItem("sygn1lDev") === "1") return true;
-    return enabled;
+    return url.searchParams.get("dev") === "1" || localStorage.getItem("sygn1lDev") === "1";
+  }
+
+  async function adminCall(op, payload = {}) {
+    // Preferred: your existing wrapper
+    if (saves?.adminInvoke) {
+      // Some wrappers expect (op, payload), some expect ({op,...payload})
+      // We'll try (op,payload) first, then fallback.
+      try {
+        const r1 = await saves.adminInvoke(op, payload);
+        return r1;
+      } catch (_e) {
+        // fallback to a single object body
+        return await saves.adminInvoke({ op, ...payload });
+      }
+    }
+
+    // Fallback: direct supabase client (if your saves module exposes it)
+    const sb = saves?.supabase;
+    if (sb?.functions?.invoke) {
+      const { data, error } = await sb.functions.invoke("sygn1l-admin", {
+        body: { op, ...payload },
+      });
+      if (error) throw error;
+      return data;
+    }
+
+    throw new Error("Admin invoke not available (no saves.adminInvoke or saves.supabase.functions.invoke).");
   }
 
   function buildPanel(api) {
@@ -28,18 +50,22 @@ export function createDevTools({ ui, saves }) {
 
     host.innerHTML = `
       <div class="muted" style="letter-spacing:.12em; font-size:11px; margin-bottom:8px;">DEV MODE</div>
+
       <div class="grid2">
         <button id="devP0">LOAD P0</button>
         <button id="devP1">LOAD P1</button>
       </div>
+
       <div class="grid2">
         <button id="devPlus1k">+1,000 SIGNAL</button>
         <button id="devPlus1m">+1,000,000 SIGNAL</button>
       </div>
+
       <div class="grid2">
         <button id="devClearPhase">CLEAR PHASE DATA</button>
         <button id="devDump">DUMP STATE</button>
       </div>
+
       <div class="grid2">
         <button id="devAiOn">AI ON</button>
         <button id="devAiOff">AI OFF</button>
@@ -47,6 +73,7 @@ export function createDevTools({ ui, saves }) {
 
       <div style="height:10px"></div>
       <div class="muted" style="letter-spacing:.12em; font-size:11px; margin-bottom:8px;">ACCOUNT PURGE (SELF)</div>
+
       <div class="grid2">
         <button id="devWipeCloud">DELETE MY CLOUD SAVE</button>
         <button id="devDeleteMe">DELETE MY ACCOUNT</button>
@@ -86,7 +113,7 @@ export function createDevTools({ ui, saves }) {
 
     anchor.appendChild(host);
 
-    // Core dev wiring
+    // Basic dev tools
     ui.$("devP0").onclick = () => api.setPhase(0);
     ui.$("devP1").onclick = () => api.setPhase(1);
 
@@ -116,16 +143,16 @@ export function createDevTools({ ui, saves }) {
       ui.popup("DEV", "Dumped state to console.");
     };
 
-    ui.$("devAiOn").onclick = () => api.setAiEnabled(true);
-    ui.$("devAiOff").onclick = () => api.setAiEnabled(false);
+    ui.$("devAiOn").onclick = () => api.setAiEnabled?.(true);
+    ui.$("devAiOff").onclick = () => api.setAiEnabled?.(false);
 
-    // Self purge tools
+    // Self tools
     ui.$("devWipeCloud").onclick = async () => {
-      if (!saves.isSignedIn()) return ui.popup("DEV", "Not signed in.");
+      if (!saves?.isSignedIn?.()) return ui.popup("DEV", "Not signed in.");
       const ok = confirm("Delete your cloud save row? (Your auth account stays.)");
       if (!ok) return;
       try {
-        await saves.wipeCloud();
+        await saves.wipeCloud?.();
         ui.popup("DEV", "Cloud save deleted.");
       } catch (e) {
         ui.popup("DEV", `Cloud delete failed: ${e?.message || e}`, { level: "danger" });
@@ -133,24 +160,24 @@ export function createDevTools({ ui, saves }) {
     };
 
     ui.$("devDeleteMe").onclick = async () => {
-      const ok = confirm("This uses the 'sygn1l-admin' Edge Function.\n\nDelete YOUR auth account + save row?");
+      const ok = confirm("Delete YOUR auth account + save row?\n\nThis uses sygn1l-admin Edge Function.");
       if (!ok) return;
       try {
-        await saves.adminInvoke("delete_self");
-        ui.popup("DEV", "Delete requested. If successful, you will be signed out.");
+        const res = await adminCall("delete_self", {});
+        ui.popup("DEV", `Delete requested. (save rows deleted: ${res?.save_deleted_rows ?? "?"})`);
       } catch (e) {
-        ui.popup("DEV", `Admin delete unavailable: ${e?.message || e}`, { level: "danger" });
+        ui.popup("DEV", `Delete failed: ${e?.message || e}`, { level: "danger" });
       }
     };
 
-    // Admin user manager state
+    // Admin user manager
     const out = ui.$("devUsers");
     const status = ui.$("devUserStatus");
     const pageLabel = ui.$("devUserPage");
     const searchEl = ui.$("devUserSearch");
     const perPageEl = ui.$("devUserPerPage");
 
-    let page = 1;       // Supabase admin listUsers is 1-based
+    let page = 1;
     let perPage = 25;
     let lastQuery = "";
 
@@ -168,6 +195,10 @@ export function createDevTools({ ui, saves }) {
       }
 
       for (const u of users) {
+        const email = u.email || "(no email)";
+        const uid = u.id || "(no id)";
+        const created = u.created_at ? new Date(u.created_at).toLocaleString() : "";
+
         const row = document.createElement("div");
         row.style.display = "grid";
         row.style.gridTemplateColumns = "1fr auto auto";
@@ -181,20 +212,21 @@ export function createDevTools({ ui, saves }) {
         label.style.fontSize = "11px";
         label.style.letterSpacing = ".08em";
         label.style.lineHeight = "1.25";
-        const email = u.email || "(no email)";
-        const uid = u.id || u.user_id || "(no id)";
-        const created = u.created_at ? new Date(u.created_at).toLocaleString() : "";
         label.textContent = `${email}\n${uid}${created ? "  •  " + created : ""}`;
 
         const delSave = document.createElement("button");
         delSave.textContent = "DELETE SAVE";
         delSave.onclick = async () => {
-          const ok = confirm(`Delete SAVE only for:\n${email}\n${uid}\n\nThis does NOT delete the auth account.`);
+          const ok = confirm(
+            `Delete SAVE only for:\n${email}\n${uid}\n\nThis does NOT delete the auth account.`
+          );
           if (!ok) return;
+
           try {
             delSave.disabled = true;
-            await saves.adminInvoke("delete_save", { id: await fetchUsers();
-            ui.popup("DEV", "Save row deleted.");
+            const res = await adminCall("delete_save", { id: uid });
+            ui.popup("DEV", `Save deleted (rows: ${res?.save_deleted_rows ?? "?"}).`);
+            await fetchUsers();
           } catch (e) {
             ui.popup("DEV", `Delete save failed: ${e?.message || e}`, { level: "danger" });
           } finally {
@@ -205,17 +237,17 @@ export function createDevTools({ ui, saves }) {
         const delUser = document.createElement("button");
         delUser.textContent = "DELETE USER";
         delUser.onclick = async () => {
-          const typed = prompt(
-            `Type DELETE to confirm deletion of AUTH USER + SAVE:\n\n${email}\n${uid}`
-          );
+          const typed = prompt(`Type DELETE to confirm deletion of AUTH USER + SAVE:\n\n${email}\n${uid}`);
           if (typed !== "DELETE") return;
 
           try {
             delUser.disabled = true;
-            await saves.adminInvoke("delete_user", { id: uid });
-            row.remove();
+            const res = await adminCall("delete_user", { id: uid });
+            ui.popup(
+              "DEV",
+              `User deleted. Save rows deleted: ${res?.save_deleted_rows ?? "?"}`
+            );
             await fetchUsers();
-            ui.popup("DEV", "User deleted.");
           } catch (e) {
             ui.popup("DEV", `Delete failed: ${e?.message || e}`, { level: "danger" });
           } finally {
@@ -232,15 +264,16 @@ export function createDevTools({ ui, saves }) {
 
     async function fetchUsers() {
       if (!pageLabel) return;
-      pageLabel.textContent = `PAGE ${page}`;
 
+      pageLabel.textContent = `PAGE ${page}`;
       perPage = parseInt(perPageEl?.value || "25", 10) || 25;
+
       const q = (searchEl?.value || "").trim();
       lastQuery = q;
 
       setStatus("Loading…");
       try {
-        const data = await saves.adminInvoke("list_users", { page, per_page: perPage, q });
+        const data = await adminCall("list_users", { page, per_page: perPage, q });
         const users = Array.isArray(data?.users) ? data.users : [];
         const total = typeof data?.total === "number" ? data.total : null;
 
@@ -280,7 +313,7 @@ export function createDevTools({ ui, saves }) {
       }, 250);
     };
 
-    // Initial load (only if dev panel opened)
+    // Initial load
     fetchUsers();
 
     return host;
