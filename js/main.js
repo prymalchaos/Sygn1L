@@ -66,10 +66,6 @@ import { createAudio } from "./core/audio.js";
   const OFFLINE_CAP_SEC = 6 * 60 * 60; // 6h
   const EDGE_FUNCTION = "sygn1l-comms";
 
-  // Frequent LOCAL checkpoints so an accidental refresh doesn't nuke minutes of progress.
-  // Cloud writes remain throttled in /js/saves.js.
-  const AUTOSAVE_LOCAL_MS = 8_000;
-
   // ----------------------------
   // Core modules
   // ----------------------------
@@ -143,7 +139,7 @@ import { createAudio } from "./core/audio.js";
   // State (single source of truth)
   // ----------------------------
   const state = {
-    profile: { name: "GUEST" },
+    profile: { name: "OPERATOR" },
     build: 1,
     relics: 0,
     signal: 0,
@@ -169,19 +165,6 @@ import { createAudio } from "./core/audio.js";
     state.meta.lastInputAtMs = nowMs();
     touch();
   };
-
-  // Last-ditch protection against iOS refresh/kill while scrolling.
-  // (Can't reliably await async cloud saves during unload, but local is instant.)
-  const quickLocalCheckpoint = () => {
-    try {
-      touch();
-      saves.saveLocal(state);
-    } catch {}
-  };
-  window.addEventListener("pagehide", quickLocalCheckpoint);
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") quickLocalCheckpoint();
-  });
 
   function setAiEnabled(on) {
     state.meta.aiEnabled = !!on;
@@ -215,6 +198,9 @@ import { createAudio } from "./core/audio.js";
     state.phase = Number(n) || 0;
     document.documentElement.dataset.phase = String(state.phase);
     await runtime.setPhase(api, state.phase, opts);
+    // Phase 0 onboarding hides the full game UI
+    ui.setVisible("gameUI", state.phase > 0);
+    ui.setVisible("onboardCard", state.phase === 0);
     recomputeAndRender();
   }
 
@@ -491,6 +477,9 @@ import { createAudio } from "./core/audio.js";
     },
     onSignedOut: () => {
       ui.pushLog("log", "SYS", "SIGNED OUT.");
+      // Lock the game behind onboarding
+      state.phase = 0;
+      setPhase(0, { silent: true }).catch(() => {});
       recomputeAndRender();
     }
   });
@@ -499,18 +488,34 @@ import { createAudio } from "./core/audio.js";
   // Boot
   // ----------------------------
   (async () => {
-    // Load guest/local immediately
-    loadIntoState(saves.loadLocal());
-    setAiEnabled(state.meta.aiEnabled);
+    // Require an authenticated session to play.
+    // Phase 0 is a clean onboarding + auth gate.
+    let uid = null;
+    try {
+      uid = await saves.getUserId();
+    } catch {}
 
-    // If signed in, load cloud (non-blocking)
-    if (saves.isSignedIn()) {
-      try {
-        const cloud = await saves.loadCloud();
-        if (cloud) loadIntoState(cloud);
-      } catch {}
+    if (!uid) {
+      state.phase = 0;
+      ui.applyPhaseUI(0);
+      await setPhase(0, { silent: true });
+      setAiEnabled(state.meta.aiEnabled);
+      recomputeAndRender();
+      return;
     }
 
+    // Signed in: load cloud as the source of truth (seed if missing).
+    try {
+      const cloud = await saves.loadCloud();
+      if (cloud) loadIntoState(cloud);
+      else await saves.saveCloud(state, true);
+    } catch (e) {
+      ui.pushLog("log", "SYS", `CLOUD LOAD ERROR: ${e?.message || e}`);
+    }
+
+    if (state.phase === 0) state.phase = 1;
+
+    setAiEnabled(state.meta.aiEnabled);
     ui.applyPhaseUI(state.phase);
     await setPhase(state.phase, { silent: true });
     applyOfflineEarnings();
@@ -523,12 +528,6 @@ import { createAudio } from "./core/audio.js";
   // ----------------------------
   let last = nowMs();
   let lastRender = 0;
-
-  // Autosave bookkeeping (local checkpoints + opportunistic cloud throttled internally)
-  let lastAutoSaveAt = nowMs();
-  let lastSavedSignal = state.signal;
-  let lastSavedTotal = state.total;
-  let lastSavedPhase = state.phase;
   function frame() {
     const t = nowMs();
     const dt = Math.min(0.25, (t - last) / 1000);
@@ -560,28 +559,6 @@ import { createAudio } from "./core/audio.js";
       mod?.tick?.(api, dt);
     } catch (e) {
       ui.pushLog("log", "SYS", `PHASE TICK ERROR: ${e?.message || e}`);
-    }
-
-    // Autosave checkpoint: keep LOCAL state fresh even during pure idle play.
-    // This prevents refreshes from snapping back to an ancient save, and makes offline
-    // recovery calculations saner by keeping updatedAtMs current.
-    if (t - lastAutoSaveAt >= AUTOSAVE_LOCAL_MS) {
-      const changed =
-        Math.abs((state.signal || 0) - (lastSavedSignal || 0)) > 0.01 ||
-        Math.abs((state.total || 0) - (lastSavedTotal || 0)) > 0.01 ||
-        state.phase !== lastSavedPhase;
-
-      if (changed) {
-        lastSavedSignal = state.signal;
-        lastSavedTotal = state.total;
-        lastSavedPhase = state.phase;
-        lastAutoSaveAt = t;
-
-        // writeCloudState() always saves local, and cloud is throttled internally.
-        saves.writeCloudState(state, false).catch(() => {});
-      } else {
-        lastAutoSaveAt = t;
-      }
     }
 
     // Render throttling: UI updates at most ~4fps unless something marked dirty.

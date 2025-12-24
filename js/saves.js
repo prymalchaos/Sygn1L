@@ -5,7 +5,7 @@
 const SUPABASE_URL = "https://qwrvlhdouicfyypxjffn.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
 
-const LOCAL_KEY = "sygn1l_guest_save_v1";
+const LOCAL_KEY = "sygn1l_local_cache_v1";
 const TABLE = "saves";
 
 const CLOUD_SAVE_THROTTLE_MS = 45_000;
@@ -18,7 +18,7 @@ export function createSaves() {
   let _lastCloudSaveAt = 0;
 
   // ----------------------------
-  // Local (guest)
+  // Local cache (signed-in safety net)
   // ----------------------------
 
   // Strip runtime-only fields that should never be persisted (canvas renderers, DOM refs, etc.)
@@ -221,14 +221,6 @@ export function createSaves() {
   // Canonical write entrypoint
   // ----------------------------
   async function writeCloudState(state, force = false) {
-    // Keep the save timestamp fresh so offline gains are calculated from a recent checkpoint.
-    // This intentionally lives here so *any* caller (ping, buy, phase hooks, etc.) is covered.
-    try {
-      if (state && typeof state === "object" && state.meta && typeof state.meta === "object") {
-        state.meta.updatedAtMs = Date.now();
-      }
-    } catch {}
-
     // Always keep local current
     saveLocal(state);
 
