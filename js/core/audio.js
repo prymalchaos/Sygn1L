@@ -34,7 +34,7 @@ export function createAudio() {
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") settings = { ...settings, ...parsed };
-    } catch {
+    } catch (e) {
       // ignore
     }
   }
@@ -42,7 +42,7 @@ export function createAudio() {
   function saveSettings() {
     try {
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    } catch {
+    } catch (e) {
       // ignore
     }
   }
@@ -74,13 +74,13 @@ export function createAudio() {
         () => {
           try {
             for (const [_, inst] of active) {
-              try { inst.stop({ fadeOut: 0.03 }); } catch {}
+              try { inst.stop({ fadeOut: 0.03 }); } catch (e) {}
             }
             active.clear();
-          } catch {}
+          } catch (e) {}
 
           // Best-effort suspend to reduce battery/CPU.
-          try { ctx?.suspend?.(); } catch {}
+          try { ctx?.suspend?.(); } catch (e) {}
         },
         { passive: true }
       );
@@ -93,7 +93,7 @@ export function createAudio() {
     if (c.state === "suspended") {
       try {
         await c.resume();
-      } catch {
+      } catch (e) {
         // ignore
       }
     }
@@ -149,7 +149,7 @@ export function createAudio() {
       if (typeof this._stopFn === "function") {
         try {
           this._stopFn({ fadeOut });
-        } catch {
+        } catch (e) {
           // ignore
         }
         return;
@@ -165,7 +165,7 @@ export function createAudio() {
         if (this.source) {
           try {
             this.source.stop(t + fadeOut + 0.02);
-          } catch {
+          } catch (e) {
             // ignore
           }
         }
@@ -173,7 +173,7 @@ export function createAudio() {
         if (this.source) {
           try {
             this.source.stop();
-          } catch {
+          } catch (e) {
             // ignore
           }
         }
@@ -234,7 +234,7 @@ export function createAudio() {
 
     // If a newer play() has started since we began, immediately stop this one.
     if (playToken.get(key) !== token) {
-      try { inst.stop({ fadeOut: 0.02 }); } catch {}
+      try { inst.stop({ fadeOut: 0.02 }); } catch (e) {}
       return null;
     }
 
