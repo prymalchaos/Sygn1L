@@ -21,6 +21,40 @@ import {
   prestigeGain
 } from "./economy.js";
 
+// Early error capture (iOS-friendly)
+window.addEventListener("error", (ev) => {
+  try {
+    const msg = [
+      "JS ERROR:",
+      ev.message || "(no message)",
+      ev.filename ? `File: ${ev.filename}` : "",
+      Number.isFinite(ev.lineno) ? `Line: ${ev.lineno}:${ev.colno}` : "",
+      ev.error && ev.error.stack ? `Stack:\n${ev.error.stack}` : ""
+    ].filter(Boolean).join("\n");
+
+    // Call your existing in-game error reporter here
+    if (window.reportError) window.reportError(msg);
+    else alert(msg);
+  } catch (e) {
+    // last resort
+    alert("JS ERROR (report failed): " + (ev.message || ""));
+  }
+});
+
+window.addEventListener("unhandledrejection", (ev) => {
+  const err = ev.reason;
+  const msg = [
+    "PROMISE REJECTION:",
+    err && err.message ? err.message : String(err),
+    err && err.stack ? `Stack:\n${err.stack}` : ""
+  ].join("\n");
+
+  if (window.reportError) window.reportError(msg);
+  else alert(msg);
+});
+
+
+
 import { createUI } from "./ui.js";
 import { createScope } from "./scope.js";
 import { createAI } from "./ai.js";
