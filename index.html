@@ -1,9 +1,10 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
-  <title>SYGN1L</title>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" name="viewport"/>
+<title>SYGN1L</title>
 <style>
 :root{
   --bg0:#040707;
@@ -695,218 +696,190 @@ html[data-phase="1"] .pop{
 
 </style>
 </head>
-
 <body>
-  <div class="fx scanlines"></div>
-  <div class="popHost" id="popHost" aria-live="polite"></div>
-
-  <!-- Modal -->
-  <div class="modalBack" id="modalBack" aria-hidden="true">
-    <div class="modal">
-      <div class="modalHd">
-        <div class="modalTitle" id="modalTitle">DIALOG</div>
-        <button id="modalClose" style="padding:10px 12px">CLOSE</button>
-      </div>
-      <div class="modalBody" id="modalBody"></div>
-    </div>
-  </div>
-
-  <div class="wrap">
-    <!-- Phase 0 Onboarding Transmission -->
-<section class="card" id="onboardCard" style="display:none;">
-  <div class="hd">
-    <div>CONTROL TRANSMISSION</div>
-    <div class="muted" id="onboardStep">STEP 1/4</div>
-  </div>
-  <div class="pad">
-    <div class="muted" id="onboardText" style="font-size:13px; line-height:1.65;"></div>
-
-    <!-- Onboarding Auth (revealed at final step) -->
-    <div id="onboardAuth" style="display:none; margin-top:12px;">
-      <input class="texty" id="onboardEmail" placeholder="EMAIL" inputmode="email" autocomplete="email" />
-      <div style="height:10px"></div>
-      <input class="texty" id="onboardPass" placeholder="PASSWORD" type="password" autocomplete="current-password" />
-      <div style="height:10px"></div>
-      <input class="texty" id="onboardName" placeholder="USERNAME (OPTIONAL)" autocomplete="nickname" />
-      <div style="height:10px"></div>
-      <div class="grid2">
-        <button id="onboardCreate">CREATE</button>
-        <button id="onboardLogin">LOGIN</button>
-      </div>
-      <div style="height:10px"></div>
-      <button id="onboardGuest" style="width:100%;">CONTINUE AS GUEST</button>
-      <div class="muted" style="margin-top:10px; font-size:11px; line-height:1.4;">
-        If CREATE asks for email confirmation, you'll stay in guest mode until you confirm.
-      </div>
-    </div>
-
-    <div style="height:12px"></div>
-    <div class="grid2" id="onboardNav">
-      <button id="onboardNext">ACK / NEXT</button>
-      <button id="onboardSkip">SKIP</button>
-    </div>
-  </div>
-</section>
-    
-    <!-- Header / HUD -->
-    <header class="card">
-      <div class="pad">
-        <h1>SYGN1L</h1>
-        <div class="subtitle" id="subtitle">THE ARRAY LISTENS. THE VOID REPLIES IN ARITHMETIC.</div>
-
-        <div class="stats">
-          <div class="stat">
-            <div class="k">SIGNAL</div>
-            <div class="v" id="signal">0</div>
-
-            <!-- Compact row under SIGNAL: Signal/sec + Phase (with LEDs) -->
-            <div id="signalSubPanel" class="miniPanel" aria-label="Signal status">
-              <div class="mpStat">
-                <span class="mpK">SIG/SEC</span>
-                <span class="mpV" id="sps">0</span>
-                <span class="led" id="ledSps" title="Signal/sec activity"></span>
-              </div>
-
-              <div class="mpDiv" aria-hidden="true"></div>
-
-              <div class="mpStat">
-                <span class="mpK">PHASE</span>
-                <span class="mpV" id="phaseTint">P1</span>
-                <span class="led" id="ledPhase" title="Phase status"></span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-<div id="narrative" class="narrative">
-  <div class="n-title">STATION MONITOR</div>
-  <div id="nText" class="n-text">BOOT SEQUENCE…</div>
+<div class="fx scanlines"></div>
+<div aria-live="polite" class="popHost" id="popHost"></div>
+<!-- Modal -->
+<div aria-hidden="true" class="modalBack" id="modalBack">
+<div class="modal">
+<div class="modalHd">
+<div class="modalTitle" id="modalTitle">DIALOG</div>
+<button id="modalClose" style="padding:10px 12px">CLOSE</button>
 </div>
+<div class="modalBody" id="modalBody"></div>
+</div>
+</div>
+<div class="wrap">
+<!-- Phase 0 Onboarding Transmission -->
+<section class="card" id="onboardCard" style="display:none;">
+<div class="hd">
+<div>CONTROL TRANSMISSION</div>
+<div class="muted" id="onboardStep">STEP 1/4</div>
+</div>
+<div class="pad">
+<div class="muted" id="onboardText" style="font-size:13px; line-height:1.65;"></div>
+<!-- Onboarding Auth (revealed at final step) -->
+<div id="onboardAuth" style="display:none; margin-top:12px;">
+<input autocomplete="email" class="texty" id="onboardEmail" inputmode="email" placeholder="EMAIL"/>
+<div style="height:10px"></div>
+<input autocomplete="current-password" class="texty" id="onboardPass" placeholder="PASSWORD" type="password"/>
+<div style="height:10px"></div>
+<input autocomplete="nickname" class="texty" id="onboardName" placeholder="USERNAME (OPTIONAL)"/>
+<div style="height:10px"></div>
+<div class="grid2">
+<button id="onboardCreate">CREATE</button>
+<button id="onboardLogin">LOGIN</button>
+</div>
+<div style="height:10px"></div>
 
-        <div class="scopeWrap">
-          <div class="scopeTop">
-            <div>ARRAY SCOPE</div>
-            <div class="scopeMeta" id="scopeLabel">LOCK: 0%</div>
-          </div>
-          <canvas id="scope"></canvas>
-        </div>
+<div class="muted" style="margin-top:10px; font-size:11px; line-height:1.4;">
+        If CREATE requires email confirmation, you'll remain on this screen until you confirm.
+      </div>
+</div>
+<div style="height:12px"></div>
+<div class="grid2" id="onboardNav">
+<button id="onboardNext">ACK / NEXT</button>
 
+</div>
+</div>
+</section><div id="gameUI"><header class="card">
+<div class="pad">
+<h1>SYGN1L</h1>
+<div class="subtitle" id="subtitle">THE ARRAY LISTENS. THE VOID REPLIES IN ARITHMETIC.</div>
+<div class="stats">
+<div class="stat">
+<div class="k">SIGNAL</div>
+<div class="v" id="signal">0</div>
+<!-- Compact row under SIGNAL: Signal/sec + Phase (with LEDs) -->
+<div aria-label="Signal status" class="miniPanel" id="signalSubPanel">
+<div class="mpStat">
+<span class="mpK">SIG/SEC</span>
+<span class="mpV" id="sps">0</span>
+<span class="led" id="ledSps" title="Signal/sec activity"></span>
+</div>
+<div aria-hidden="true" class="mpDiv"></div>
+<div class="mpStat">
+<span class="mpK">PHASE</span>
+<span class="mpV" id="phaseTint">P1</span>
+<span class="led" id="ledPhase" title="Phase status"></span>
+</div>
+</div>
+</div>
+</div>
+<div class="narrative" id="narrative">
+<div class="n-title">STATION MONITOR</div>
+<div class="n-text" id="nText">BOOT SEQUENCE…</div>
+</div>
+<div class="scopeWrap">
+<div class="scopeTop">
+<div>ARRAY SCOPE</div>
+<div class="scopeMeta" id="scopeLabel">LOCK: 0%</div>
+</div>
+<canvas id="scope"></canvas>
+</div>
 <button class="big" id="ping">PING VOID</button>
-
-        <div style="height:10px"></div>
-
-        <div class="stat">
-          <div class="k">CORRUPTION</div>
-          <div class="bar"><div class="fill danger" id="corrFill"></div></div>
-          <div class="muted" id="corrText">0% (DORMANT)</div>
-        </div>
-      </div>
-    </header>
-
-<!-- Upgrades -->
-    <section class="card">
-      <div class="hd">
-        <div>BUFFS</div>
-        <div class="muted">Available buffs glow. Locked buffs show requirements.</div>
-      </div>
-      <div class="pad">
-        <div class="upgrades" id="upgrades"></div>
-      </div>
-    </section>
-
-    <!-- Comms -->
-    <section class="card">
-      <div class="hd">
-        <div>COMMUNICATIONS</div>
-        <div class="muted">Tap popups to close.</div>
-      </div>
-      <div class="pad">
-        <div class="log" id="comms"></div>
-      </div>
-    </section>
-
-    <!-- Log -->
-    <section class="card">
-      <div class="hd">
-        <div>TRANSMISSION LOG</div>
-        <div class="muted">Milestones reveal context.</div>
-      </div>
-      <div class="pad">
-        <div class="log" id="log"></div>
-      </div>
-    </section>
-
-    <!-- Control Panel -->
-    <section class="card">
-      <div class="hd">
-        <div>
-          <span class="chip"><span class="dot"></span><span id="phase">PHASE 1</span></span>
-          <span class="chip" id="status">ARRAY: STABLE</span>
-          <span class="chip" id="buildChip">BUILD: 1</span>
-          <span class="chip" id="relicChip">RELICS: 0</span>
-        </div>
-        <div>
-          <span class="chip" id="syncChip">SYNC: LOCAL</span>
-          <span class="chip clickable" id="userChip" title="Tap to edit username">USER: GUEST</span>
-          <button class="chip clickable btn" id="sfxMuteBtn" type="button" title="Toggle sound effects" aria-pressed="true">SFX: ON</button>
-          <button class="chip clickable btn" id="musicMuteBtn" type="button" title="Toggle music" aria-pressed="true">MUSIC: ON</button>
-        </div>
-      </div>
-
-      <div class="pad">
-        
-
-        <div class="grid2">
-          <button id="saveBtn">SAVE</button>
-          <button id="wipeBtn">WIPE</button>
-        </div>
-
-        <div class="grid2">
-          <button id="riteBtn" disabled>RITE</button>
-          <button id="fbBtn">FEEDBACK</button>
-        </div>
-
-        <div class="grid2">
-          <button id="aiBtn">AI COMMS</button>
-          <span class="chip" id="aiChip">AI: OFF</span>
-        </div>
-
-        <div class="grid2">
-          <button id="helpBtn">MANUAL</button>
-          <span class="chip" id="authStatus">STATUS: NOT SIGNED IN</span>
-        </div>
-
-        <div class="muted" id="objective">
+<div style="height:10px"></div>
+<div class="stat">
+<div class="k">CORRUPTION</div>
+<div class="bar"><div class="fill danger" id="corrFill"></div></div>
+<div class="muted" id="corrText">0% (DORMANT)</div>
+</div>
+</div>
+</header><section class="card">
+<div class="hd">
+<div>BUFFS</div>
+<div class="muted">Available buffs glow. Locked buffs show requirements.</div>
+</div>
+<div class="pad">
+<div class="upgrades" id="upgrades"></div>
+</div>
+</section><section class="card">
+<div class="hd">
+<div>COMMUNICATIONS</div>
+<div class="muted">Tap popups to close.</div>
+</div>
+<div class="pad">
+<div class="log" id="comms"></div>
+</div>
+</section><section class="card">
+<div class="hd">
+<div>TRANSMISSION LOG</div>
+<div class="muted">Milestones reveal context.</div>
+</div>
+<div class="pad">
+<div class="log" id="log"></div>
+</div>
+</section><section class="card">
+<div class="hd">
+<div>
+<span class="chip"><span class="dot"></span><span id="phase">PHASE 1</span></span>
+<span class="chip" id="status">ARRAY: STABLE</span>
+<span class="chip" id="buildChip">BUILD: 1</span>
+<span class="chip" id="relicChip">RELICS: 0</span>
+</div>
+<div>
+<span class="chip" id="syncChip">SYNC: LOCAL</span>
+<span class="chip clickable" id="userChip" title="Tap to edit username">USER: GUEST</span>
+<button aria-pressed="true" class="chip clickable btn" id="sfxMuteBtn" title="Toggle sound effects" type="button">SFX: ON</button>
+<button aria-pressed="true" class="chip clickable btn" id="musicMuteBtn" title="Toggle music" type="button">MUSIC: ON</button>
+</div>
+</div>
+<div class="pad">
+<div class="grid2">
+<button id="saveBtn">SAVE</button>
+<button id="wipeBtn">WIPE</button>
+</div>
+<div class="grid2">
+<button disabled="" id="riteBtn">RITE</button>
+<button id="fbBtn">FEEDBACK</button>
+</div>
+<div class="grid2">
+<button id="aiBtn">AI COMMS</button>
+<span class="chip" id="aiChip">AI: OFF</span>
+</div>
+<div class="grid2">
+<button id="helpBtn">MANUAL</button>
+<span class="chip" id="authStatus">STATUS: NOT SIGNED IN</span>
+</div>
+<div class="muted" id="objective">
           OBJECTIVE: Tap PING VOID, then buy DISH to start passive Signal/sec.
         </div>
-      </div>
-    </section>
+</div>
+</section><section class="card">
+<div class="hd">
+<div>ACCOUNT</div>
+<div class="muted">Email/password for cross-device cloud saves.</div>
+</div>
+<div class="pad">
+<div class="muted" id="authStatus" style="margin-bottom:10px; letter-spacing:.12em; font-size:11px;">GUEST</div>
+<input autocomplete="email" class="texty" id="email" inputmode="email" placeholder="EMAIL"/>
+<div style="height:10px"></div>
+<input autocomplete="current-password" class="texty" id="pass" placeholder="PASSWORD" type="password"/>
+<div class="grid2">
+<button id="signUpBtn">SIGN UP</button>
+<button id="signInBtn">SIGN IN</button>
+</div>
+<div class="grid2">
+<button disabled="" id="signOutBtn">SIGN OUT</button>
+<button id="whoBtn">WHOAMI</button>
+</div>
+</div>
+</section></div>
+<!-- Header / HUD -->
 
-    <!-- Auth -->
-    <section class="card">
-      <div class="hd">
-        <div>ACCOUNT</div>
-        <div class="muted">Email/password for cross-device cloud saves.</div>
-      </div>
-      <div class="pad">
-        <div class="muted" id="authStatus" style="margin-bottom:10px; letter-spacing:.12em; font-size:11px;">GUEST</div>
-        <input class="texty" id="email" placeholder="EMAIL" inputmode="email" autocomplete="email" />
-        <div style="height:10px"></div>
-        <input class="texty" id="pass" placeholder="PASSWORD" type="password" autocomplete="current-password" />
-        <div class="grid2">
-          <button id="signUpBtn">SIGN UP</button>
-          <button id="signInBtn">SIGN IN</button>
-        </div>
-        <div class="grid2">
-          <button id="signOutBtn" disabled>SIGN OUT</button>
-          <button id="whoBtn">WHOAMI</button>
-        </div>
-      </div>
-    </section>
-  </div>
+<!-- Upgrades -->
 
-  <!-- Supabase client -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Comms -->
+
+<!-- Log -->
+
+<!-- Control Panel -->
+
+<!-- Auth -->
+
+</div>
+<!-- Supabase client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (function(){
   function showFatal(msg){
@@ -931,7 +904,7 @@ html[data-phase="1"] .pop{
   
 })();
 </script>
-  <!-- Game entry point (ES module) -->
-  <script type="module" src="./js/main.js"></script>
+<!-- Game entry point (ES module) -->
+<script src="./js/main.js" type="module"></script>
 </body>
 </html>
