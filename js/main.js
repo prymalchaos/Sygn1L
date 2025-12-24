@@ -321,9 +321,9 @@ import { createAudio } from "./core/audio.js";
 
     // Control layout tweaks (space-saving)
     // Hide PING once you're out of the early-game tutorial band.
-    ui.setVisible("ping", state.signal >= 0 && state.signal <= 200);
-
-    const syncText = saves.isSignedIn() ? "SYNC: CLOUD" : "SYNC: GUEST";
+        // Keep PING available throughout Phase 1 (and beyond unless a phase overrides it).
+    ui.setVisible("ping", state.phase >= 1);
+const syncText = saves.isSignedIn() ? "SYNC: CLOUD" : "SYNC: GUEST";
     ui.renderHUD(state, derived, syncText);
 
     // HUD re-renders can replace the mute buttons; keep labels/state in sync.
