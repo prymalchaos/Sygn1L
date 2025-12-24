@@ -559,7 +559,7 @@ export default {
           let buf;
           try {
             buf = await a.loadBuffer(MUSIC_SRC_PRIMARY);
-          } catch {
+          } catch (e) {
             buf = await a.loadBuffer(MUSIC_SRC_FALLBACK);
           }
           return a.loopingSource(buf, { bus: "music", gain: 0.5, fadeIn: 2.0 });
@@ -687,8 +687,8 @@ export default {
       api.touch();
 
       // Force-save right when the run begins so refresh doesn't zero you
-      try { api.saves?.saveLocal?.(api.state); } catch {}
-      try { api.saves?.writeCloudState?.(api.state, false); } catch {}
+      try { api.saves?.saveLocal?.(api.state); } catch (e) {}
+      try { api.saves?.writeCloudState?.(api.state, false); } catch (e) {}
     }
 
     // Cryo Amp tradeoff: slightly increases corruption per ping
@@ -715,12 +715,12 @@ export default {
     if (d._autosaveAccum >= 6) {
       d._autosaveAccum = 0;
       api.touch();
-      try { api.saves?.saveLocal?.(api.state); } catch {}
+      try { api.saves?.saveLocal?.(api.state); } catch (e) {}
     }
 
     if (d._cloudSaveAccum >= 20) {
       d._cloudSaveAccum = 0;
-      try { api.saves?.writeCloudState?.(api.state, false); } catch {}
+      try { api.saves?.writeCloudState?.(api.state, false); } catch (e) {}
     }
 
     // Win condition only after the return is acquired
