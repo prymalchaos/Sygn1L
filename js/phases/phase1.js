@@ -231,11 +231,29 @@ function ensurePhase1HUD(api) {
   styles.add(
     "p1-ui",
     `
-    /* Keep the two scopes on one horizontal row even on mobile.
-       If space is tight, allow sideways scroll rather than stacking. */
-    html[data-phase='1'] .p1VizRow{ display:flex; gap:14px; margin-top:12px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
-    html[data-phase='1'] .p1VizRow > .scopeWrap{ flex:0 0 min(520px, 100%); }
-    html[data-phase='1'] .p1VizRow::-webkit-scrollbar{ height:8px; }
+    /* Phase 1: keep Array Scope + Sync Osc on one row.
+       Layout rule: row height drives the square oscilloscope; scope takes the remaining width.
+       Target ratio: ~80% scope / ~20% osc via height ~= 20vw.
+    */
+    html[data-phase='1'] .p1VizRow{
+      display:flex;
+      gap:14px;
+      margin-top:12px;
+      align-items:stretch;
+      width:100%;
+      height:clamp(112px, 20vw, 176px);
+    }
+    html[data-phase='1'] .p1VizRow > .scopeWrap{ height:100%; }
+    /* Main scope panel grows */
+    html[data-phase='1'] .p1VizRow > .scopeWrap:not(.p1OscWrap){
+      flex:1 1 auto;
+      min-width:0;
+    }
+    /* Osc panel stays square; width follows height */
+    html[data-phase='1'] .p1VizRow > .p1OscWrap{
+      flex:0 0 auto;
+      aspect-ratio:1/1;
+    }
 
     html[data-phase='1'] .scopeWrap{ border-radius:14px; }
     html[data-phase='1'] .p1OscWrap, html[data-phase='1'] .scopeWrap{ overflow:hidden; }
@@ -269,7 +287,9 @@ function ensurePhase1HUD(api) {
     html[data-phase='1'] .p1SpsRow{ margin-top:8px; display:flex; justify-content:flex-end; }
     html[data-phase='1'] .p1Chip{ font-size:11px; opacity:.92; }
 
-    html[data-phase='1'] canvas#p1Osc{ display:block; width:100%; height:84px; }
+    /* Let canvases size themselves to the row height (renderers use clientHeight). */
+    html[data-phase='1'] #scope{ display:block; width:100%; height:100%; }
+    html[data-phase='1'] canvas#p1Osc{ display:block; width:100%; height:100%; }
     html[data-phase='1'] canvas#p1Bars{ display:block; width:100%; height:34px; margin-top:8px; opacity:.92; }
 
     html[data-phase='1'] #ping.afford{ filter: drop-shadow(0 0 10px rgba(90,255,170,.20)); }
@@ -309,8 +329,8 @@ function createOscRenderer(canvas) {
   function resize() {
     dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
     const cssW = canvas.clientWidth || 300;
-    const cssH = 84;
-    canvas.style.height = cssH + "px";
+    // Height is driven by CSS (Phase 1 row layout). Fall back if not measurable yet.
+    const cssH = canvas.clientHeight || 84;
     canvas.width = Math.floor(cssW * dpr);
     canvas.height = Math.floor(cssH * dpr);
     w = canvas.width;
