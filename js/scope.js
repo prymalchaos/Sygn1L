@@ -109,7 +109,7 @@ function ping(strength = 1, freqHz = 2.2, durationSec = 1.6) {
       sig.cols[i] += sig.vel[i];
     }
 
-    const midY = Math.floor(sh * 0.6);
+    const midY = Math.floor(sh * 0.52);
     const px = Math.max(1, Math.floor(dpr));
     const baseG = 190;
 
@@ -153,7 +153,8 @@ function ping(strength = 1, freqHz = 2.2, durationSec = 1.6) {
       const travel = (pingT / Math.max(0.001, pingDur)) * Math.PI * 6;
       const pingTerm = pingEnv > 0 ? pingEnv * Math.sin(phase * pingF + travel) : 0;
 
-      const y = midY - (spikeH + noiseH + echo + pingTerm) * (sh * 0.7);
+      const yRaw = midY - (spikeH + noiseH + echo + pingTerm) * (sh * 0.55);
+      const y = clamp(yRaw, 2, sh - 3);
 
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
