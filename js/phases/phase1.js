@@ -559,9 +559,9 @@ export default {
         ]));
 
         p1Say(api, P1_CAST.TECH, pick([
-          "Dish is stable. Atmospherics are quiet… which usually means something else is loud.",
-          "I’ll watch the waveform. You just keep the pings consistent. Patterns don’t like impatience.",
-          "If the return is real, it’ll start repeating. Repetition is how ghosts and signals announce themselves."
+          "Dish is stable. Atmospherics are quietâ¦ which usually means something else is loud.",
+          "Iâll watch the waveform. You just keep the pings consistent. Patterns donât like impatience.",
+          "If the return is real, itâll start repeating. Repetition is how ghosts and signals announce themselves."
         ]));
       }
     }
@@ -679,14 +679,14 @@ export default {
     if (d.pings === 10 && !flags.ping10) {
       flags.ping10 = true;
       p1Say(api, P1_CAST.TECH, pick([
-        "I’m seeing smear on the edges of the trace. Not wind. Not power. Something… answering late.",
-        "There’s a wobble that shouldn’t be there. Either the dish is haunted, or you’re close. I’m betting close.",
-        "The noise floor is doing a little dance. That’s either interference… or a hello."
+        "Iâm seeing smear on the edges of the trace. Not wind. Not power. Somethingâ¦ answering late.",
+        "Thereâs a wobble that shouldnât be there. Either the dish is haunted, or youâre close. Iâm betting close.",
+        "The noise floor is doing a little dance. Thatâs either interferenceâ¦ or a hello."
       ]));
       p1Say(api, P1_CAST.OPS, pick([
-        "Halfway to a return. Keep tapping. We just need enough samples that the void can’t pretend it’s innocent.",
+        "Halfway to a return. Keep tapping. We just need enough samples that the void canât pretend itâs innocent.",
         "Ten down. Ten to go. Then you can stop poking it and start farming it.",
-        "Good. Don’t drift. Consistency is how you catch a liar."
+        "Good. Donât drift. Consistency is how you catch a liar."
       ]));
     }
 
@@ -703,7 +703,7 @@ export default {
       ]));
       p1Say(api, P1_CAST.OPS, pick([
         "There it is. Now buy your first buff and watch the meter start walking by itself.",
-        "Congrats. You found the thread. Now don’t yank it, weave it. Upgrades first, panic later.",
+        "Congrats. You found the thread. Now donât yank it, weave it. Upgrades first, panic later.",
         "Cool. This is where you stop mashing and start engineering."
       ]));
       p1Say(api, P1_CAST.SWF, pick([
@@ -723,42 +723,7 @@ export default {
       try { api.saves?.writeCloudState?.(api.state, false); } catch (e) {}
     }
 
-    
-    // Ping backlash: after 50% sync, each ping risks a brief corruption spike.
-    // Noise Canceller mitigates most of this backlash so it becomes a strategic buy.
-    const s = clamp(d.sync || 0, 0, 1);
-    if (s >= 0.50) {
-      const cancelLv = lvl(api.state, "p1_cancel");
-      const progress = clamp((s - 0.50) / 0.50, 0, 1); // 0..1 from 50% to 100%
-      // Base spike scales up toward the endgame. Tuned to be noticeable but survivable with good buffs.
-      let spike = 0.0020 + 0.0065 * progress;
-
-      // Tiny anti-spam ramp: repeated pings add a little extra pressure.
-      d._p1_pingSpam ||= 0;
-      d._p1_pingSpam = clamp(d._p1_pingSpam + 0.25, 0, 4);
-      spike *= 1 + 0.10 * d._p1_pingSpam;
-
-      if (cancelLv > 0) spike *= Math.max(0.15, 1 - 0.40 * cancelLv);
-
-      api.state.corruption = clamp((api.state.corruption || 0) + spike, 0, 1);
-
-      if (!flags.pingBacklash) {
-        flags.pingBacklash = true;
-        p1Say(api, P1_CAST.OPS, pick([
-          "Heads up: pings are echoing back now. Each one nudges the corruption. Buy Noise Canceller or bleed out.",
-          "You’re loud enough to be heard. PING now feeds the static. You need Noise Canceller, or a bigger engine.",
-          "At 50% sync the void starts answering. Each ping drags corruption in. Play smart."
-        ]));
-      } else if ((api.state.corruption || 0) >= 0.75 && !flags.corr75) {
-        // corr75 milestone will also fire later, but this makes the moment feel immediate during spam.
-        p1Say(api, P1_CAST.SWF, pick([
-          "Stop broadcasting weakness. Your pings are contaminating the channel.",
-          "You are overdriving the scan. Control the noise or lose the lock."
-        ]));
-      }
-    }
-
-// Cryo Amp tradeoff: slightly increases corruption per ping
+    // Cryo Amp tradeoff: slightly increases corruption per ping
     const gainLv = lvl(api.state, "p1_gain");
     if (gainLv > 0) {
       api.state.corruption = clamp((api.state.corruption || 0) + 0.00010 * gainLv, 0, 1);
@@ -767,9 +732,6 @@ export default {
 
   tick(api, dt) {
     const d = ensurePhaseData(api);
-
-    // Decay ping-spam heat over time so backlash feels "brief" unless you're hammering PING.
-    if (d._p1_pingSpam) d._p1_pingSpam = Math.max(0, d._p1_pingSpam - dt * 0.9);
 
     // Defensive: if older saves accidentally persisted these as plain objects,
     // they block initialisation and the canvases look "dead" after refresh.
@@ -931,9 +893,9 @@ export default {
           "Containment failed. I want results, not excuses. Start over."
         ]));
         p1Say(api, P1_CAST.OPS, pick([
-          "Yep. That’s what happens when you ignore the corruption and hope vibes will carry you.",
+          "Yep. Thatâs what happens when you ignore the corruption and hope vibes will carry you.",
           "You got greedy and the static bit back. Re-run it, but buy smarter.",
-          "Lock’s gone. Take a breath. Build a pipeline. Then try again."
+          "Lockâs gone. Take a breath. Build a pipeline. Then try again."
         ]));
 
         api.ui.pushLog("log", "SYS", "PHASE 1 FAILED: CORRUPTION DOMINATED. RUN RESET.");
@@ -988,14 +950,14 @@ export default {
       if (owned >= 1) {
         flags.firstBuff = true;
         p1Say(api, P1_CAST.OPS, pick([
-          "There. Hear that? That’s the sound of not doing everything yourself. Signal/sec is online.",
+          "There. Hear that? Thatâs the sound of not doing everything yourself. Signal/sec is online.",
           "Good. Now the machine earns while you think. Stack buffs that multiply, not just add.",
           "Nice. Now stop feeding it crumbs. Build a pipeline."
         ]));
         p1Say(api, P1_CAST.TECH, pick([
-          "Waveform looks… less angry. Buffs are smoothing the return. Keep going.",
-          "Okay, that helped. The trace is still skittish, but it’s got a rhythm now.",
-          "If this were a campfire story, this is the part where the wind stops. I don’t love it."
+          "Waveform looksâ¦ less angry. Buffs are smoothing the return. Keep going.",
+          "Okay, that helped. The trace is still skittish, but itâs got a rhythm now.",
+          "If this were a campfire story, this is the part where the wind stops. I donât love it."
         ]));
       }
     }
@@ -1009,8 +971,8 @@ export default {
         "We are no longer searching. We are aligning. Maintain momentum."
       ]));
       p1Say(api, P1_CAST.OPS, pick([
-        "30%: tutorial’s over. Now it fights back. Don’t let your passive gain sag.",
-        "You’re in the zone where people stall and blame the universe. Buy smarter.",
+        "30%: tutorialâs over. Now it fights back. Donât let your passive gain sag.",
+        "Youâre in the zone where people stall and blame the universe. Buy smarter.",
         "Good pace. Keep it. Corruption will start punching above its weight now."
       ]));
     }
@@ -1018,14 +980,14 @@ export default {
     if (s >= 0.60 && !flags.hit60) {
       flags.hit60 = true;
       p1Say(api, P1_CAST.OPS, pick([
-        "60%: this is the plateau cliff. If you’re not stacking synergies, you’re hiking in flip-flops.",
+        "60%: this is the plateau cliff. If youâre not stacking synergies, youâre hiking in flip-flops.",
         "Halfway is a trap. One multiplier beats three tiny boosts. Act accordingly.",
-        "If it slows here, it’s not bad luck. It’s your build."
+        "If it slows here, itâs not bad luck. Itâs your build."
       ]));
       p1Say(api, P1_CAST.TECH, pick([
-        "The trace is trying to become a circle. It’s… weirdly satisfying. Also ominous.",
-        "I’m seeing the oscillation tighten. Like it knows where it wants to be.",
-        "If this thing starts syncing with the facility clock, I’m unplugging something."
+        "The trace is trying to become a circle. Itâsâ¦ weirdly satisfying. Also ominous.",
+        "Iâm seeing the oscillation tighten. Like it knows where it wants to be.",
+        "If this thing starts syncing with the facility clock, Iâm unplugging something."
       ]));
     }
 
@@ -1033,7 +995,7 @@ export default {
       flags.hit85 = true;
       p1Say(api, P1_CAST.SWF, pick([
         "You are approaching a sensitive threshold. Finish the lock. Do not linger.",
-        "If you experience… anomalies, you will ignore them and proceed.",
+        "If you experienceâ¦ anomalies, you will ignore them and proceed.",
         "Do not celebrate early. Complete the task. Then we will discuss whether you are permitted to remember it."
       ]));
       p1Say(api, P1_CAST.CONTROL, pick([
@@ -1047,14 +1009,14 @@ export default {
     if (corr >= 0.25 && !flags.corr25) {
       flags.corr25 = true;
       p1Say(api, P1_CAST.TECH, pick([
-        "Corruption is climbing. It’s like static with intent. You’ll feel it in the drag.",
-        "Quarter corruption. The trace is getting… spiteful. Noise Canceller helps.",
-        "I don’t want to anthropomorphize it, but it’s acting like it’s annoyed."
+        "Corruption is climbing. Itâs like static with intent. Youâll feel it in the drag.",
+        "Quarter corruption. The trace is gettingâ¦ spiteful. Noise Canceller helps.",
+        "I donât want to anthropomorphize it, but itâs acting like itâs annoyed."
       ]));
       p1Say(api, P1_CAST.OPS, pick([
-        "Corruption’s up. Don’t brute force it. Mitigate it or outrun it, your call.",
-        "If signal growth feels sticky, that’s corruption chewing the edges. Fix it.",
-        "Keep the machine fed, but don’t pour fuel into a leak."
+        "Corruptionâs up. Donât brute force it. Mitigate it or outrun it, your call.",
+        "If signal growth feels sticky, thatâs corruption chewing the edges. Fix it.",
+        "Keep the machine fed, but donât pour fuel into a leak."
       ]));
     }
 
@@ -1080,7 +1042,7 @@ export default {
         "Warning: lock integrity compromised. You are entering collapse conditions."
       ]));
       p1Say(api, P1_CAST.OPS, pick([
-        "Okay, now it’s personal. If your build isn’t multiplying, it’s dying.",
+        "Okay, now itâs personal. If your build isnât multiplying, itâs dying.",
         "This is the part where you either outscale it or you eat a reset.",
         "Seventy-five. No more sightseeing. Buy for momentum, not comfort."
       ]));
@@ -1094,9 +1056,9 @@ export default {
         "This is your last warning. Do not let it take the channel."
       ]));
       p1Say(api, P1_CAST.TECH, pick([
-        "It’s screaming in the waveform. I can’t smooth this without upgrades.",
-        "The noise floor is… weaponized. You need mitigation or raw scaling, right now.",
-        "I’m watching the trace fray. Please don’t make me unplug the dish."
+        "Itâs screaming in the waveform. I canât smooth this without upgrades.",
+        "The noise floor isâ¦ weaponized. You need mitigation or raw scaling, right now.",
+        "Iâm watching the trace fray. Please donât make me unplug the dish."
       ]));
     }
 
@@ -1109,9 +1071,9 @@ export default {
         const p1sps = d._p1_sps || 0;
         if (s < 0.45 && p1sps < 1.2) {
           p1Say(api, P1_CAST.OPS, pick([
-            "If you’re still clicking for rent money, your passive gain is underbuilt. Fix it.",
+            "If youâre still clicking for rent money, your passive gain is underbuilt. Fix it.",
             "Buy something that boosts signal/sec. Let time do the boring work.",
-            "You’re allowed to stop mashing. That’s what buffs are for."
+            "Youâre allowed to stop mashing. Thatâs what buffs are for."
           ]));
           p1Say(api, P1_CAST.CONTROL, pick([
             "Recommendation: increase passive gain. Maintain cadence. Continue scan-to-lock protocol.",
@@ -1153,11 +1115,11 @@ export default {
     }
 
     if (!d.complete) {
-      if (d.pings < 20) api.ui.monitor(`SCANNING… ${d.pings}/20 PINGS`);
+      if (d.pings < 20) api.ui.monitor(`SCANNINGâ¦ ${d.pings}/20 PINGS`);
       else if (d.sync < 0.30)
-        api.ui.monitor(`RETURN ACQUIRED. SEEK COHERENCE. SYNC ${syncPct.toFixed(1)}%  •  P1 +${(d._p1_sps || 0).toFixed(2)}/s`);
+        api.ui.monitor(`RETURN ACQUIRED. SEEK COHERENCE. SYNC ${syncPct.toFixed(1)}%  â¢  P1 +${(d._p1_sps || 0).toFixed(2)}/s`);
       else
-        api.ui.monitor(`CORRUPTION PUSHBACK DETECTED. HOLD THE LINE. SYNC ${syncPct.toFixed(1)}%  •  P1 +${(d._p1_sps || 0).toFixed(2)}/s`);
+        api.ui.monitor(`CORRUPTION PUSHBACK DETECTED. HOLD THE LINE. SYNC ${syncPct.toFixed(1)}%  â¢  P1 +${(d._p1_sps || 0).toFixed(2)}/s`);
     }
   }
 };
