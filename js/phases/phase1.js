@@ -8,6 +8,54 @@ import { clamp, fmt } from "../state.js";
 import { lvl } from "../economy.js";
 
 const PHASE_ID = 1;
+// ----------------------------
+// Local personal times (Top 10 per phase)
+// Stored locally so players can compare runs without extra DB tables.
+// ----------------------------
+const PERSONAL_TIMES_KEY = "sygn1l_personal_times_v1";
+
+function _loadPersonalTimes() {
+  try {
+    const raw = localStorage.getItem(PERSONAL_TIMES_KEY);
+    const data = raw ? JSON.parse(raw) : {};
+    return data && typeof data === "object" ? data : {};
+  } catch (_e) {
+    return {};
+  }
+}
+
+function _savePersonalTimes(obj) {
+  try {
+    localStorage.setItem(PERSONAL_TIMES_KEY, JSON.stringify(obj || {}));
+  } catch (_e) {}
+}
+
+function recordPersonalTime(phaseId, timeMs) {
+  const p = Number(phaseId) || 0;
+  const t = Math.max(0, Math.floor(Number(timeMs) || 0));
+  if (!p || !t) return;
+
+  const store = _loadPersonalTimes();
+  store[p] ||= [];
+  store[p].push({ time_ms: t, ended_at: new Date().toISOString() });
+
+  // Keep best 10 (ascending)
+  store[p] = store[p]
+    .filter(r => r && Number(r.time_ms) > 0)
+    .sort((a, b) => Number(a.time_ms) - Number(b.time_ms))
+    .slice(0, 10);
+
+  _savePersonalTimes(store);
+}
+
+function getPersonalTimes(_api) {
+  const store = _loadPersonalTimes();
+  const rows = Array.isArray(store[PHASE_ID]) ? store[PHASE_ID] : [];
+  return rows
+    .filter(r => r && Number(r.time_ms) > 0)
+    .sort((a, b) => Number(a.time_ms) - Number(b.time_ms))
+    .slice(0, 10);
+}
 
 // ----------------------------
 // Phase-owned music (single-instance safe)
@@ -281,7 +329,11 @@ function ensurePhase1HUD(api) {
       <button id="p1MyTimes" class="big" style="flex:1">MY TOP 10</button>
     `;
 
-    headerPad.insertBefore(row, document.getElementById("ping"));
+    // Place leaderboards under comms + transmission logs (better flow on tall screens)
+    const logEl = document.getElementById("log");
+    const logCard = logEl ? logEl.closest("section.card") : null;
+    if (logCard && logCard.parentElement) logCard.insertAdjacentElement("afterend", row);
+    else headerPad.insertBefore(row, document.getElementById("ping"));
 
     const gBtn = row.querySelector("#p1GlobalLb");
     const mBtn = row.querySelector("#p1MyTimes");
@@ -338,7 +390,7 @@ function ensurePhase1HUD(api) {
       parts.push(`<h3>PHASE ${PHASE_ID}</h3>`);
       rows.forEach((r, idx) => {
         const time = fmtTimeMs(Number(r.time_ms) || 0);
-        const when = r.at ? new Date(r.at).toLocaleString() : "";
+                const when = r.ended_at ? new Date(r.ended_at).toLocaleString() : "";
         parts.push(`
           <div class='sygLbRow'>
             <div class='sygLbLeft'>
@@ -650,6 +702,17 @@ function syncTick(api, dt) {
 
     api.ui.popup("CONTROL", `SYNCHRONICITY ACHIEVED. TIME: ${fmtTime(timeSec)}. BEST: ${best}.`);
     api.ui.pushLog("log", "SYS", `PHASE 1 COMPLETE. TIME ${fmtTime(timeSec)}.`);
+
+    // Save personal time locally (Top 10)
+    recordPersonalTime(PHASE_ID, Math.floor(timeSec * 1000));
+
+    // Submit best time to global leaderboard (best per user+phase)
+    try {
+      if (api.saves?.isSignedIn?.()) {
+        const uname = (api.state?.profile?.name || "UNKNOWN");
+        api.saves.submitPhaseBest({ phase: PHASE_ID, timeMs: Math.floor(timeSec * 1000), username: uname }).catch(()=>{});
+      }
+    } catch (_e) { /* leaderboard failures shouldn't block gameplay */ }
 
     const replayBtn = document.getElementById("p1Replay");
     if (replayBtn) replayBtn.style.display = "";
@@ -1013,11 +1076,15 @@ export default {
       const flags = ensureCommsFlags(d);
       const corr = clamp(api.state.corruption || 0, 0, 1);
       const now = Date.now();
-      if (d.pings >= 20 && !d.complete && corr >= 1 && now >= (d._failLockoutUntil || 0)) {
+      if (d.pings > 0 && !d.complete && corr >= 1 && now >= (d._failLockoutUntil || 0)) {
         d._failLockoutUntil = now + 1500;
 
         // Hard reset the phase run.
-        d.pings = 20; // return stays acquired so you can immediately re-engage
+        d.pings = 0; // full restart: return not acquired
+        d._p1_sps = 0;
+        api.state.signal = 0;
+        api.state.total = 0;
+        api.state.corruption = 0;
         d.sync = 0;
         d.complete = false;
         d.startAtMs = Date.now();
@@ -1031,7 +1098,7 @@ export default {
         api.state.total = 0;
         api.state.corruption = 0;
 
-        api.ui.popup("SWF", "LOCK LOST. CORRUPTION OVERRAN THE TRACE. RESETTING RUN.");
+        api.ui.popup("CONTROL", "YOU LOST SYNC. CORRUPTION HIT 100%. STARTING OVER.");
         p1Say(api, P1_CAST.SWF, pick([
           "You let it slip. Do you understand how rare that return was? Reset and do not embarrass us again.",
           "You lost lock. That was preventable. Re-engage. And this time, build properly.",
@@ -1043,6 +1110,8 @@ export default {
           "Lockâs gone. Take a breath. Build a pipeline. Then try again."
         ]));
 
+        const replayBtn = document.getElementById("p1Replay");
+        if (replayBtn) replayBtn.style.display = "none";
         api.ui.pushLog("log", "SYS", "PHASE 1 FAILED: CORRUPTION DOMINATED. RUN RESET.");
         api.touch();
       }
