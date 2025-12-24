@@ -53,7 +53,7 @@ function ping(strength = 1, freqHz = 2.2, durationSec = 1.6) {
   function nudgeResizeSoon() {
     // next frame tends to have correct layout metrics
     requestAnimationFrame(() => {
-      try { resize(); } catch {}
+      try { resize(); } catch (e) {}
     });
   }
 
@@ -175,7 +175,7 @@ function ping(strength = 1, freqHz = 2.2, durationSec = 1.6) {
   function tick(dt, tMs, { total, bw, corruption }) {
     // If layout changed (or page restored), make sure the canvas is correctly sized.
     if (!sw || !sh || canvasEl.width === 0 || canvasEl.height === 0) {
-      try { resize(); } catch {}
+      try { resize(); } catch (e) {}
     }
 
     // --- advance ping clock / auto-clear

@@ -8,7 +8,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
 const LOCAL_KEY = "sygn1l_local_cache_v1";
 const TABLE = "saves";
 
-const CLOUD_SAVE_THROTTLE_MS = 45_000;
+const CLOUD_SAVE_THROTTLE_MS = 45000;
 
 export function createSaves() {
   const supabase = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_ANON_KEY) || null;
