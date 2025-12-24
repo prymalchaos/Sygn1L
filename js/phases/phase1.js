@@ -55,6 +55,11 @@ function ensureCommsFlags(d) {
     hit85: false,
     corr25: false,
     corr50: false,
+    corr75: false,
+    corr90: false,
+    pressure30: false,
+    pressure60: false,
+    failedOnce: false,
     reminderIdle: 0
   };
   return d._p1_comms;
@@ -70,7 +75,7 @@ const P1_BUFFS = [
     unlock: 20,
     base: 28,
     mult: 2.05,
-    desc: "Cleaner returns. +12% ping gain. +18% Sync growth. +0.50 signal/sec."
+    desc: "Cleaner returns. +24% ping gain. +36% Sync growth. +1.00 signal/sec."
   },
   {
     id: "p1_gain",
@@ -78,7 +83,7 @@ const P1_BUFFS = [
     unlock: 80,
     base: 160,
     mult: 2.18,
-    desc: "More power in the dark. +28% ping gain. +1.40 signal/sec. Slightly aggravates corruption."
+    desc: "More power in the dark. +56% ping gain. +2.80 signal/sec. Aggravates corruption."
   },
   {
     id: "p1_cancel",
@@ -86,7 +91,7 @@ const P1_BUFFS = [
     unlock: 300,
     base: 1100,
     mult: 2.25,
-    desc: "Suppresses corruption pressure in Phase 1. +0.90 signal/sec."
+    desc: "Suppresses corruption pressure in Phase 1. +1.80 signal/sec."
   },
   {
     id: "p1_lock",
@@ -94,7 +99,7 @@ const P1_BUFFS = [
     unlock: 2200,
     base: 10500,
     mult: 2.35,
-    desc: "Synergy engine. Multiplies passive signal/sec and Sync growth per other buff owned."
+    desc: "Synergy engine. Strongly multiplies passive signal/sec and Sync growth per other buff owned."
   },
   {
     id: "p1_bias",
@@ -462,19 +467,21 @@ function syncTick(api, dt) {
 
   let growth = (0.00074 + 0.00100 * signalPressure);
 
-  growth *= 1 + 0.18 * f;
+  // Buffed growth: doubled so upgrades kick the meter into motion.
+  growth *= 1 + 0.36 * f;
 
   const owned = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
-  growth *= 1 + 0.30 * h * Math.max(0, owned - 1);
+  growth *= 1 + 0.60 * h * Math.max(0, owned - 1);
 
   growth *= 1 - 0.55 * corr;
 
   const post30 = Math.max(0, s - 0.30);
-  let drag = 0.00020 + 0.00210 * post30 * post30;
-  drag *= 0.55 + 1.15 * corr;
+  // After 30%, the return actively fights back. This is the pressure gate.
+  let drag = 0.00026 + 0.00360 * post30 * post30;
+  drag *= 0.65 + 1.55 * corr;
   drag *= 1 - clamp(0.22 * n, 0, 0.65);
 
-  const surf = q > 0 ? (0.00016 * q * corr) : 0;
+  const surf = q > 0 ? (0.00032 * q * corr) : 0;
 
   d.sync = clamp(s + (growth - drag + surf) * dt, 0, 1);
 
@@ -493,6 +500,53 @@ function syncTick(api, dt) {
     if (replayBtn) replayBtn.style.display = "";
     api.touch();
   }
+}
+
+function phase1Fail(api, why = "LOCK LOST") {
+  const d = ensurePhaseData(api);
+  const flags = ensureCommsFlags(d);
+  if (d.complete) return;
+  if (flags.failedOnce && (d._failJustNow || 0) > 0) return;
+
+  flags.failedOnce = true;
+  d._failJustNow = 2.0; // brief cooldown to prevent double-trigger on the same frame
+
+  api.ui.popup("CONTROL", "LOCK LOST. CORRUPTION OVERRAN THE RETURN. RESETTING RUN.");
+  api.ui.pushLog("log", "SYS", "PHASE 1 FAILURE: CORRUPTION OVERRAN SYNCHRONICITY. RUN RESET.");
+
+  // Harsh words from the ancillary character.
+  p1Say(api, P1_CAST.OPS, pick([
+    "Corey... you let the return slip. You had a thread and you turned it into confetti. Reset and do it right.",
+    "We had lock. HAD. Corruption ate it because you tried to brute-force a system designed to punish brute force.",
+    "That was a gift-wrapped signal and you dropped it in the snow. Buff up, then push. Do not just mash and pray."
+  ]));
+  p1Say(api, P1_CAST.SWF, pick([
+    "You have failed to maintain lock. This is not a game. Reacquire and proceed. No further allowances.",
+    "Incident logged. Your performance is being reviewed. Begin again.",
+    "Control: ensure the operator understands consequences. Restart protocol."
+  ]));
+
+  // Reset Phase 1 run state (keep return acquired, but wipe momentum and buffs).
+  d.sync = 0;
+  d.complete = false;
+  d.startAtMs = Date.now();
+  d.endAtMs = 0;
+
+  for (const b of P1_BUFFS) {
+    if (api.state.up && b.id in api.state.up) api.state.up[b.id] = 0;
+  }
+
+  api.state.signal = 0;
+  api.state.total = 0;
+  api.state.corruption = 0;
+
+  // Keep the return unlocked so the player can immediately re-attempt.
+  d.pings = Math.max(d.pings, 20);
+
+  // Save immediately so refresh doesn't resurrect the doomed timeline.
+  api.touch();
+  try { api.saves?.saveLocal?.(api.state); } catch (e) {}
+  try { api.saves?.writeCloudState?.(api.state, false); } catch (e) {}
 }
 
 // ----------------------------
@@ -606,8 +660,9 @@ export default {
     const lockLv = lvl(api.state, "p1_lock");
     const biasLv = lvl(api.state, "p1_bias");
 
-    g *= 1 + 0.12 * filterLv;
-    g *= 1 + 0.28 * gainLv;
+    // Buffed click gain: doubled so buffs feel like "the machine" outpaces raw tapping.
+    g *= 1 + 0.24 * filterLv;
+    g *= 1 + 0.56 * gainLv;
 
     const owned =
       (lvl(api.state, "p1_filter") > 0) +
@@ -616,11 +671,11 @@ export default {
       (lvl(api.state, "p1_lock") > 0) +
       (lvl(api.state, "p1_bias") > 0);
 
-    g *= 1 + 0.08 * lockLv * Math.max(0, owned - 1);
+    g *= 1 + 0.16 * lockLv * Math.max(0, owned - 1);
 
     if (biasLv > 0) {
       const c = clamp(api.state.corruption || 0, 0, 1);
-      g *= 1 + 0.12 * biasLv * c;
+      g *= 1 + 0.24 * biasLv * c;
     }
 
     return g;
@@ -701,6 +756,8 @@ export default {
   tick(api, dt) {
     const d = ensurePhaseData(api);
 
+    if (d._failJustNow) d._failJustNow = Math.max(0, d._failJustNow - dt);
+
     // Defensive: if older saves accidentally persisted these as plain objects,
     // they block initialisation and the canvases look "dead" after refresh.
     if (d._osc && typeof d._osc.draw !== "function") d._osc = null;
@@ -737,17 +794,18 @@ export default {
       const q = lvl(api.state, "p1_bias");
 
       let sps = 0.04;
-      sps += 0.50 * f;
-      sps += 1.40 * g;
-      sps += 0.90 * n;
+      // Buffed passive gain: doubled so upgrades create runaway momentum.
+      sps += 1.00 * f;
+      sps += 2.80 * g;
+      sps += 1.80 * n;
 
       const owned = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
-      sps *= 1 + 0.34 * h * Math.max(0, owned - 1);
+      sps *= 1 + 0.68 * h * Math.max(0, owned - 1);
 
       const corr = clamp(api.state.corruption || 0, 0, 1);
       sps *= 1 - 0.38 * corr;
 
-      if (q > 0) sps += 0.55 * q * corr;
+      if (q > 0) sps += 1.10 * q * corr;
 
       sps *= 1 + 0.42 * clamp(d.sync, 0, 1);
 
@@ -756,6 +814,46 @@ export default {
       api.state.total = (api.state.total || 0) + delta;
 
       d._p1_sps = sps;
+    }
+
+    // ----------------------------
+    // Corruption pressure (ramps hard after 30% synchronicity)
+    // Goal: if you don't build momentum with buffs, corruption can win and force a reset.
+    // ----------------------------
+    if (d.pings >= 20 && !d.complete) {
+      const s = clamp(d.sync, 0, 1);
+      const corr0 = clamp(api.state.corruption || 0, 0, 1);
+      const intensity = clamp((s - 0.30) / 0.70, 0, 1);
+
+      if (intensity > 0) {
+        const f = lvl(api.state, "p1_filter");
+        const g = lvl(api.state, "p1_gain");
+        const n = lvl(api.state, "p1_cancel");
+        const h = lvl(api.state, "p1_lock");
+        const q = lvl(api.state, "p1_bias");
+
+        // Baseline pressure increases nonlinearly with intensity.
+        let rise = (0.00005 + 0.00035 * intensity * intensity) * dt;
+
+        // Cryo Amp makes the return "hot" and attracts attention.
+        rise *= 1 + 0.10 * g;
+
+        // Noise Canceller actively suppresses the pressure.
+        rise *= 1 - clamp(0.10 * n, 0, 0.55);
+
+        // If your current momentum (signal/sec) is below the demanded threshold,
+        // corruption spikes. This is the "use buffs cleverly or lose" hook.
+        const sps = Math.max(0, d._p1_sps || 0);
+        const required = 0.85 + 2.10 * intensity + 3.40 * intensity * intensity;
+        const deficit = clamp((required - sps) / Math.max(0.001, required), 0, 1);
+        rise += 0.0022 * deficit * (0.25 + 0.75 * intensity) * dt;
+
+        // Harmonic Lock and Phase Bias let you "ride" the chaos rather than just tank it.
+        rise *= 1 - clamp(0.04 * h, 0, 0.22);
+        if (q > 0) rise *= 1 - clamp(0.06 * q, 0, 0.30);
+
+        api.state.corruption = clamp(corr0 + rise, 0, 1);
+      }
     }
 
     // Corruption relief
@@ -893,6 +991,74 @@ export default {
         "If you cannot control it, you will contain it. Failure is not an option we budgeted for.",
         "You are accountable for what you wake."
       ]));
+    }
+
+    if (corr >= 0.75 && !flags.corr75) {
+      flags.corr75 = true;
+      p1Say(api, P1_CAST.TECH, pick([
+        "Three-quarter corruption. The return is actively trying to break rhythm.",
+        "Corruption is loud now. It’s not random. It’s… targeted.",
+        "We are getting phase shear. If you feel the drag spike, that’s it pushing back."
+      ]));
+      p1Say(api, P1_CAST.OPS, pick([
+        "75% corruption: stop coasting. Either buy mitigation or go full send and outrun it.",
+        "It’s winning the tug-of-war. You need more momentum. Now.",
+        "You’re letting the return get framed. Don’t."
+      ]));
+    }
+
+    if (corr >= 0.90 && !flags.corr90) {
+      flags.corr90 = true;
+      p1Say(api, P1_CAST.CONTROL, pick([
+        "Corruption at ninety percent. Lock failure imminent.",
+        "Critical contamination level. Immediate action required.",
+        "Warning: loss of lock likely. Stabilize or abort."
+      ]));
+      p1Say(api, P1_CAST.SWF, pick([
+        "Do not fail here.",
+        "If you lose lock, you will explain why you were allowed to touch the controls.",
+        "Finish. Now."
+      ]));
+    }
+
+    // Pressure warnings: the "fight" becomes obvious after 30% if momentum is underbuilt.
+    {
+      const intensity = clamp((s - 0.30) / 0.70, 0, 1);
+      if (intensity > 0) {
+        const sps = Math.max(0, d._p1_sps || 0);
+        const required = 0.85 + 2.10 * intensity + 3.40 * intensity * intensity;
+        const deficit = clamp((required - sps) / Math.max(0.001, required), 0, 1);
+
+        if (deficit > 0.55 && !flags.pressure30) {
+          flags.pressure30 = true;
+          p1Say(api, P1_CAST.OPS, pick([
+            "Lock’s slipping. Your signal/sec is under the demand curve. Buff up.",
+            "You’re being outpaced. This is where builds matter.",
+            "That drag you feel? That’s you losing the race. Fix your engine."
+          ]));
+          p1Say(api, P1_CAST.CONTROL, "Recommendation: increase passive signal/sec or apply corruption suppression.");
+        }
+
+        if (deficit > 0.45 && intensity > 0.55 && !flags.pressure60) {
+          flags.pressure60 = true;
+          p1Say(api, P1_CAST.TECH, pick([
+            "The waveform is buckling. Momentum is the only stabilizer left.",
+            "This is the point where the return decides if you’re friend or food.",
+            "You need either Noise Canceller, or raw acceleration. Preferably both."
+          ]));
+        }
+
+        // UI intensity bump without spamming popups.
+        if (deficit > 0.65 && intensity > 0.35) {
+          api.ui.monitor("LOCK SLIPPING… BOOST MOMENTUM / SUPPRESS CORRUPTION");
+        }
+      }
+    }
+
+    // Failure condition: corruption fully overruns the run.
+    if (corr >= 0.999 && !d.complete) {
+      phase1Fail(api, "CORRUPTION OVERRUN");
+      return;
     }
 
     // Gentle reminder every ~90s after return if player seems stuck
