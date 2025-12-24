@@ -8,6 +8,10 @@ const SUPABASE_ANON_KEY = "sb_publishable_uBQsnY94g__2VzSm4Z9Yvg_mq32-ABR";
 const LOCAL_KEY = "sygn1l_local_cache_v1";
 const TABLE = "saves";
 
+// Public leaderboard table (needs to exist in Supabase).
+// See README in patch notes / SQL snippet.
+const LEADERBOARD_TABLE = "phase_leaderboard";
+
 const CLOUD_SAVE_THROTTLE_MS = 45000;
 
 export function createSaves() {
@@ -218,6 +222,75 @@ export function createSaves() {
   }
 
   // ----------------------------
+  // Leaderboards (public read, per-user best write)
+  // ----------------------------
+  async function submitPhaseBest({ phase, timeMs, username }) {
+    if (!supabase || !isSignedIn()) return { ok: false, reason: "not_signed_in" };
+    const p = Number(phase) || 0;
+    const t = Math.max(0, Math.floor(Number(timeMs) || 0));
+    if (!p || !t) return { ok: false, reason: "bad_args" };
+
+    const name = String(username || "").trim().toUpperCase().slice(0, 18) || "UNKNOWN";
+
+    // Read current best for this user+phase
+    const { data: existing, error: selErr } = await supabase
+      .from(LEADERBOARD_TABLE)
+      .select("time_ms")
+      .eq("phase", p)
+      .eq("player_id", _userId)
+      .maybeSingle();
+
+    // If table is missing or RLS blocks access, don't crash the game.
+    if (selErr && String(selErr.message || "").length) {
+      throw selErr;
+    }
+
+    const cur = existing?.time_ms;
+    if (typeof cur === "number" && cur > 0 && t >= cur) {
+      // Not a PB
+      return { ok: true, updated: false, bestMs: cur };
+    }
+
+    const payload = {
+      phase: p,
+      player_id: _userId,
+      username: name,
+      time_ms: t,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { error: upErr } = await supabase.from(LEADERBOARD_TABLE).upsert(payload);
+    if (upErr) throw upErr;
+    return { ok: true, updated: true, bestMs: t };
+  }
+
+  async function fetchGlobalLeaderboards({ limitPerPhase = 25 } = {}) {
+    if (!supabase) return { ok: false, phases: {} };
+
+    // Fetch a reasonable slice; client will group by phase.
+    // If you later have lots of phases/rows, switch to a view/RPC.
+    const { data, error } = await supabase
+      .from(LEADERBOARD_TABLE)
+      .select("phase, username, time_ms, updated_at")
+      .order("phase", { ascending: true })
+      .order("time_ms", { ascending: true })
+      .limit(500);
+
+    if (error) throw error;
+
+    const phases = {};
+    for (const row of data || []) {
+      const p = Number(row.phase) || 0;
+      if (!p) continue;
+      phases[p] ||= [];
+      if (phases[p].length >= limitPerPhase) continue;
+      phases[p].push(row);
+    }
+
+    return { ok: true, phases };
+  }
+
+  // ----------------------------
   // Canonical write entrypoint
   // ----------------------------
   async function writeCloudState(state, force = false) {
@@ -357,6 +430,10 @@ export function createSaves() {
     syncOnSignIn,
 
     // canonical write
-    writeCloudState
+    writeCloudState,
+
+    // leaderboards
+    submitPhaseBest,
+    fetchGlobalLeaderboards
   };
 }

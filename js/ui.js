@@ -13,6 +13,87 @@ export function createUI() {
   const $ = (id) => document.getElementById(id);
 
   // ----------------------------
+  // Modal windows (bigger than popups)
+  // ----------------------------
+  function ensureModalStyles() {
+    if (document.getElementById("sygn1lModalStyles")) return;
+    const st = document.createElement("style");
+    st.id = "sygn1lModalStyles";
+    st.textContent = `
+      .sygModalHost{ position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; padding:16px; }
+      .sygModalShade{ position:absolute; inset:0; background:rgba(0,0,0,.65); backdrop-filter: blur(2px); }
+      .sygModal{ position:relative; width:min(720px, 100%); max-height:min(78vh, 620px);
+        background:rgba(10,12,16,.96); border:1px solid rgba(255,255,255,.14);
+        border-radius:16px; overflow:hidden; box-shadow:0 18px 60px rgba(0,0,0,.55);
+      }
+      .sygModalHead{ display:flex; align-items:center; justify-content:space-between; gap:12px;
+        padding:12px 12px 10px; border-bottom:1px solid rgba(255,255,255,.10);
+      }
+      .sygModalTitle{ font-weight:700; letter-spacing:.08em; font-size:12px; opacity:.95; }
+      .sygModalClose{ padding:10px 12px; border-radius:12px; }
+      .sygModalBody{ padding:12px; overflow:auto; max-height:calc(min(78vh, 620px) - 54px); }
+      .sygModalBody h3{ margin:10px 0 8px; font-size:12px; letter-spacing:.08em; opacity:.9; }
+      .sygModalBody .muted{ opacity:.7; }
+      .sygLbRow{ display:flex; justify-content:space-between; gap:12px; padding:8px 10px; border-radius:12px;
+        border:1px solid rgba(255,255,255,.08); margin:6px 0; background:rgba(255,255,255,.03);
+      }
+      .sygLbLeft{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+      .sygLbName{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .sygLbMeta{ font-size:12px; opacity:.75; }
+      .sygLbTime{ font-variant-numeric: tabular-nums; font-weight:800; }
+    `;
+    document.head.appendChild(st);
+  }
+
+  function modal(title, content, opts = {}) {
+    ensureModalStyles();
+    const host = document.createElement("div");
+    host.className = "sygModalHost";
+
+    const shade = document.createElement("div");
+    shade.className = "sygModalShade";
+    host.appendChild(shade);
+
+    const box = document.createElement("div");
+    box.className = "sygModal";
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
+
+    const head = document.createElement("div");
+    head.className = "sygModalHead";
+    head.innerHTML = `
+      <div class="sygModalTitle">${esc(title || "WINDOW")}</div>
+      <button class="sygModalClose">CLOSE</button>
+    `;
+    box.appendChild(head);
+
+    const body = document.createElement("div");
+    body.className = "sygModalBody";
+    if (typeof content === "string") body.innerHTML = content;
+    else if (content instanceof Node) body.appendChild(content);
+    box.appendChild(body);
+
+    host.appendChild(box);
+    document.body.appendChild(host);
+
+    const close = () => {
+      try { opts.onClose?.(); } catch {}
+      host.remove();
+    };
+    head.querySelector(".sygModalClose")?.addEventListener("click", close);
+    shade.addEventListener("click", close);
+    document.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.key === "Escape") close();
+      },
+      { once: true }
+    );
+
+    return { host, body, close };
+  }
+
+  // ----------------------------
   // Logs + popups
   // ----------------------------
   function pushLog(elId, tag, msg) {
@@ -180,6 +261,7 @@ export function createUI() {
     $,
     pushLog,
     popup,
+    modal,
     monitor,
     applyPhaseUI,
     renderHUD,
