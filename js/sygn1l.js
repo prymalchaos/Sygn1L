@@ -325,7 +325,7 @@
       }
       normalizeName();
       return true;
-    } catch {
+    } catch (e) {
       return false;
     }
   }

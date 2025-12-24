@@ -141,7 +141,7 @@ export function createAI({
     // Persist immediately to prevent cross-tab spam
     try {
       await saves.writeCloudState(state, true);
-    } catch {}
+    } catch (e) {}
 
     try {
       const payload = {
@@ -170,7 +170,7 @@ export function createAI({
       ui.pushLog("comms", who, esc(text));
       setChip("AI: READY");
       return true;
-    } catch {
+    } catch (e) {
       setChip("AI: OFFLINE");
       ui.pushLog("log", "SYS", "AI COMMS FAILED.");
       return false;
@@ -217,7 +217,7 @@ export function createAI({
 
     try {
       await saves.writeCloudState(state, false);
-    } catch {}
+    } catch (e) {}
     return true;
   }
 

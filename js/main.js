@@ -21,40 +21,6 @@ import {
   prestigeGain
 } from "./economy.js";
 
-// Early error capture (iOS-friendly)
-window.addEventListener("error", (ev) => {
-  try {
-    const msg = [
-      "JS ERROR:",
-      ev.message || "(no message)",
-      ev.filename ? `File: ${ev.filename}` : "",
-      Number.isFinite(ev.lineno) ? `Line: ${ev.lineno}:${ev.colno}` : "",
-      ev.error && ev.error.stack ? `Stack:\n${ev.error.stack}` : ""
-    ].filter(Boolean).join("\n");
-
-    // Call your existing in-game error reporter here
-    if (window.reportError) window.reportError(msg);
-    else alert(msg);
-  } catch (e) {
-    // last resort
-    alert("JS ERROR (report failed): " + (ev.message || ""));
-  }
-});
-
-window.addEventListener("unhandledrejection", (ev) => {
-  const err = ev.reason;
-  const msg = [
-    "PROMISE REJECTION:",
-    err && err.message ? err.message : String(err),
-    err && err.stack ? `Stack:\n${err.stack}` : ""
-  ].join("\n");
-
-  if (window.reportError) window.reportError(msg);
-  else alert(msg);
-});
-
-
-
 import { createUI } from "./ui.js";
 import { createScope } from "./scope.js";
 import { createAI } from "./ai.js";
@@ -68,7 +34,17 @@ import { createAudio } from "./core/audio.js";
   // ----------------------------
   // Safety: show runtime errors as popups
   // ----------------------------
+  // De-dupe identical error popups that can fire via both "error" and "unhandledrejection".
+  let _lastFatal = "";
+  let _lastFatalAt = 0;
+
   function showFatal(msg) {
+    const now = Date.now();
+    const s = String(msg);
+    if (s && s === _lastFatal && now - _lastFatalAt < 400) return;
+    _lastFatal = s;
+    _lastFatalAt = now;
+
     console.error(msg);
     const host = document.getElementById("popHost");
     if (!host) return;
@@ -82,8 +58,22 @@ import { createAudio } from "./core/audio.js";
     box.addEventListener("click", () => box.remove());
     host.prepend(box);
   }
-  window.addEventListener("error", (e) => showFatal(e?.message || e));
-  window.addEventListener("unhandledrejection", (e) => showFatal(e?.reason?.message || e?.reason || e));
+
+  window.addEventListener("error", (e) => {
+    const parts = [];
+    parts.push(e && e.message ? e.message : e);
+    if (e && e.filename) parts.push("File: " + e.filename);
+    if (e && Number.isFinite(e.lineno)) parts.push("Line: " + e.lineno + ":" + e.colno);
+    if (e && e.error && e.error.stack) parts.push("Stack:\n" + e.error.stack);
+    showFatal(parts.filter(Boolean).join("\n"));
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    const r = e && "reason" in e ? e.reason : e;
+    const parts = [];
+    parts.push(r && r.message ? r.message : r);
+    if (r && r.stack) parts.push("Stack:\n" + r.stack);
+    showFatal(parts.filter(Boolean).join("\n"));
+  });
 
   // Prevent iOS double-tap zoom on buttons
   document.addEventListener(
@@ -164,9 +154,9 @@ import { createAudio } from "./core/audio.js";
     saves,
     ui,
     edgeFunction: EDGE_FUNCTION,
-    activeWindowMs: 20_000,
-    aiCooldownMs: 180_000,
-    ambientCooldownMs: 180_000
+    activeWindowMs: 20000,
+    aiCooldownMs: 180000,
+    ambientCooldownMs: 180000
   });
 
   // ----------------------------
@@ -353,7 +343,7 @@ import { createAudio } from "./core/audio.js";
         recomputeAndRender();
         try {
           await saves.writeCloudState(state, false);
-        } catch {}
+        } catch (e) {}
       }
     });
 
@@ -389,7 +379,7 @@ import { createAudio } from "./core/audio.js";
       if (mod?.modifyClickGain) {
         try {
           g = mod.modifyClickGain(g, api);
-        } catch {}
+        } catch (e) {}
       }
 
       state.signal += g;
@@ -403,13 +393,13 @@ import { createAudio } from "./core/audio.js";
 
       try {
         await saves.writeCloudState(state, false);
-      } catch {}
+      } catch (e) {}
 
       // Occasional AI flavour
       if (Math.random() < 0.08) {
         try {
           await ai.invokeEdge(state, "ping", "OPS");
-        } catch {}
+        } catch (e) {}
       }
     };
   }
@@ -421,7 +411,7 @@ import { createAudio } from "./core/audio.js";
       try {
         await saveNow(true);
         ui.pushLog("log", "SYS", saves.isSignedIn() ? "SAVED (CLOUD)." : "SAVED (GUEST).");
-      } catch {
+      } catch (e) {
         ui.pushLog("log", "SYS", "SAVE FAILED.");
       }
     };
@@ -440,7 +430,7 @@ import { createAudio } from "./core/audio.js";
       if (saves.isSignedIn()) {
         try {
           await saves.wipeCloud();
-        } catch {}
+        } catch (e) {}
       }
       location.reload();
     };
@@ -458,7 +448,7 @@ import { createAudio } from "./core/audio.js";
       recomputeAndRender();
       try {
         await saves.writeCloudState(state, true);
-      } catch {}
+      } catch (e) {}
     };
   }
 
@@ -527,7 +517,7 @@ import { createAudio } from "./core/audio.js";
     let uid = null;
     try {
       uid = await saves.getUserId();
-    } catch {}
+    } catch (e) {}
 
     if (!uid) {
       state.phase = 0;
@@ -585,7 +575,7 @@ import { createAudio } from "./core/audio.js";
     // Scope tick (visual only)
     try {
       scope.tick?.(dt, t, { total: state.total, bw: derived.bw, corruption: state.corruption });
-    } catch {}
+    } catch (e) {}
 
     // Phase tick hook
     const mod = currentPhaseModule();

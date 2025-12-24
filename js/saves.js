@@ -56,7 +56,7 @@ export function createSaves() {
     if (!raw) return null;
     try {
       return JSON.parse(raw);
-    } catch {
+    } catch (e) {
       return null;
     }
   }
@@ -65,7 +65,7 @@ export function createSaves() {
     try {
       localStorage.setItem(LOCAL_KEY, JSON.stringify(sanitizeStateForSave(state)));
       return true;
-    } catch {
+    } catch (e) {
       return false;
     }
   }
@@ -143,7 +143,7 @@ export function createSaves() {
       let body = null;
       try {
         if (error?.context?.json) body = await error.context.json();
-      } catch {}
+      } catch (e) {}
 
       const status =
         error?.context?.status ||
@@ -228,7 +228,7 @@ export function createSaves() {
     if (isSignedIn()) {
       try {
         await saveCloud(state, force);
-      } catch {
+      } catch (e) {
         // swallow network errors, game should keep running
       }
     }
