@@ -640,20 +640,13 @@ export default {
       g *= 1 + 0.12 * biasLv * c;
     }
 
-    // EARLY-RUN CALIBRATION MULTIPLIER
-    // Goal: give enough purchasing power to unlock a fuller buff set before sync races to 100.
-    // It decays as synchronicity rises, and mostly helps before your build is online.
-    const s = clamp(d.sync || 0, 0, 1);
-    const ownedCount =
-      (lvl(api.state, "p1_filter") > 0) +
-      (lvl(api.state, "p1_gain") > 0) +
-      (lvl(api.state, "p1_cancel") > 0) +
-      (lvl(api.state, "p1_lock") > 0) +
-      (lvl(api.state, "p1_bias") > 0);
-
-    const early = clamp(1 - s / 0.30, 0, 1);
-    const needsBuild = clamp((4 - ownedCount) / 4, 0, 1);
-    g *= 1 + 0.85 * early * needsBuild;
+      // EARLY-RUN CALIBRATION MULTIPLIER (passive)
+  // Helps you buy more buffs before synchronicity finishes, without making late-game free.
+  const sEarly = clamp(d.sync || 0, 0, 1);
+  const ownedCount = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
+  const early = clamp(1 - sEarly / 0.30, 0, 1);
+  const needsBuild = clamp((4 - ownedCount) / 4, 0, 1);
+  sps *= 1 + 0.60 * early * needsBuild;
 
     return g;
   },
