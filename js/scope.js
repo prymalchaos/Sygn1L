@@ -32,9 +32,10 @@ function ping(strength = 1, freqHz = 2.2, durationSec = 1.6) {
   function resize() {
     dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1));
     const cssW = canvasEl.clientWidth || 300;
-    const cssH = 84;
-
-    canvasEl.style.height = cssH + "px";
+    // Prefer layout-driven height (e.g., Phase 1 forces a fixed row height).
+    // Fall back to the legacy 84px if height isn't measurable yet.
+    const cssH = canvasEl.clientHeight || 84;
+    if (!canvasEl.clientHeight) canvasEl.style.height = cssH + "px";
     canvasEl.width = Math.floor(cssW * dpr);
     canvasEl.height = Math.floor(cssH * dpr);
 
