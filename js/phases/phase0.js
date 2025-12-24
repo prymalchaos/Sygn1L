@@ -7,8 +7,8 @@ export default {
 
   enter(api) {
     const { ui, state } = api;
-    state.phaseData ||= {};
-    state.phaseData[0] ||= { step: 0 };
+    state.phaseData = state.phaseData || {};
+    state.phaseData[0] = state.phaseData[0] || { step: 0 };
     ui.setVisible("gameUI", false);
     ui.setVisible("onboardCard", true);
     ui.monitor("BOOT SEQUENCE: CONTROL TRANSMISSION…");
@@ -103,7 +103,7 @@ export default {
     // Username: save immediately on blur
     if (on) {
       on.addEventListener("blur", () => {
-        const name = (on?.value || "").trim();
+        const name = ((on && on.value) ? on.value : "").trim();
         if (!name) return;
         state.profile.name = name.toUpperCase().slice(0, 18);
         touch();
