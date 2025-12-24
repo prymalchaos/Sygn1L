@@ -640,13 +640,20 @@ export default {
       g *= 1 + 0.12 * biasLv * c;
     }
 
-      // EARLY-RUN CALIBRATION MULTIPLIER (passive)
-  // Helps you buy more buffs before synchronicity finishes, without making late-game free.
-  const sEarly = clamp(d.sync || 0, 0, 1);
-  const ownedCount = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
-  const early = clamp(1 - sEarly / 0.30, 0, 1);
-  const needsBuild = clamp((4 - ownedCount) / 4, 0, 1);
-  sps *= 1 + 0.60 * early * needsBuild;
+    // EARLY-RUN CALIBRATION MULTIPLIER
+    // Goal: give enough purchasing power to unlock a fuller buff set before sync races to 100.
+    // It decays as synchronicity rises, and mostly helps before your build is online.
+    const s = clamp(d.sync || 0, 0, 1);
+    const ownedCount =
+      (lvl(api.state, "p1_filter") > 0) +
+      (lvl(api.state, "p1_gain") > 0) +
+      (lvl(api.state, "p1_cancel") > 0) +
+      (lvl(api.state, "p1_lock") > 0) +
+      (lvl(api.state, "p1_bias") > 0);
+
+    const early = clamp(1 - s / 0.30, 0, 1);
+    const needsBuild = clamp((4 - ownedCount) / 4, 0, 1);
+    g *= 1 + 0.85 * early * needsBuild;
 
     return g;
   },
@@ -766,8 +773,8 @@ export default {
       sps += 1.40 * g;
       sps += 0.90 * n;
 
-      const owned = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
-      sps *= 1 + 0.34 * h * Math.max(0, owned - 1);
+      const ownedCount = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
+      sps *= 1 + 0.34 * h * Math.max(0, ownedCount - 1);
 
       const corr = clamp(api.state.corruption || 0, 0, 1);
       sps *= 1 - 0.38 * corr;
@@ -778,13 +785,12 @@ export default {
 
       // EARLY-RUN CALIBRATION MULTIPLIER (passive)
       // Helps you buy more buffs before synchronicity finishes, without making late-game free.
-      const s = clamp(d.sync || 0, 0, 1);
-      const owned = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
-      const early = clamp(1 - s / 0.30, 0, 1);
-      const needsBuild = clamp((4 - owned) / 4, 0, 1);
+      const sEarly = clamp(d.sync || 0, 0, 1);
+      const early = clamp(1 - sEarly / 0.30, 0, 1);
+      const needsBuild = clamp((4 - ownedCount) / 4, 0, 1);
       sps *= 1 + 0.60 * early * needsBuild;
 
-      const delta = Math.max(0, sps) * dt;
+const delta = Math.max(0, sps) * dt;
       api.state.signal = (api.state.signal || 0) + delta;
       api.state.total = (api.state.total || 0) + delta;
 
