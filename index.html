@@ -155,6 +155,58 @@ h1{
   text-shadow:0 0 10px rgba(0,0,0,.55);
 }
 
+/* Compact mini status panel (SIG/SEC + PHASE) */
+.miniPanel{
+  margin-top:8px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+
+  padding:7px 10px;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:12px;
+  background:rgba(0,0,0,.28);
+}
+.miniPanel .mpStat{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.miniPanel .mpK{
+  font-size:10px;
+  opacity:.64;
+  letter-spacing:.12em;
+}
+.miniPanel .mpV{
+  font-size:12px;
+  font-weight:700;
+  font-variant-numeric: tabular-nums;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.miniPanel .mpDiv{
+  width:1px;
+  height:14px;
+  background:rgba(255,255,255,.12);
+  flex:0 0 auto;
+}
+.led{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:rgba(255,255,255,.10);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+  flex:0 0 auto;
+}
+.led.on{
+  background:var(--accent);
+  box-shadow:
+    0 0 10px rgba(126,247,255,.22),
+    0 0 16px rgba(57,255,106,.16);
+}
+
 /* Make SIGNAL stand out */
 #signal{
   font-weight: 900;
@@ -703,9 +755,27 @@ html[data-phase="1"] .pop{
         <div class="subtitle" id="subtitle">THE ARRAY LISTENS. THE VOID REPLIES IN ARITHMETIC.</div>
 
         <div class="stats">
-          <div class="stat"><div class="k">SIGNAL</div><div class="v" id="signal">0</div></div>
-          <div class="stat"><div class="k">SIGNAL/SEC</div><div class="v" id="sps">0</div></div>
-          <div class="stat"><div class="k">PHASE</div><div class="v" id="phaseTint">P1</div></div>
+          <div class="stat">
+            <div class="k">SIGNAL</div>
+            <div class="v" id="signal">0</div>
+
+            <!-- Compact row under SIGNAL: Signal/sec + Phase (with LEDs) -->
+            <div id="signalSubPanel" class="miniPanel" aria-label="Signal status">
+              <div class="mpStat">
+                <span class="mpK">SIG/SEC</span>
+                <span class="mpV" id="sps">0</span>
+                <span class="led" id="ledSps" title="Signal/sec activity"></span>
+              </div>
+
+              <div class="mpDiv" aria-hidden="true"></div>
+
+              <div class="mpStat">
+                <span class="mpK">PHASE</span>
+                <span class="mpV" id="phaseTint">P1</span>
+                <span class="led" id="ledPhase" title="Phase status"></span>
+              </div>
+            </div>
+          </div>
         </div>
 
 <div id="narrative" class="narrative">
@@ -741,6 +811,28 @@ html[data-phase="1"] .pop{
       </div>
       <div class="pad">
         <div class="upgrades" id="upgrades"></div>
+      </div>
+    </section>
+
+    <!-- Comms -->
+    <section class="card">
+      <div class="hd">
+        <div>COMMUNICATIONS</div>
+        <div class="muted">Tap popups to close.</div>
+      </div>
+      <div class="pad">
+        <div class="log" id="comms"></div>
+      </div>
+    </section>
+
+    <!-- Log -->
+    <section class="card">
+      <div class="hd">
+        <div>TRANSMISSION LOG</div>
+        <div class="muted">Milestones reveal context.</div>
+      </div>
+      <div class="pad">
+        <div class="log" id="log"></div>
       </div>
     </section>
 
@@ -787,30 +879,6 @@ html[data-phase="1"] .pop{
         <div class="muted" id="objective">
           OBJECTIVE: Tap PING VOID, then buy DISH to start passive Signal/sec.
         </div>
-      </div>
-    </section>
-
-    
-
-    <!-- Comms -->
-    <section class="card">
-      <div class="hd">
-        <div>COMMUNICATIONS</div>
-        <div class="muted">Tap popups to close.</div>
-      </div>
-      <div class="pad">
-        <div class="log" id="comms"></div>
-      </div>
-    </section>
-
-    <!-- Log -->
-    <section class="card">
-      <div class="hd">
-        <div>TRANSMISSION LOG</div>
-        <div class="muted">Milestones reveal context.</div>
-      </div>
-      <div class="pad">
-        <div class="log" id="log"></div>
       </div>
     </section>
 
