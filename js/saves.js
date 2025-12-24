@@ -221,6 +221,14 @@ export function createSaves() {
   // Canonical write entrypoint
   // ----------------------------
   async function writeCloudState(state, force = false) {
+    // Keep the save timestamp fresh so offline gains are calculated from a recent checkpoint.
+    // This intentionally lives here so *any* caller (ping, buy, phase hooks, etc.) is covered.
+    try {
+      if (state && typeof state === "object" && state.meta && typeof state.meta === "object") {
+        state.meta.updatedAtMs = Date.now();
+      }
+    } catch {}
+
     // Always keep local current
     saveLocal(state);
 

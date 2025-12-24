@@ -66,6 +66,10 @@ import { createAudio } from "./core/audio.js";
   const OFFLINE_CAP_SEC = 6 * 60 * 60; // 6h
   const EDGE_FUNCTION = "sygn1l-comms";
 
+  // Frequent LOCAL checkpoints so an accidental refresh doesn't nuke minutes of progress.
+  // Cloud writes remain throttled in /js/saves.js.
+  const AUTOSAVE_LOCAL_MS = 8_000;
+
   // ----------------------------
   // Core modules
   // ----------------------------
@@ -165,6 +169,19 @@ import { createAudio } from "./core/audio.js";
     state.meta.lastInputAtMs = nowMs();
     touch();
   };
+
+  // Last-ditch protection against iOS refresh/kill while scrolling.
+  // (Can't reliably await async cloud saves during unload, but local is instant.)
+  const quickLocalCheckpoint = () => {
+    try {
+      touch();
+      saves.saveLocal(state);
+    } catch {}
+  };
+  window.addEventListener("pagehide", quickLocalCheckpoint);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") quickLocalCheckpoint();
+  });
 
   function setAiEnabled(on) {
     state.meta.aiEnabled = !!on;
@@ -506,6 +523,12 @@ import { createAudio } from "./core/audio.js";
   // ----------------------------
   let last = nowMs();
   let lastRender = 0;
+
+  // Autosave bookkeeping (local checkpoints + opportunistic cloud throttled internally)
+  let lastAutoSaveAt = nowMs();
+  let lastSavedSignal = state.signal;
+  let lastSavedTotal = state.total;
+  let lastSavedPhase = state.phase;
   function frame() {
     const t = nowMs();
     const dt = Math.min(0.25, (t - last) / 1000);
@@ -537,6 +560,28 @@ import { createAudio } from "./core/audio.js";
       mod?.tick?.(api, dt);
     } catch (e) {
       ui.pushLog("log", "SYS", `PHASE TICK ERROR: ${e?.message || e}`);
+    }
+
+    // Autosave checkpoint: keep LOCAL state fresh even during pure idle play.
+    // This prevents refreshes from snapping back to an ancient save, and makes offline
+    // recovery calculations saner by keeping updatedAtMs current.
+    if (t - lastAutoSaveAt >= AUTOSAVE_LOCAL_MS) {
+      const changed =
+        Math.abs((state.signal || 0) - (lastSavedSignal || 0)) > 0.01 ||
+        Math.abs((state.total || 0) - (lastSavedTotal || 0)) > 0.01 ||
+        state.phase !== lastSavedPhase;
+
+      if (changed) {
+        lastSavedSignal = state.signal;
+        lastSavedTotal = state.total;
+        lastSavedPhase = state.phase;
+        lastAutoSaveAt = t;
+
+        // writeCloudState() always saves local, and cloud is throttled internally.
+        saves.writeCloudState(state, false).catch(() => {});
+      } else {
+        lastAutoSaveAt = t;
+      }
     }
 
     // Render throttling: UI updates at most ~4fps unless something marked dirty.
