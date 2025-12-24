@@ -80,6 +80,10 @@ export function createUI() {
     if ($("subtitle")) $("subtitle").textContent = ph.sub;
     if ($("objective")) $("objective").textContent = "OBJECTIVE: " + ph.obj;
     if ($("phaseTint")) $("phaseTint").textContent = "P" + ph.n;
+
+    // Phase LED: off for Phase 0, on otherwise
+    const ledPhase = $("ledPhase");
+    if (ledPhase) ledPhase.classList.toggle("on", Number(ph.n) > 0);
   }
 
   // ----------------------------
@@ -95,7 +99,12 @@ export function createUI() {
     setSmartNumber($("signal"), state.signal);
     // Prefer a precomputed "display" SPS if provided by the core loop.
     // Falls back to the core economy SPS.
-    setSmartNumber($("sps"), (derived && (derived.displaySps ?? derived.sps)) || 0);
+    const spsVal = (derived && (derived.displaySps ?? derived.sps)) || 0;
+    setSmartNumber($("sps"), spsVal);
+
+    // Signal/sec LED: on when producing positive passive gain
+    const ledSps = $("ledSps");
+    if (ledSps) ledSps.classList.toggle("on", Number(spsVal) > 0);
 
     if ($("buildChip")) $("buildChip").textContent = "BUILD: " + state.build;
     if ($("relicChip")) $("relicChip").textContent = "RELICS: " + state.relics;
