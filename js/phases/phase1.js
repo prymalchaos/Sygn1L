@@ -723,7 +723,42 @@ export default {
       try { api.saves?.writeCloudState?.(api.state, false); } catch (e) {}
     }
 
-    // Cryo Amp tradeoff: slightly increases corruption per ping
+    
+    // Ping backlash: after 50% sync, each ping risks a brief corruption spike.
+    // Noise Canceller mitigates most of this backlash so it becomes a strategic buy.
+    const s = clamp(d.sync || 0, 0, 1);
+    if (s >= 0.50) {
+      const cancelLv = lvl(api.state, "p1_cancel");
+      const progress = clamp((s - 0.50) / 0.50, 0, 1); // 0..1 from 50% to 100%
+      // Base spike scales up toward the endgame. Tuned to be noticeable but survivable with good buffs.
+      let spike = 0.0020 + 0.0065 * progress;
+
+      // Tiny anti-spam ramp: repeated pings add a little extra pressure.
+      d._p1_pingSpam ||= 0;
+      d._p1_pingSpam = clamp(d._p1_pingSpam + 0.25, 0, 4);
+      spike *= 1 + 0.10 * d._p1_pingSpam;
+
+      if (cancelLv > 0) spike *= Math.max(0.15, 1 - 0.40 * cancelLv);
+
+      api.state.corruption = clamp((api.state.corruption || 0) + spike, 0, 1);
+
+      if (!flags.pingBacklash) {
+        flags.pingBacklash = true;
+        p1Say(api, P1_CAST.OPS, pick([
+          "Heads up: pings are echoing back now. Each one nudges the corruption. Buy Noise Canceller or bleed out.",
+          "You’re loud enough to be heard. PING now feeds the static. You need Noise Canceller, or a bigger engine.",
+          "At 50% sync the void starts answering. Each ping drags corruption in. Play smart."
+        ]));
+      } else if ((api.state.corruption || 0) >= 0.75 && !flags.corr75) {
+        // corr75 milestone will also fire later, but this makes the moment feel immediate during spam.
+        p1Say(api, P1_CAST.SWF, pick([
+          "Stop broadcasting weakness. Your pings are contaminating the channel.",
+          "You are overdriving the scan. Control the noise or lose the lock."
+        ]));
+      }
+    }
+
+// Cryo Amp tradeoff: slightly increases corruption per ping
     const gainLv = lvl(api.state, "p1_gain");
     if (gainLv > 0) {
       api.state.corruption = clamp((api.state.corruption || 0) + 0.00010 * gainLv, 0, 1);
@@ -732,6 +767,9 @@ export default {
 
   tick(api, dt) {
     const d = ensurePhaseData(api);
+
+    // Decay ping-spam heat over time so backlash feels "brief" unless you're hammering PING.
+    if (d._p1_pingSpam) d._p1_pingSpam = Math.max(0, d._p1_pingSpam - dt * 0.9);
 
     // Defensive: if older saves accidentally persisted these as plain objects,
     // they block initialisation and the canvases look "dead" after refresh.
@@ -773,8 +811,8 @@ export default {
       sps += 1.40 * g;
       sps += 0.90 * n;
 
-      const ownedCount = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
-      sps *= 1 + 0.34 * h * Math.max(0, ownedCount - 1);
+      const owned = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
+      sps *= 1 + 0.34 * h * Math.max(0, owned - 1);
 
       const corr = clamp(api.state.corruption || 0, 0, 1);
       sps *= 1 - 0.38 * corr;
@@ -785,12 +823,13 @@ export default {
 
       // EARLY-RUN CALIBRATION MULTIPLIER (passive)
       // Helps you buy more buffs before synchronicity finishes, without making late-game free.
-      const sEarly = clamp(d.sync || 0, 0, 1);
-      const early = clamp(1 - sEarly / 0.30, 0, 1);
-      const needsBuild = clamp((4 - ownedCount) / 4, 0, 1);
+      const s = clamp(d.sync || 0, 0, 1);
+      const owned = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
+      const early = clamp(1 - s / 0.30, 0, 1);
+      const needsBuild = clamp((4 - owned) / 4, 0, 1);
       sps *= 1 + 0.60 * early * needsBuild;
 
-const delta = Math.max(0, sps) * dt;
+      const delta = Math.max(0, sps) * dt;
       api.state.signal = (api.state.signal || 0) + delta;
       api.state.total = (api.state.total || 0) + delta;
 
