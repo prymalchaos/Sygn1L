@@ -140,6 +140,52 @@ function fmtTime(sec) {
   const mm = String(Math.floor(s / 60)).padStart(2, "0");
   const ss = String(s % 60).padStart(2, "0");
   return `${mm}:${ss}`;
+
+
+function fmtTimeMs(ms) {
+  const t = Math.max(0, Math.floor(ms));
+  const sec = Math.floor(t / 1000);
+  const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+  const ss = String(sec % 60).padStart(2, "0");
+  const cs = String(Math.floor((t % 1000) / 10)).padStart(2, "0"); // centiseconds
+  return `${mm}:${ss}.${cs}`;
+}
+
+function personalTimesKey(api) {
+  const uid = api.saves?.getUserId?.() || "guest";
+  return `sygn1l_personal_times_${uid}_p${PHASE_ID}`;
+}
+
+function recordPersonalTime(api, timeMs) {
+  try {
+    const key = personalTimesKey(api);
+    const raw = localStorage.getItem(key);
+    const arr = raw ? JSON.parse(raw) : [];
+    arr.push({ time_ms: Math.max(0, Math.floor(timeMs || 0)), at: Date.now() });
+    const clean = arr
+      .filter((x) => x && Number.isFinite(Number(x.time_ms)) && Number(x.time_ms) > 0)
+      .sort((a, b) => a.time_ms - b.time_ms)
+      .slice(0, 10);
+    localStorage.setItem(key, JSON.stringify(clean));
+    return clean;
+  } catch {
+    return [];
+  }
+}
+
+function getPersonalTimes(api) {
+  try {
+    const key = personalTimesKey(api);
+    const raw = localStorage.getItem(key);
+    const arr = raw ? JSON.parse(raw) : [];
+    return (arr || [])
+      .filter((x) => x && Number.isFinite(Number(x.time_ms)) && Number(x.time_ms) > 0)
+      .sort((a, b) => a.time_ms - b.time_ms)
+      .slice(0, 10);
+  } catch {
+    return [];
+  }
+}
 }
 
 // ----------------------------
@@ -222,6 +268,92 @@ function ensurePhase1HUD(api) {
     api.touch();
   });
   headerPad.insertBefore(replay, document.getElementById("ping"));
+  // Leaderboards (Phase 1 UI)
+  if (!document.getElementById("p1LbRow")) {
+    const row = document.createElement("div");
+    row.id = "p1LbRow";
+    row.style.display = "flex";
+    row.style.gap = "10px";
+    row.style.width = "100%";
+
+    row.innerHTML = `
+      <button id="p1GlobalLb" class="big" style="flex:1">GLOBAL TOP 10</button>
+      <button id="p1MyTimes" class="big" style="flex:1">MY TOP 10</button>
+    `;
+
+    headerPad.insertBefore(row, document.getElementById("ping"));
+
+    const gBtn = row.querySelector("#p1GlobalLb");
+    const mBtn = row.querySelector("#p1MyTimes");
+
+    gBtn?.addEventListener("click", async () => {
+      const w = api.ui.modal("GLOBAL LEADERBOARD", "<div class='muted'>LOADING…</div>");
+      try {
+        if (!api.saves?.isSignedIn?.()) {
+          w.body.innerHTML = "<div class='muted'>SIGN IN TO VIEW GLOBAL LEADERBOARDS.</div>";
+          return;
+        }
+
+        const res = await api.saves.fetchGlobalLeaderboards({ limitPerPhase: 10 });
+        const rows = (res?.phases?.[PHASE_ID] || []).slice(0, 10);
+
+        if (!rows.length) {
+          w.body.innerHTML = "<div class='muted'>NO COMPLETIONS ON RECORD YET.</div>";
+          return;
+        }
+
+        const parts = [];
+        parts.push(`<h3>PHASE ${PHASE_ID}</h3>`);
+        rows.forEach((r, idx) => {
+          const name = String(r.username || "UNKNOWN");
+          const time = fmtTimeMs(Number(r.time_ms) || 0);
+          const when = r.updated_at ? new Date(r.updated_at).toLocaleString() : "";
+          parts.push(`
+            <div class='sygLbRow'>
+              <div class='sygLbLeft'>
+                <div class='sygLbName'>#${idx + 1} ${name}</div>
+                <div class='sygLbMeta'>${when}</div>
+              </div>
+              <div class='sygLbTime'>${time}</div>
+            </div>
+          `);
+        });
+
+        w.body.innerHTML = parts.join("");
+      } catch (e) {
+        w.body.innerHTML = "<div class='muted'>FAILED TO LOAD LEADERBOARD.</div>";
+      }
+    });
+
+    mBtn?.addEventListener("click", () => {
+      const w = api.ui.modal("MY TIME TRIALS", "<div class='muted'>LOADING…</div>");
+      const rows = getPersonalTimes(api);
+
+      if (!rows.length) {
+        w.body.innerHTML = "<div class='muted'>NO RUNS SAVED YET. COMPLETE PHASE 1 TO ADD A TIME.</div>";
+        return;
+      }
+
+      const parts = [];
+      parts.push(`<h3>PHASE ${PHASE_ID}</h3>`);
+      rows.forEach((r, idx) => {
+        const time = fmtTimeMs(Number(r.time_ms) || 0);
+        const when = r.at ? new Date(r.at).toLocaleString() : "";
+        parts.push(`
+          <div class='sygLbRow'>
+            <div class='sygLbLeft'>
+              <div class='sygLbName'>#${idx + 1}</div>
+              <div class='sygLbMeta'>${when}</div>
+            </div>
+            <div class='sygLbTime'>${time}</div>
+          </div>
+        `);
+      });
+
+      w.body.innerHTML = parts.join("");
+    });
+  }
+
 
   const chipHost = document.querySelector("#syncChip")?.parentElement;
   if (chipHost && !document.getElementById("p1TimerChip")) {
@@ -502,6 +634,19 @@ function syncTick(api, dt) {
 
     if (!d.bestTimeSec || timeSec < d.bestTimeSec) d.bestTimeSec = timeSec;
     const best = d.bestTimeSec ? fmtTime(d.bestTimeSec) : fmtTime(timeSec);
+
+    // Record personal Top 10 (local) for this phase
+    const timeMs = d.endAtMs - d.startAtMs;
+    recordPersonalTime(api, timeMs);
+
+    // Submit best to global leaderboard (signed-in only)
+    try {
+      const username = (api.state?.profile?.name || "UNKNOWN").toString().toUpperCase().slice(0, 18);
+      api.saves?.submitPhaseBest?.({ phase: PHASE_ID, timeMs, username })?.catch?.(() => {});
+    } catch {
+      // non-fatal
+    }
+
 
     api.ui.popup("CONTROL", `SYNCHRONICITY ACHIEVED. TIME: ${fmtTime(timeSec)}. BEST: ${best}.`);
     api.ui.pushLog("log", "SYS", `PHASE 1 COMPLETE. TIME ${fmtTime(timeSec)}.`);
