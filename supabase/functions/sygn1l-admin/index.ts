@@ -48,15 +48,7 @@ function getNested(body: AnyBody, keys: string[], fallback: any = undefined) {
 }
 
 function getOp(body: AnyBody): string {
-  const raw = getNested(body, ["op", "action", "cmd"], "");
-  if (typeof raw === "string") return raw.trim();
-  // Some callers accidentally pass { op: { op: "list_users" } }
-  if (raw && typeof raw === "object") {
-    const o = raw as AnyBody;
-    const inner = o.op ?? o.action ?? o.cmd ?? "";
-    if (typeof inner === "string") return inner.trim();
-  }
-  return String(raw ?? "").trim();
+  return String(getNested(body, ["op", "action", "cmd"], "") || "").trim();
 }
 
 function getId(body: AnyBody): string {
@@ -110,6 +102,42 @@ async function deleteSaveRowAnyColumn(supaAdmin: any, userId: string) {
   }
 
   return { deleted, errors, details };
+
+
+async function deleteUserDependenciesAnyColumn(supaAdmin: any, userId: string) {
+  // Best-effort cleanup of rows that commonly reference auth.users.
+  // This prevents FK constraint failures when deleting the auth user.
+  const attempts = [
+    // Leaderboards
+    { table: "phase_leaderboard", cols: ["player_id", "user_id", "id"] },
+
+    // Common profile/user tables
+    { table: "profiles", cols: ["id", "user_id", "player_id"] },
+    { table: "users", cols: ["id", "user_id", "player_id"] },
+  ];
+
+  const results: Array<{ table: string; col: string; count?: number }> = [];
+  const errors: string[] = [];
+
+  for (const a of attempts) {
+    for (const col of a.cols) {
+      const { error, count } = await supaAdmin
+        .from(a.table)
+        .delete({ count: "exact" })
+        .eq(col, userId);
+
+      if (error) {
+        // Ignore missing table errors but record them for debugging.
+        errors.push(`${a.table}.${col}: ${error.message}`);
+        continue;
+      }
+
+      results.push({ table: a.table, col, ...(typeof count === "number" ? { count } : {}) });
+    }
+  }
+
+  return { results, errors };
+}
 }
 
 serve(async (req) => {
@@ -219,6 +247,7 @@ console.log(`[sygn1l-admin] op=${op} caller=${callerEmail} (${callerId})`);
       const id = getId(body);
       if (!id) return err("Missing id", 400);
 
+      const depRes = await deleteUserDependenciesAnyColumn(supaAdmin, id);
       const saveRes = await deleteSaveRowAnyColumn(supaAdmin, id);
 
       const { error } = await supaAdmin.auth.admin.deleteUser(id);
@@ -228,6 +257,8 @@ console.log(`[sygn1l-admin] op=${op} caller=${callerEmail} (${callerId})`);
         ok: true,
         id,
         user_deleted: true,
+        deps_deleted: depRes.results,
+        deps_delete_errors: depRes.errors,
         save_deleted_rows: saveRes.deleted,
         save_delete_attempts: saveRes.details,
         save_delete_errors: saveRes.errors,
@@ -238,6 +269,7 @@ console.log(`[sygn1l-admin] op=${op} caller=${callerEmail} (${callerId})`);
       const selfId = callerId;
       if (!selfId) return err("Missing caller id", 500);
 
+      const depRes = await deleteUserDependenciesAnyColumn(supaAdmin, selfId);
       const saveRes = await deleteSaveRowAnyColumn(supaAdmin, selfId);
 
       const { error } = await supaAdmin.auth.admin.deleteUser(selfId);
@@ -247,6 +279,8 @@ console.log(`[sygn1l-admin] op=${op} caller=${callerEmail} (${callerId})`);
         ok: true,
         id: selfId,
         user_deleted: true,
+        deps_deleted: depRes.results,
+        deps_delete_errors: depRes.errors,
         save_deleted_rows: saveRes.deleted,
         save_delete_attempts: saveRes.details,
         save_delete_errors: saveRes.errors,
