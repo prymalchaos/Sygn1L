@@ -1,5 +1,19 @@
 # Patch Changelog
 
+## [2025-12-25] Phase 1 Tuning Patch (Applied to Runtime)
+
+### Fixed
+- Applied Phase 1 tuning changes to the runtime-loaded module `js/phases/phase1.js` (previously edits landed in `js/phase1.js`, which is not imported by the phase loader).
+
+### Changed
+- Phase 1 buffs: stronger multiplicative scaling to allow signal growth to outrun corruption.
+- Added ping momentum + temporary surge behavior (see Phase 1 module tooltips/mechanics).
+- Corruption drag softened and more strongly mitigated by NOISE CANCELLER.
+
+### Notes
+- Phase loader imports `js/phases/phase{n}.js` via `js/core/phaseRuntime.js`. Runtime behavior will now reflect the tuned Phase 1 module.
+
+
 ## Patch Summary
 Phase 1 tuning pass to let players get ahead of corruption through stronger multipliers and a cadence-based momentum system.
 
