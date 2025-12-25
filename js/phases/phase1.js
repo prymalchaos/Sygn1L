@@ -55,9 +55,6 @@ function ensureCommsFlags(d) {
     hit85: false,
     corr25: false,
     corr50: false,
-    corr75: false,
-    corr90: false,
-    gameOver: false,
     reminderIdle: 0
   };
   return d._p1_comms;
@@ -73,7 +70,15 @@ const P1_BUFFS = [
     unlock: 20,
     base: 28,
     mult: 2.05,
-    desc: "Cleaner returns. +12% ping gain. +18% Sync growth. +0.50 signal/sec."
+    desc: "Cleaner returns. Ping gains x1.25. Sync growth x1.30. Passive signal multiplier."
+  },
+  {
+    id: "p1_surge",
+    name: "SIGNAL SURGE",
+    unlock: 45,
+    base: 65,
+    mult: 2.35,
+    desc: "Illegal boost. After each PING: x5 click gain for 6s, plus corruption bleed-off."
   },
   {
     id: "p1_gain",
@@ -81,7 +86,7 @@ const P1_BUFFS = [
     unlock: 80,
     base: 160,
     mult: 2.18,
-    desc: "More power in the dark. +28% ping gain. +1.40 signal/sec. Slightly aggravates corruption."
+    desc: "More power in the dark. Ping gains x1.60. Passive signal multiplier. Slightly aggravates corruption."
   },
   {
     id: "p1_cancel",
@@ -89,7 +94,7 @@ const P1_BUFFS = [
     unlock: 300,
     base: 1100,
     mult: 2.25,
-    desc: "Suppresses corruption pressure in Phase 1. +0.90 signal/sec."
+    desc: "Suppresses corruption pressure. Strong corruption bleed + reduced corruption drag."
   },
   {
     id: "p1_lock",
@@ -122,6 +127,13 @@ function ensurePhaseData(api) {
     endAtMs: 0,
     bestTimeSec: 0,
 
+    // Ping momentum (rewards cadence; decays quickly if you stop)
+    _pingChain: 0,
+    _pingChainHold: 0,
+
+    // Temporary surge window after ping (from SIGNAL SURGE)
+    _surgeTimer: 0,
+
     _p1_sps: 0,
     _osc: null,
     _bars: null,
@@ -129,8 +141,7 @@ function ensurePhaseData(api) {
     _autosaveAccum: 0,
     _cloudSaveAccum: 0,
     _commsAccum: 0,
-    _aiPulseAccum: 0,
-    _failLockoutUntil: 0
+    _aiPulseAccum: 0
   };
   return api.state.phaseData[PHASE_ID];
 }
@@ -140,7 +151,7 @@ function fmtTime(sec) {
   const mm = String(Math.floor(s / 60)).padStart(2, "0");
   const ss = String(s % 60).padStart(2, "0");
   return `${mm}:${ss}`;
-
+}
 
 function fmtTimeMs(ms) {
   const t = Math.max(0, Math.floor(ms));
@@ -149,43 +160,6 @@ function fmtTimeMs(ms) {
   const ss = String(sec % 60).padStart(2, "0");
   const cs = String(Math.floor((t % 1000) / 10)).padStart(2, "0"); // centiseconds
   return `${mm}:${ss}.${cs}`;
-}
-
-function personalTimesKey(api) {
-  const uid = api.saves?.getUserId?.() || "guest";
-  return `sygn1l_personal_times_${uid}_p${PHASE_ID}`;
-}
-
-function recordPersonalTime(api, timeMs) {
-  try {
-    const key = personalTimesKey(api);
-    const raw = localStorage.getItem(key);
-    const arr = raw ? JSON.parse(raw) : [];
-    arr.push({ time_ms: Math.max(0, Math.floor(timeMs || 0)), at: Date.now() });
-    const clean = arr
-      .filter((x) => x && Number.isFinite(Number(x.time_ms)) && Number(x.time_ms) > 0)
-      .sort((a, b) => a.time_ms - b.time_ms)
-      .slice(0, 10);
-    localStorage.setItem(key, JSON.stringify(clean));
-    return clean;
-  } catch {
-    return [];
-  }
-}
-
-function getPersonalTimes(api) {
-  try {
-    const key = personalTimesKey(api);
-    const raw = localStorage.getItem(key);
-    const arr = raw ? JSON.parse(raw) : [];
-    return (arr || [])
-      .filter((x) => x && Number.isFinite(Number(x.time_ms)) && Number(x.time_ms) > 0)
-      .sort((a, b) => a.time_ms - b.time_ms)
-      .slice(0, 10);
-  } catch {
-    return [];
-  }
-}
 }
 
 // ----------------------------
@@ -268,40 +242,22 @@ function ensurePhase1HUD(api) {
     api.touch();
   });
   headerPad.insertBefore(replay, document.getElementById("ping"));
-  // Leaderboards (Phase 1 UI)
-  // Requested: buttons live under the COMMS + TRANSMISSION windows (not in the header area).
-  if (!document.getElementById("p1LbCard")) {
-    // Clean up any older placement.
-    document.getElementById("p1LbRow")?.remove();
 
-    const txCard = document.getElementById("log")?.closest("section.card");
-    const host = txCard?.parentElement;
-    if (host) {
-      const card = document.createElement("section");
-      card.className = "card";
-      card.id = "p1LbCard";
+  // Leaderboard buttons (Phase 1 UI)
+  if (!document.getElementById("p1LbRow")) {
+    const row2 = document.createElement("div");
+    row2.id = "p1LbRow";
+    row2.className = "p1LbRow";
+    row2.innerHTML = `
+      <button id="p1GlobalLb" class="big">GLOBAL LEADERBOARD</button>
+      <button id="p1MyTimes" class="big">MY TIME TRIALS</button>
+    `;
+    headerPad.insertBefore(row2, document.getElementById("ping"));
 
-      card.innerHTML = `
-        <div class="hd">
-          <div>LEADERBOARDS</div>
-          <div class="muted">Phase 1 rankings and your best runs.</div>
-        </div>
-        <div class="pad">
-          <div id="p1LbRow" class="p1LbRow">
-            <button id="p1GlobalLb" class="big">GLOBAL TOP 10</button>
-            <button id="p1MyTimes" class="big">MY TOP 10</button>
-          </div>
-        </div>
-      `;
+    const gBtn = row2.querySelector("#p1GlobalLb");
+    const mBtn = row2.querySelector("#p1MyTimes");
 
-      // Insert directly under the TRANSMISSION LOG card.
-      txCard.insertAdjacentElement("afterend", card);
-
-      const row = card.querySelector("#p1LbRow");
-      const gBtn = row?.querySelector("#p1GlobalLb");
-      const mBtn = row?.querySelector("#p1MyTimes");
-
-      gBtn?.addEventListener("click", async () => {
+    gBtn?.addEventListener("click", async () => {
       const w = api.ui.modal("GLOBAL LEADERBOARD", "<div class='muted'>LOADING…</div>");
       try {
         if (!api.saves?.isSignedIn?.()) {
@@ -309,67 +265,65 @@ function ensurePhase1HUD(api) {
           return;
         }
 
-        const res = await api.saves.fetchGlobalLeaderboards({ limitPerPhase: 10 });
-        const rows = (res?.phases?.[PHASE_ID] || []).slice(0, 10);
+        const res = await api.saves.fetchGlobalLeaderboards({ limitPerPhase: 25 });
+        const phases = res?.phases || {};
+        const phaseNums = Object.keys(phases)
+          .map((n) => Number(n))
+          .filter(Boolean)
+          .sort((a, b) => a - b)
+          .filter((n) => (phases[n] || []).length > 0);
 
-        if (!rows.length) {
+        if (!phaseNums.length) {
           w.body.innerHTML = "<div class='muted'>NO COMPLETIONS ON RECORD YET.</div>";
           return;
         }
 
         const parts = [];
-        parts.push(`<h3>PHASE ${PHASE_ID}</h3>`);
-        rows.forEach((r, idx) => {
-          const name = String(r.username || "UNKNOWN");
-          const time = fmtTimeMs(Number(r.time_ms) || 0);
-          const when = r.updated_at ? new Date(r.updated_at).toLocaleString() : "";
-          parts.push(`
-            <div class='sygLbRow'>
-              <div class='sygLbLeft'>
-                <div class='sygLbName'>#${idx + 1} ${name}</div>
-                <div class='sygLbMeta'>${when}</div>
+        for (const p of phaseNums) {
+          const rows = phases[p] || [];
+          parts.push(`<h3>PHASE ${p}</h3>`);
+          rows.forEach((r, idx) => {
+            const name = String(r.username || "UNKNOWN");
+            const time = fmtTimeMs(Number(r.time_ms) || 0);
+            const when = r.updated_at ? new Date(r.updated_at).toLocaleString() : "";
+            parts.push(`
+              <div class='sygLbRow'>
+                <div class='sygLbLeft'>
+                  <div class='sygLbName'>#${idx + 1} ${name}</div>
+                  <div class='sygLbMeta'>${when}</div>
+                </div>
+                <div class='sygLbTime'>${time}</div>
               </div>
-              <div class='sygLbTime'>${time}</div>
-            </div>
-          `);
-        });
-
+            `);
+          });
+        }
         w.body.innerHTML = parts.join("");
       } catch (e) {
-        w.body.innerHTML = "<div class='muted'>FAILED TO LOAD LEADERBOARD.</div>";
+        w.body.innerHTML = `<div class='muted'>LEADERBOARD ERROR: ${String(e?.message || e)}</div>`;
       }
     });
 
-      mBtn?.addEventListener("click", () => {
-      const w = api.ui.modal("MY TIME TRIALS", "<div class='muted'>LOADING…</div>");
-      const rows = getPersonalTimes(api);
+    mBtn?.addEventListener("click", () => {
+      const pd = api.state?.phaseData || {};
+      const nums = Object.keys(pd)
+        .map((n) => Number(n))
+        .filter(Boolean)
+        .sort((a, b) => a - b)
+        .filter((n) => pd[n]?.complete && pd[n]?.bestTimeSec);
 
-      if (!rows.length) {
-        w.body.innerHTML = "<div class='muted'>NO RUNS SAVED YET. COMPLETE PHASE 1 TO ADD A TIME.</div>";
+      if (!nums.length) {
+        api.ui.modal("MY TIME TRIALS", "<div class='muted'>NO COMPLETED PHASE TIMES YET.</div>");
         return;
       }
 
       const parts = [];
-      parts.push(`<h3>PHASE ${PHASE_ID}</h3>`);
-      rows.forEach((r, idx) => {
-        const time = fmtTimeMs(Number(r.time_ms) || 0);
-        const when = r.at ? new Date(r.at).toLocaleString() : "";
-        parts.push(`
-          <div class='sygLbRow'>
-            <div class='sygLbLeft'>
-              <div class='sygLbName'>#${idx + 1}</div>
-              <div class='sygLbMeta'>${when}</div>
-            </div>
-            <div class='sygLbTime'>${time}</div>
-          </div>
-        `);
-      });
-
-      w.body.innerHTML = parts.join("");
-      });
-    }
+      for (const p of nums) {
+        const best = fmtTime(Number(pd[p].bestTimeSec) || 0);
+        parts.push(`<div class='sygLbRow'><div class='sygLbLeft'><div class='sygLbName'>PHASE ${p}</div><div class='sygLbMeta'>PERSONAL BEST</div></div><div class='sygLbTime'>${best}</div></div>`);
+      }
+      api.ui.modal("MY TIME TRIALS", parts.join(""));
+    });
   }
-
 
   const chipHost = document.querySelector("#syncChip")?.parentElement;
   if (chipHost && !document.getElementById("p1TimerChip")) {
@@ -410,6 +364,9 @@ function ensurePhase1HUD(api) {
     html[data-phase='1'] .scopeWrap{ border-radius:14px; }
     html[data-phase='1'] .p1OscWrap, html[data-phase='1'] .scopeWrap{ overflow:hidden; }
 
+    html[data-phase='1'] .p1LbRow{ display:flex; gap:10px; margin:10px 0 6px; }
+    html[data-phase='1'] .p1LbRow button.big{ flex:1 1 0; padding:14px 12px; font-size:12px; }
+
     html[data-phase='1'] .p1OscWrap::before,
     html[data-phase='1'] .scopeWrap::before,
     html[data-phase='1'] .p1SyncBar::before{
@@ -445,14 +402,6 @@ function ensurePhase1HUD(api) {
     html[data-phase='1'] canvas#p1Bars{ display:block; width:100%; height:34px; margin-top:8px; opacity:.92; }
 
     html[data-phase='1'] #ping.afford{ filter: drop-shadow(0 0 10px rgba(90,255,170,.20)); }
-
-    /* Leaderboard buttons row (lives under COMMS + TRANSMISSION). */
-    html[data-phase='1'] .p1LbRow{
-      display:flex;
-      gap:10px;
-      width:100%;
-    }
-    html[data-phase='1'] .p1LbRow > button{ flex:1 1 0; }
   `
   );
 }
@@ -474,7 +423,6 @@ function teardownPhase1HUD(api) {
   document.querySelector(".p1SyncBar")?.remove();
   document.getElementById("p1Replay")?.remove();
   document.getElementById("p1TimerChip")?.remove();
-  document.getElementById("p1LbCard")?.remove();
 }
 
 // ----------------------------
@@ -619,36 +567,29 @@ function syncTick(api, dt) {
   const q = lvl(api.state, "p1_bias");
 
   const sig = Math.max(0, api.state.signal || 0);
-  const signalPressure = clamp(Math.log10(sig + 10) / 7.6, 0, 1);
+  const signalPressure = clamp(Math.log10(sig + 10) / 7.2, 0, 1);
 
-  // IMPORTANT BALANCE GOAL:
-  // - Early phase should give you time to buy buffs (sync should not sprint to 100%).
-  // - Mid/late phase should accelerate only if you built multipliers.
-  const owned = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
+  const chain = clamp(d._pingChain || 0, 0, 20);
 
-  // Slower baseline than before, then it scales more with "build".
-  let growth = 0.00046 + 0.00062 * signalPressure;
+  // Faster early progression + a cadence reward so active play feels impactful.
+  let growth = (0.00092 + 0.00135 * signalPressure);
+  growth *= 1 + 0.30 * f;
+  growth *= 1 + 0.012 * chain;
 
-  // Owning buffs is a direct permission slip to go faster.
-  growth *= 1 + 0.09 * owned;
+  const sOwned = (f > 0) + (lvl(api.state, "p1_surge") > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
+  growth *= 1 + 0.45 * h * Math.max(0, sOwned - 1);
 
-  // Filter gives better coherence, but not a free win.
-  growth *= 1 + 0.12 * f;
+  // Corruption should hurt, but not hard-lock progress.
+  // Noise Canceller reduces the bite.
+  const corrBite = 0.35 * corr * (1 - clamp(0.18 * n, 0, 0.55));
+  growth *= 1 - corrBite;
 
-  // Harmonic Lock is the real "engine" once you have other buffs.
-  growth *= 1 + 0.28 * h * Math.max(0, owned - 1);
-
-  // Corruption reduces sync growth noticeably.
-  growth *= 1 - 0.62 * corr;
-
-  // Drag increases after 30% and becomes brutal if corruption is high.
   const post30 = Math.max(0, s - 0.30);
-  let drag = 0.00018 + 0.00270 * post30 * post30;
-  drag *= 0.60 + 1.40 * corr;
-  drag *= 1 - clamp(0.26 * n, 0, 0.70);
+  let drag = 0.00018 + 0.00185 * post30 * post30;
+  drag *= 0.50 + 1.05 * corr;
+  drag *= 1 - clamp(0.28 * n, 0, 0.70);
 
-  // Bias lets you "surf" corruption a bit, but never enough to ignore it.
-  const surf = q > 0 ? (0.00014 * q * corr) : 0;
+  const surf = q > 0 ? (0.00022 * q * corr) : 0;
 
   d.sync = clamp(s + (growth - drag + surf) * dt, 0, 1);
 
@@ -656,25 +597,30 @@ function syncTick(api, dt) {
     d.complete = true;
     d.endAtMs = Date.now();
     const timeSec = (d.endAtMs - d.startAtMs) / 1000;
+    const timeMs = Math.floor(d.endAtMs - d.startAtMs);
 
     if (!d.bestTimeSec || timeSec < d.bestTimeSec) d.bestTimeSec = timeSec;
     const best = d.bestTimeSec ? fmtTime(d.bestTimeSec) : fmtTime(timeSec);
 
-    // Record personal Top 10 (local) for this phase
-    const timeMs = d.endAtMs - d.startAtMs;
-    recordPersonalTime(api, timeMs);
-
-    // Submit best to global leaderboard (signed-in only)
-    try {
-      const username = (api.state?.profile?.name || "UNKNOWN").toString().toUpperCase().slice(0, 18);
-      api.saves?.submitPhaseBest?.({ phase: PHASE_ID, timeMs, username })?.catch?.(() => {});
-    } catch {
-      // non-fatal
-    }
-
-
     api.ui.popup("CONTROL", `SYNCHRONICITY ACHIEVED. TIME: ${fmtTime(timeSec)}. BEST: ${best}.`);
     api.ui.pushLog("log", "SYS", `PHASE 1 COMPLETE. TIME ${fmtTime(timeSec)}.`);
+
+    // Global leaderboard submission (best time per user per phase)
+    // Non-blocking: if the table/RLS isn't configured yet, the run still completes.
+    (async () => {
+      try {
+        if (api.saves?.isSignedIn?.()) {
+          await api.saves.submitPhaseBest({
+            phase: PHASE_ID,
+            timeMs,
+            username: api.state?.profile?.name || "UNKNOWN",
+          });
+        }
+      } catch (e) {
+        // Log only; don't spam popups.
+        api.ui.pushLog("log", "SYS", `LEADERBOARD SUBMIT FAILED: ${String(e?.message || e)}`);
+      }
+    })();
 
     const replayBtn = document.getElementById("p1Replay");
     if (replayBtn) replayBtn.style.display = "";
@@ -789,41 +735,37 @@ export default {
     let g = base;
 
     const filterLv = lvl(api.state, "p1_filter");
+    const surgeLv = lvl(api.state, "p1_surge");
     const gainLv = lvl(api.state, "p1_gain");
     const lockLv = lvl(api.state, "p1_lock");
     const biasLv = lvl(api.state, "p1_bias");
 
-    g *= 1 + 0.12 * filterLv;
-    g *= 1 + 0.28 * gainLv;
+    // Reward cadence: consistent pings ramp click output.
+    const chain = clamp(d._pingChain || 0, 0, 20);
+    g *= 1 + 0.15 * chain;
+
+    // Buffs: aggressive multipliers (Phase 1 needs a breakthrough moment)
+    if (filterLv > 0) g *= 1.25;
+    if (gainLv > 0) g *= 1.60;
 
     const owned =
       (lvl(api.state, "p1_filter") > 0) +
+      (lvl(api.state, "p1_surge") > 0) +
       (lvl(api.state, "p1_gain") > 0) +
       (lvl(api.state, "p1_cancel") > 0) +
       (lvl(api.state, "p1_lock") > 0) +
       (lvl(api.state, "p1_bias") > 0);
 
-    g *= 1 + 0.08 * lockLv * Math.max(0, owned - 1);
+    // Synergy engine: the more buffs, the harder this punches.
+    g *= 1 + 0.14 * lockLv * Math.max(0, owned - 1);
+
+    // "Illegal" surge window: x5 for a short time after ping.
+    if (surgeLv > 0 && (d._surgeTimer || 0) > 0) g *= 1 + 4.0 * surgeLv;
 
     if (biasLv > 0) {
       const c = clamp(api.state.corruption || 0, 0, 1);
-      g *= 1 + 0.12 * biasLv * c;
+      g *= 1 + 0.20 * biasLv * c;
     }
-
-    // EARLY-RUN CALIBRATION MULTIPLIER
-    // Goal: give enough purchasing power to unlock a fuller buff set before sync races to 100.
-    // It decays as synchronicity rises, and mostly helps before your build is online.
-    const s = clamp(d.sync || 0, 0, 1);
-    const ownedCount =
-      (lvl(api.state, "p1_filter") > 0) +
-      (lvl(api.state, "p1_gain") > 0) +
-      (lvl(api.state, "p1_cancel") > 0) +
-      (lvl(api.state, "p1_lock") > 0) +
-      (lvl(api.state, "p1_bias") > 0);
-
-    const early = clamp(1 - s / 0.30, 0, 1);
-    const needsBuild = clamp((4 - ownedCount) / 4, 0, 1);
-    g *= 1 + 0.85 * early * needsBuild;
 
     return g;
   },
@@ -831,6 +773,14 @@ export default {
   onPing(api) {
     const d = ensurePhaseData(api);
     d.pings++;
+
+    // Ping momentum: reward cadence. Chain decays fast if you stop.
+    d._pingChain = Math.min(20, (d._pingChain || 0) + 1);
+    d._pingChainHold = 1.8;
+
+    // SIGNAL SURGE: brief overpowered window after each ping
+    const surgeLv = lvl(api.state, "p1_surge");
+    if (surgeLv > 0) d._surgeTimer = 6.0;
 
     const flags = ensureCommsFlags(d);
 
@@ -909,6 +859,14 @@ export default {
     if (d._bars && typeof d._bars.draw !== "function") d._bars = null;
 
     // ----------------------------
+    // Ping momentum + surge timers
+    // ----------------------------
+    if (d._pingChainHold > 0) d._pingChainHold = Math.max(0, d._pingChainHold - dt);
+    else d._pingChain = Math.max(0, (d._pingChain || 0) - dt * 1.85);
+
+    if (d._surgeTimer > 0) d._surgeTimer = Math.max(0, d._surgeTimer - dt);
+
+    // ----------------------------
     // Phase-local autosave
     // ----------------------------
     d._autosaveAccum += dt;
@@ -933,33 +891,44 @@ export default {
     // ----------------------------
     if (d.pings >= 20 && !d.complete) {
       const f = lvl(api.state, "p1_filter");
+      const surgeLv = lvl(api.state, "p1_surge");
       const g = lvl(api.state, "p1_gain");
       const n = lvl(api.state, "p1_cancel");
       const h = lvl(api.state, "p1_lock");
       const q = lvl(api.state, "p1_bias");
 
-      let sps = 0.04;
-      sps += 0.50 * f;
-      sps += 1.40 * g;
-      sps += 0.90 * n;
+      // Phase 1 needs multipliers that can actually outrun corruption.
+      // Build base, then stack multipliers for a real "breakthrough".
+      let sps = 0.055;
+      let mult = 1;
 
-      const ownedCount = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
-      sps *= 1 + 0.34 * h * Math.max(0, ownedCount - 1);
+      // Core multipliers (more aggressive than before)
+      if (f > 0) mult *= 1.45;
+      if (g > 0) mult *= 2.10;
+      if (n > 0) mult *= 1.80;
+
+      // Cadence reward: sustained pings improve passive output too.
+      const chain = clamp(d._pingChain || 0, 0, 20);
+      mult *= 1 + 0.08 * chain;
+
+      const owned = (f > 0) + (surgeLv > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
+      mult *= 1 + 0.60 * h * Math.max(0, owned - 1);
 
       const corr = clamp(api.state.corruption || 0, 0, 1);
-      sps *= 1 - 0.38 * corr;
+      // Corruption drag, softened, and strongly mitigated by NOISE CANCELLER.
+      const drag = 0.55 * corr * (1 - clamp(0.20 * n, 0, 0.65));
+      mult *= 1 - drag;
 
-      if (q > 0) sps += 0.55 * q * corr;
+      // QUANTUM PHASE BIAS: corruption becomes fuel.
+      if (q > 0) mult *= 1 + 0.55 * q * corr;
 
-      sps *= 1 + 0.42 * clamp(d.sync, 0, 1);
+      // Sync makes everything more stable (late-phase ramp)
+      mult *= 1 + 0.55 * clamp(d.sync, 0, 1);
 
-      // EARLY-RUN CALIBRATION MULTIPLIER (passive)
-      // Helps you buy more buffs before synchronicity finishes, without making late-game free.
-      const s = clamp(d.sync || 0, 0, 1);
-      /* ownedCount already computed above */
-      const early = clamp(1 - s / 0.30, 0, 1);
-      const needsBuild = clamp((4 - ownedCount) / 4, 0, 1);
-      sps *= 1 + 0.60 * early * needsBuild;
+      // SIGNAL SURGE also slightly improves passive while active (tiny bleed into idle)
+      if (surgeLv > 0 && (d._surgeTimer || 0) > 0) mult *= 1.35;
+
+      sps *= Math.max(0.05, mult);
 
       const delta = Math.max(0, sps) * dt;
       api.state.signal = (api.state.signal || 0) + delta;
@@ -968,109 +937,17 @@ export default {
       d._p1_sps = sps;
     }
 
-    // ----------------------------
-    // Corruption pressure (the endgame should be a fight)
-    // ----------------------------
-    if (d.pings >= 20 && !d.complete) {
-      const s = clamp(d.sync || 0, 0, 1);
-      const corr0 = clamp(api.state.corruption || 0, 0, 1);
-
-      const f = lvl(api.state, "p1_filter");
-      const g = lvl(api.state, "p1_gain");
-      const n = lvl(api.state, "p1_cancel");
-      const h = lvl(api.state, "p1_lock");
-      const q = lvl(api.state, "p1_bias");
-
-      // Baseline corruption grows with sync. Early: manageable. Late: hungry.
-      // Tuned to reach "real threat" levels by end of an average run unless you outscale it.
-      let corrGain = (0.00045 + 0.00320 * s * s) * dt;
-
-      // After 30%, corruption starts chasing your build.
-      if (s >= 0.30) {
-        const post = s - 0.30;
-
-        // Demand ramps from ~1.4/s to ~7+/s by the end.
-        const demandedSps = 1.4 + 5.2 * post + 2.0 * s * s;
-        const haveSps = Math.max(0, d._p1_sps || 0);
-        const deficit = Math.max(0, demandedSps - haveSps);
-
-        // Deficit punishes harder the later you are.
-        const chase = Math.pow(deficit, 1.35) * (0.00080 + 0.00450 * post);
-        corrGain += chase * dt;
-      }
-
-      // Cryo Amp tradeoff: it gives power but feeds the problem (scaled a bit more now).
-      if (g > 0) corrGain += (0.00015 * g) * dt;
-
-      // Mitigation: Noise Canceller + Harmonic Lock + Bias reduce pressure.
-      let mitigate = 1;
-      mitigate *= 1 - clamp(0.22 * n, 0, 0.70);
-      mitigate *= 1 - clamp(0.12 * h, 0, 0.45);
-      mitigate *= 1 - clamp(0.10 * q, 0, 0.40);
-      mitigate *= 1 - clamp(0.05 * f, 0, 0.20);
-
-      let corr1 = clamp(corr0 + corrGain * mitigate, 0, 1);
-
-      // If corruption dominates, it can actively pull synchronicity backwards.
-      // This turns the last stretch into a real tug-of-war.
-      if (corr1 > 0.68 && s > 0.40) {
-        const dominance = corr1 - 0.68;
-        let syncDrain = (0.00018 + 0.00135 * dominance) * (0.55 + s);
-        syncDrain *= 1 - clamp(0.30 * n, 0, 0.75);
-        syncDrain *= 1 - clamp(0.18 * q, 0, 0.55);
-        d.sync = clamp(d.sync - syncDrain * dt, 0, 1);
-      }
-
-      api.state.corruption = corr1;
-    }
-
-    // Corruption relief (always-on)
+    // Corruption relief
     const cancelLv = lvl(api.state, "p1_cancel");
     if (cancelLv > 0) {
-      // Relief is meaningful now because corruption pressure is meaningful.
-      api.state.corruption = clamp((api.state.corruption || 0) - 0.00035 * cancelLv * dt, 0, 1);
+      // Much stronger than before: this is the core counterplay.
+      api.state.corruption = clamp((api.state.corruption || 0) - 0.000040 * cancelLv * dt, 0, 1);
     }
 
-    // ----------------------------
-    // Fail state: lose lock (Phase 1 reset)
-    // ----------------------------
-    {
-      const flags = ensureCommsFlags(d);
-      const corr = clamp(api.state.corruption || 0, 0, 1);
-      const now = Date.now();
-      if (d.pings >= 20 && !d.complete && corr >= 1 && now >= (d._failLockoutUntil || 0)) {
-        d._failLockoutUntil = now + 1500;
-
-        // Hard reset the phase run.
-        d.pings = 20; // return stays acquired so you can immediately re-engage
-        d.sync = 0;
-        d.complete = false;
-        d.startAtMs = Date.now();
-        d.endAtMs = 0;
-
-        for (const b of P1_BUFFS) {
-          if (api.state.up && b.id in api.state.up) api.state.up[b.id] = 0;
-        }
-
-        api.state.signal = 0;
-        api.state.total = 0;
-        api.state.corruption = 0;
-
-        api.ui.popup("SWF", "LOCK LOST. CORRUPTION OVERRAN THE TRACE. RESETTING RUN.");
-        p1Say(api, P1_CAST.SWF, pick([
-          "You let it slip. Do you understand how rare that return was? Reset and do not embarrass us again.",
-          "You lost lock. That was preventable. Re-engage. And this time, build properly.",
-          "Containment failed. I want results, not excuses. Start over."
-        ]));
-        p1Say(api, P1_CAST.OPS, pick([
-          "Yep. That’s what happens when you ignore the corruption and hope vibes will carry you.",
-          "You got greedy and the static bit back. Re-run it, but buy smarter.",
-          "Lock’s gone. Take a breath. Build a pipeline. Then try again."
-        ]));
-
-        api.ui.pushLog("log", "SYS", "PHASE 1 FAILED: CORRUPTION DOMINATED. RUN RESET.");
-        api.touch();
-      }
+    // SIGNAL SURGE: active "get ahead" window bleeds corruption faster.
+    const surgeLv = lvl(api.state, "p1_surge");
+    if (surgeLv > 0 && (d._surgeTimer || 0) > 0) {
+      api.state.corruption = clamp((api.state.corruption || 0) - 0.000090 * surgeLv * dt, 0, 1);
     }
 
     // ----------------------------
@@ -1112,6 +989,7 @@ export default {
     if (!flags.firstBuff && d.pings >= 20) {
       const owned =
         (lvl(api.state, "p1_filter") > 0) +
+        (lvl(api.state, "p1_surge") > 0) +
         (lvl(api.state, "p1_gain") > 0) +
         (lvl(api.state, "p1_cancel") > 0) +
         (lvl(api.state, "p1_lock") > 0) +
@@ -1201,34 +1079,6 @@ export default {
         "You will not allow contamination to propagate beyond this phase. Understood?",
         "If you cannot control it, you will contain it. Failure is not an option we budgeted for.",
         "You are accountable for what you wake."
-      ]));
-    }
-
-    if (corr >= 0.75 && !flags.corr75) {
-      flags.corr75 = true;
-      p1Say(api, P1_CAST.CONTROL, pick([
-        "Corruption at seventy-five percent. Stability failure imminent. Maintain signal growth or disengage.",
-        "Seventy-five percent. The trace is slipping. Countermeasures now.",
-        "Warning: lock integrity compromised. You are entering collapse conditions."
-      ]));
-      p1Say(api, P1_CAST.OPS, pick([
-        "Okay, now it’s personal. If your build isn’t multiplying, it’s dying.",
-        "This is the part where you either outscale it or you eat a reset.",
-        "Seventy-five. No more sightseeing. Buy for momentum, not comfort."
-      ]));
-    }
-
-    if (corr >= 0.90 && !flags.corr90) {
-      flags.corr90 = true;
-      p1Say(api, P1_CAST.SWF, pick([
-        "Ninety percent. You are seconds from losing lock. Fix it. Immediately.",
-        "Containment is collapsing. If you fail here, you will explain it in writing.",
-        "This is your last warning. Do not let it take the channel."
-      ]));
-      p1Say(api, P1_CAST.TECH, pick([
-        "It’s screaming in the waveform. I can’t smooth this without upgrades.",
-        "The noise floor is… weaponized. You need mitigation or raw scaling, right now.",
-        "I’m watching the trace fray. Please don’t make me unplug the dish."
       ]));
     }
 
