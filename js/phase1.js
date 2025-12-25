@@ -70,7 +70,15 @@ const P1_BUFFS = [
     unlock: 20,
     base: 28,
     mult: 2.05,
-    desc: "Cleaner returns. +12% ping gain. +18% Sync growth. +0.50 signal/sec."
+    desc: "Cleaner returns. Ping gains x1.25. Sync growth x1.30. Passive signal multiplier."
+  },
+  {
+    id: "p1_surge",
+    name: "SIGNAL SURGE",
+    unlock: 45,
+    base: 65,
+    mult: 2.35,
+    desc: "Illegal boost. After each PING: x5 click gain for 6s, plus corruption bleed-off."
   },
   {
     id: "p1_gain",
@@ -78,7 +86,7 @@ const P1_BUFFS = [
     unlock: 80,
     base: 160,
     mult: 2.18,
-    desc: "More power in the dark. +28% ping gain. +1.40 signal/sec. Slightly aggravates corruption."
+    desc: "More power in the dark. Ping gains x1.60. Passive signal multiplier. Slightly aggravates corruption."
   },
   {
     id: "p1_cancel",
@@ -86,7 +94,7 @@ const P1_BUFFS = [
     unlock: 300,
     base: 1100,
     mult: 2.25,
-    desc: "Suppresses corruption pressure in Phase 1. +0.90 signal/sec."
+    desc: "Suppresses corruption pressure. Strong corruption bleed + reduced corruption drag."
   },
   {
     id: "p1_lock",
@@ -118,6 +126,13 @@ function ensurePhaseData(api) {
     startAtMs: Date.now(),
     endAtMs: 0,
     bestTimeSec: 0,
+
+    // Ping momentum (rewards cadence; decays quickly if you stop)
+    _pingChain: 0,
+    _pingChainHold: 0,
+
+    // Temporary surge window after ping (from SIGNAL SURGE)
+    _surgeTimer: 0,
 
     _p1_sps: 0,
     _osc: null,
@@ -554,21 +569,27 @@ function syncTick(api, dt) {
   const sig = Math.max(0, api.state.signal || 0);
   const signalPressure = clamp(Math.log10(sig + 10) / 7.2, 0, 1);
 
-  let growth = (0.00074 + 0.00100 * signalPressure);
+  const chain = clamp(d._pingChain || 0, 0, 20);
 
-  growth *= 1 + 0.18 * f;
+  // Faster early progression + a cadence reward so active play feels impactful.
+  let growth = (0.00092 + 0.00135 * signalPressure);
+  growth *= 1 + 0.30 * f;
+  growth *= 1 + 0.012 * chain;
 
-  const owned = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
-  growth *= 1 + 0.30 * h * Math.max(0, owned - 1);
+  const sOwned = (f > 0) + (lvl(api.state, "p1_surge") > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
+  growth *= 1 + 0.45 * h * Math.max(0, sOwned - 1);
 
-  growth *= 1 - 0.55 * corr;
+  // Corruption should hurt, but not hard-lock progress.
+  // Noise Canceller reduces the bite.
+  const corrBite = 0.35 * corr * (1 - clamp(0.18 * n, 0, 0.55));
+  growth *= 1 - corrBite;
 
   const post30 = Math.max(0, s - 0.30);
-  let drag = 0.00020 + 0.00210 * post30 * post30;
-  drag *= 0.55 + 1.15 * corr;
-  drag *= 1 - clamp(0.22 * n, 0, 0.65);
+  let drag = 0.00018 + 0.00185 * post30 * post30;
+  drag *= 0.50 + 1.05 * corr;
+  drag *= 1 - clamp(0.28 * n, 0, 0.70);
 
-  const surf = q > 0 ? (0.00016 * q * corr) : 0;
+  const surf = q > 0 ? (0.00022 * q * corr) : 0;
 
   d.sync = clamp(s + (growth - drag + surf) * dt, 0, 1);
 
@@ -714,25 +735,36 @@ export default {
     let g = base;
 
     const filterLv = lvl(api.state, "p1_filter");
+    const surgeLv = lvl(api.state, "p1_surge");
     const gainLv = lvl(api.state, "p1_gain");
     const lockLv = lvl(api.state, "p1_lock");
     const biasLv = lvl(api.state, "p1_bias");
 
-    g *= 1 + 0.12 * filterLv;
-    g *= 1 + 0.28 * gainLv;
+    // Reward cadence: consistent pings ramp click output.
+    const chain = clamp(d._pingChain || 0, 0, 20);
+    g *= 1 + 0.15 * chain;
+
+    // Buffs: aggressive multipliers (Phase 1 needs a breakthrough moment)
+    if (filterLv > 0) g *= 1.25;
+    if (gainLv > 0) g *= 1.60;
 
     const owned =
       (lvl(api.state, "p1_filter") > 0) +
+      (lvl(api.state, "p1_surge") > 0) +
       (lvl(api.state, "p1_gain") > 0) +
       (lvl(api.state, "p1_cancel") > 0) +
       (lvl(api.state, "p1_lock") > 0) +
       (lvl(api.state, "p1_bias") > 0);
 
-    g *= 1 + 0.08 * lockLv * Math.max(0, owned - 1);
+    // Synergy engine: the more buffs, the harder this punches.
+    g *= 1 + 0.14 * lockLv * Math.max(0, owned - 1);
+
+    // "Illegal" surge window: x5 for a short time after ping.
+    if (surgeLv > 0 && (d._surgeTimer || 0) > 0) g *= 1 + 4.0 * surgeLv;
 
     if (biasLv > 0) {
       const c = clamp(api.state.corruption || 0, 0, 1);
-      g *= 1 + 0.12 * biasLv * c;
+      g *= 1 + 0.20 * biasLv * c;
     }
 
     return g;
@@ -741,6 +773,14 @@ export default {
   onPing(api) {
     const d = ensurePhaseData(api);
     d.pings++;
+
+    // Ping momentum: reward cadence. Chain decays fast if you stop.
+    d._pingChain = Math.min(20, (d._pingChain || 0) + 1);
+    d._pingChainHold = 1.8;
+
+    // SIGNAL SURGE: brief overpowered window after each ping
+    const surgeLv = lvl(api.state, "p1_surge");
+    if (surgeLv > 0) d._surgeTimer = 6.0;
 
     const flags = ensureCommsFlags(d);
 
@@ -819,6 +859,14 @@ export default {
     if (d._bars && typeof d._bars.draw !== "function") d._bars = null;
 
     // ----------------------------
+    // Ping momentum + surge timers
+    // ----------------------------
+    if (d._pingChainHold > 0) d._pingChainHold = Math.max(0, d._pingChainHold - dt);
+    else d._pingChain = Math.max(0, (d._pingChain || 0) - dt * 1.85);
+
+    if (d._surgeTimer > 0) d._surgeTimer = Math.max(0, d._surgeTimer - dt);
+
+    // ----------------------------
     // Phase-local autosave
     // ----------------------------
     d._autosaveAccum += dt;
@@ -843,25 +891,44 @@ export default {
     // ----------------------------
     if (d.pings >= 20 && !d.complete) {
       const f = lvl(api.state, "p1_filter");
+      const surgeLv = lvl(api.state, "p1_surge");
       const g = lvl(api.state, "p1_gain");
       const n = lvl(api.state, "p1_cancel");
       const h = lvl(api.state, "p1_lock");
       const q = lvl(api.state, "p1_bias");
 
-      let sps = 0.04;
-      sps += 0.50 * f;
-      sps += 1.40 * g;
-      sps += 0.90 * n;
+      // Phase 1 needs multipliers that can actually outrun corruption.
+      // Build base, then stack multipliers for a real "breakthrough".
+      let sps = 0.055;
+      let mult = 1;
 
-      const owned = (f > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
-      sps *= 1 + 0.34 * h * Math.max(0, owned - 1);
+      // Core multipliers (more aggressive than before)
+      if (f > 0) mult *= 1.45;
+      if (g > 0) mult *= 2.10;
+      if (n > 0) mult *= 1.80;
+
+      // Cadence reward: sustained pings improve passive output too.
+      const chain = clamp(d._pingChain || 0, 0, 20);
+      mult *= 1 + 0.08 * chain;
+
+      const owned = (f > 0) + (surgeLv > 0) + (g > 0) + (n > 0) + (h > 0) + (q > 0);
+      mult *= 1 + 0.60 * h * Math.max(0, owned - 1);
 
       const corr = clamp(api.state.corruption || 0, 0, 1);
-      sps *= 1 - 0.38 * corr;
+      // Corruption drag, softened, and strongly mitigated by NOISE CANCELLER.
+      const drag = 0.55 * corr * (1 - clamp(0.20 * n, 0, 0.65));
+      mult *= 1 - drag;
 
-      if (q > 0) sps += 0.55 * q * corr;
+      // QUANTUM PHASE BIAS: corruption becomes fuel.
+      if (q > 0) mult *= 1 + 0.55 * q * corr;
 
-      sps *= 1 + 0.42 * clamp(d.sync, 0, 1);
+      // Sync makes everything more stable (late-phase ramp)
+      mult *= 1 + 0.55 * clamp(d.sync, 0, 1);
+
+      // SIGNAL SURGE also slightly improves passive while active (tiny bleed into idle)
+      if (surgeLv > 0 && (d._surgeTimer || 0) > 0) mult *= 1.35;
+
+      sps *= Math.max(0.05, mult);
 
       const delta = Math.max(0, sps) * dt;
       api.state.signal = (api.state.signal || 0) + delta;
@@ -873,7 +940,14 @@ export default {
     // Corruption relief
     const cancelLv = lvl(api.state, "p1_cancel");
     if (cancelLv > 0) {
-      api.state.corruption = clamp((api.state.corruption || 0) - 0.0000030 * cancelLv * dt, 0, 1);
+      // Much stronger than before: this is the core counterplay.
+      api.state.corruption = clamp((api.state.corruption || 0) - 0.000040 * cancelLv * dt, 0, 1);
+    }
+
+    // SIGNAL SURGE: active "get ahead" window bleeds corruption faster.
+    const surgeLv = lvl(api.state, "p1_surge");
+    if (surgeLv > 0 && (d._surgeTimer || 0) > 0) {
+      api.state.corruption = clamp((api.state.corruption || 0) - 0.000090 * surgeLv * dt, 0, 1);
     }
 
     // ----------------------------
@@ -915,6 +989,7 @@ export default {
     if (!flags.firstBuff && d.pings >= 20) {
       const owned =
         (lvl(api.state, "p1_filter") > 0) +
+        (lvl(api.state, "p1_surge") > 0) +
         (lvl(api.state, "p1_gain") > 0) +
         (lvl(api.state, "p1_cancel") > 0) +
         (lvl(api.state, "p1_lock") > 0) +
