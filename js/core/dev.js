@@ -9,17 +9,9 @@ export function createDevTools({ ui, saves }) {
   }
 
   async function adminCall(op, payload = {}) {
-    // Preferred: your existing wrapper
-    if (saves?.adminInvoke) {
-      // Some wrappers expect (op, payload), some expect ({op,...payload})
-      // We'll try (op,payload) first, then fallback.
-      try {
-        const r1 = await saves.adminInvoke(op, payload);
-        return r1;
-      } catch (_e) {
-        // fallback to a single object body
-        return await saves.adminInvoke({ op, ...payload });
-      }
+    // Preferred: wrapper from saves.js (expects (op, payload))
+    if (typeof saves?.adminInvoke === "function") {
+      return await saves.adminInvoke(op, payload);
     }
 
     // Fallback: direct supabase client (if your saves module exposes it)
