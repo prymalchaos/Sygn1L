@@ -104,6 +104,50 @@ async function deleteSaveRowAnyColumn(supaAdmin: any, userId: string) {
   return { deleted, errors, details };
 }
 
+// Best-effort cleanup for other tables that may have FK references to auth.users
+// (e.g. leaderboards). If these rows aren't removed first, auth.admin.deleteUser()
+// can fail with a foreign key violation.
+async function deleteRelatedRows(supaAdmin: any, userId: string) {
+  const attempts = [
+    // Leaderboards
+    { table: "phase_leaderboard", col: "player_id" },
+    { table: "phase_leaderboard", col: "user_id" },
+
+    // Common profile tables (harmless if they don't exist)
+    { table: "profiles", col: "id" },
+    { table: "profiles", col: "user_id" },
+    { table: "users", col: "id" },
+    { table: "users", col: "user_id" },
+  ];
+
+  let deleted = 0;
+  const errors: string[] = [];
+  const details: { table: string; col: string; count?: number }[] = [];
+
+  for (const a of attempts) {
+    const { error, count } = await supaAdmin
+      .from(a.table)
+      .delete({ count: "exact" })
+      .eq(a.col, userId);
+
+    if (error) {
+      // Ignore missing-table / missing-column style errors, but keep a breadcrumb
+      // so we can diagnose real issues from Function logs.
+      errors.push(`${a.table}.${a.col}: ${error.message}`);
+      continue;
+    }
+
+    if (typeof count === "number") {
+      deleted += count;
+      details.push({ table: a.table, col: a.col, count });
+    } else {
+      details.push({ table: a.table, col: a.col });
+    }
+  }
+
+  return { deleted, errors, details };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -211,6 +255,8 @@ console.log(`[sygn1l-admin] op=${op} caller=${callerEmail} (${callerId})`);
       const id = getId(body);
       if (!id) return err("Missing id", 400);
 
+      // Clear related rows first to avoid FK violations on auth user deletion.
+      const relatedRes = await deleteRelatedRows(supaAdmin, id);
       const saveRes = await deleteSaveRowAnyColumn(supaAdmin, id);
 
       const { error } = await supaAdmin.auth.admin.deleteUser(id);
@@ -220,6 +266,9 @@ console.log(`[sygn1l-admin] op=${op} caller=${callerEmail} (${callerId})`);
         ok: true,
         id,
         user_deleted: true,
+        related_deleted_rows: relatedRes.deleted,
+        related_delete_attempts: relatedRes.details,
+        related_delete_errors: relatedRes.errors,
         save_deleted_rows: saveRes.deleted,
         save_delete_attempts: saveRes.details,
         save_delete_errors: saveRes.errors,
@@ -230,6 +279,8 @@ console.log(`[sygn1l-admin] op=${op} caller=${callerEmail} (${callerId})`);
       const selfId = callerId;
       if (!selfId) return err("Missing caller id", 500);
 
+      // Clear related rows first to avoid FK violations on auth user deletion.
+      const relatedRes = await deleteRelatedRows(supaAdmin, selfId);
       const saveRes = await deleteSaveRowAnyColumn(supaAdmin, selfId);
 
       const { error } = await supaAdmin.auth.admin.deleteUser(selfId);
@@ -239,6 +290,9 @@ console.log(`[sygn1l-admin] op=${op} caller=${callerEmail} (${callerId})`);
         ok: true,
         id: selfId,
         user_deleted: true,
+        related_deleted_rows: relatedRes.deleted,
+        related_delete_attempts: relatedRes.details,
+        related_delete_errors: relatedRes.errors,
         save_deleted_rows: saveRes.deleted,
         save_delete_attempts: saveRes.details,
         save_delete_errors: saveRes.errors,
