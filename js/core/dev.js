@@ -9,8 +9,8 @@ export function createDevTools({ ui, saves }) {
   }
 
   async function adminCall(op, payload = {}) {
-    // Preferred: wrapper from saves.js (expects (op, payload))
-    if (typeof saves?.adminInvoke === "function") {
+    // Preferred: your existing wrapper (expected signature: (op, payload))
+    if (saves?.adminInvoke) {
       return await saves.adminInvoke(op, payload);
     }
 
