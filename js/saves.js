@@ -14,6 +14,11 @@ const LEADERBOARD_TABLE = "phase_leaderboard";
 
 const CLOUD_SAVE_THROTTLE_MS = 45000;
 
+// Seamless sign-in note:
+// We treat local storage as the always-on "black box" so a player never loses
+// progress if cloud writes are throttled or connectivity is flaky.
+// On sign-in we merge LOCAL + CLOUD and then force-write the merged snapshot.
+
 export function createSaves() {
   const supabase = window.supabase?.createClient?.(SUPABASE_URL, SUPABASE_ANON_KEY) || null;
 
@@ -55,6 +60,85 @@ export function createSaves() {
 
     return out;
   }
+
+  // ----------------------------
+  // Seamless merge helpers
+  // ----------------------------
+  function isObj(x) {
+    return !!x && typeof x === "object" && !Array.isArray(x);
+  }
+
+  function num(x, fallback = 0) {
+    const n = Number(x);
+    return Number.isFinite(n) ? n : fallback;
+  }
+
+  function newerOf(a, b) {
+    const ta = num(a?.meta?.updatedAtMs, 0);
+    const tb = num(b?.meta?.updatedAtMs, 0);
+    return tb > ta ? b : a;
+  }
+
+  // Merge two snapshots so we never lose progress.
+  // NOTE: we assume the game isn't competitive, so "max" merging is OK.
+  function mergeProgress(localState, cloudState) {
+    if (!isObj(localState) && !isObj(cloudState)) return null;
+    if (!isObj(localState)) return sanitizeStateForSave(cloudState);
+    if (!isObj(cloudState)) return sanitizeStateForSave(localState);
+
+    const base = sanitizeStateForSave(newerOf(localState, cloudState));
+    const other = base === localState ? cloudState : localState;
+    const out = sanitizeStateForSave({ ...base });
+
+    // Core currencies / progress
+    out.build = Math.max(1, Math.floor(Math.max(num(out.build, 1), num(other.build, 1))));
+    out.relics = Math.max(num(out.relics, 0), num(other.relics, 0));
+    out.signal = Math.max(num(out.signal, 0), num(other.signal, 0));
+    out.total = Math.max(num(out.total, 0), num(other.total, 0));
+
+    // Phase: never go backwards
+    out.phase = Math.max(0, Math.floor(Math.max(num(out.phase, 0), num(other.phase, 0))));
+
+    // Corruption is more "run state" than "wealth". Prefer the freshest snapshot.
+    const freshest = newerOf(localState, cloudState);
+    out.corruption = num(freshest?.corruption, num(out.corruption, 0));
+
+    // Profile name: keep the most recently set non-empty name.
+    const aName = String(base?.profile?.name || "").trim();
+    const bName = String(other?.profile?.name || "").trim();
+    const picked = (aName || bName || "GUEST").toUpperCase().slice(0, 18);
+    out.profile = { ...(out.profile || {}), name: picked };
+
+    // Upgrades: max each (covers both old economy.js style and newer variants)
+    out.up = { ...(out.up || {}) };
+    const otherUp = other?.up || {};
+    const keys = new Set([...Object.keys(out.up), ...Object.keys(otherUp)]);
+    for (const k of keys) {
+      out.up[k] = Math.max(0, Math.floor(Math.max(num(out.up[k], 0), num(otherUp[k], 0))));
+    }
+
+    // Phase data: shallow merge, freshest keys win.
+    const aPD = isObj(out.phaseData) ? out.phaseData : {};
+    const bPD = isObj(other.phaseData) ? other.phaseData : {};
+    const mergedPD = { ...aPD };
+    for (const [phaseId, bucket] of Object.entries(bPD)) {
+      if (!isObj(bucket)) continue;
+      const have = mergedPD[phaseId];
+      if (!isObj(have)) mergedPD[phaseId] = bucket;
+      else mergedPD[phaseId] = { ...have, ...bucket };
+    }
+    out.phaseData = mergedPD;
+
+    // Meta: keep the newest timestamps.
+    out.meta = { ...(out.meta || {}) };
+    const om = other?.meta || {};
+    out.meta.updatedAtMs = Math.max(num(out.meta.updatedAtMs, 0), num(om.updatedAtMs, 0));
+    out.meta.lastTickMs = Math.max(num(out.meta.lastTickMs, 0), num(om.lastTickMs, 0));
+    out.meta.lastCloudWriteMs = Math.max(num(out.meta.lastCloudWriteMs, 0), num(om.lastCloudWriteMs, 0));
+
+    return out;
+  }
+
   function loadLocal() {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (!raw) return null;
@@ -308,18 +392,51 @@ export function createSaves() {
   }
 
   async function syncOnSignIn(currentState) {
+    // Back-compat: keep the old name, but route through the seamless flow.
+    return await syncSeamless(currentState);
+  }
+
+  // Seamless sign-in sync:
+  // - merges LOCAL + CLOUD snapshots
+  // - force-writes the merged state to cloud so the next session never "reverts"
+  // - always keeps LOCAL current as the safety net
+  async function syncSeamless(currentState) {
+    const localState = loadLocal();
+
+    // Guest mode: still prefer local if it exists.
     if (!supabase || !isSignedIn()) {
-      return { mode: "guest", cloudLoaded: null };
+      const merged = mergeProgress(localState, currentState) || sanitizeStateForSave(currentState);
+      saveLocal(merged);
+      return { mode: "guest", merged, cloudLoaded: null };
     }
 
-    const cloudState = await loadCloud();
-    if (cloudState) {
-      return { mode: "cloud", cloudLoaded: cloudState };
+    let cloudState = null;
+    try {
+      cloudState = await loadCloud();
+    } catch (e) {
+      // Cloud unavailable: fall back to local/current and keep playing.
+      const merged = mergeProgress(localState, currentState) || sanitizeStateForSave(currentState);
+      saveLocal(merged);
+      return { mode: "cloud", merged, cloudLoaded: null, warning: "cloud_unavailable" };
     }
 
-    // No cloud row yet, seed it with current local
-    await saveCloud(currentState, true);
-    return { mode: "cloud", cloudLoaded: null };
+    // Merge local and cloud so we don't lose progress from throttled cloud writes.
+    const merged =
+      mergeProgress(localState, cloudState) ||
+      mergeProgress(localState, currentState) ||
+      sanitizeStateForSave(cloudState || currentState);
+
+    saveLocal(merged);
+
+    // Ensure the cloud is immediately brought up to date.
+    try {
+      await saveCloud(merged, true);
+      _lastCloudSaveAt = Date.now();
+    } catch (e) {
+      // swallow; local is the safety net
+    }
+
+    return { mode: "cloud", merged, cloudLoaded: cloudState };
   }
 
   // ----------------------------
@@ -428,6 +545,7 @@ export function createSaves() {
     saveCloud,
     wipeCloud,
     syncOnSignIn,
+    syncSeamless,
 
     // canonical write
     writeCloudState,

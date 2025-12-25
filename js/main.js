@@ -487,9 +487,9 @@ const syncText = saves.isSignedIn() ? "SYNC: CLOUD" : "SYNC: GUEST";
     authStatusEl: ui.$("authStatus"),
     onSignedIn: async () => {
       ui.pushLog("log", "SYS", "SIGNED IN.");
-      // Prefer cloud if present
-      const cloud = await saves.loadCloud();
-      if (cloud) loadIntoState(cloud);
+      // Seamless sync: merge LOCAL + CLOUD so progress never appears to revert.
+      const sync = await saves.syncSeamless(state);
+      if (sync?.merged) loadIntoState(sync.merged);
 
       // If the player just signed in during Phase 0 onboarding, advance to gameplay.
       if (state.phase === 0) state.phase = 1;
@@ -530,11 +530,10 @@ const syncText = saves.isSignedIn() ? "SYNC: CLOUD" : "SYNC: GUEST";
 
     // Signed in: load cloud as the source of truth (seed if missing).
     try {
-      const cloud = await saves.loadCloud();
-      if (cloud) loadIntoState(cloud);
-      else await saves.saveCloud(state, true);
+      const sync = await saves.syncSeamless(state);
+      if (sync?.merged) loadIntoState(sync.merged);
     } catch (e) {
-      ui.pushLog("log", "SYS", `CLOUD LOAD ERROR: ${e?.message || e}`);
+      ui.pushLog("log", "SYS", `SYNC ERROR: ${e?.message || e}`);
     }
 
     if (state.phase === 0) state.phase = 1;
