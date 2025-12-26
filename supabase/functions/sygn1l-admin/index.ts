@@ -3,6 +3,17 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// --------------------------------------------------
+// CORS
+// --------------------------------------------------
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
+// --------------------------------------------------
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY =
   Deno.env.get("SERVICE_ROLE_KEY") ||
@@ -21,11 +32,20 @@ const supabaseAdmin = createClient(
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...corsHeaders,
+    },
   });
 }
 
+// --------------------------------------------------
 serve(async (req) => {
+  // CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
   try {
     const body = await req.json().catch(() => ({}));
     const op = body?.op;
@@ -36,14 +56,15 @@ serve(async (req) => {
 
     console.log("SYGN1L ADMIN op =", op);
 
-    // ------------------------------------------------------------------
+    // ----------------------------------------------
     // LIST USERS
-    // ------------------------------------------------------------------
+    // ----------------------------------------------
     if (op === "list_users") {
-      const { data, error } = await supabaseAdmin.auth.admin.listUsers({
-        page: 1,
-        perPage: 200,
-      });
+      const { data, error } =
+        await supabaseAdmin.auth.admin.listUsers({
+          page: 1,
+          perPage: 200,
+        });
 
       if (error) {
         console.error("ADMIN list_users failed", error);
@@ -59,9 +80,9 @@ serve(async (req) => {
       });
     }
 
-    // ------------------------------------------------------------------
-    // DELETE USER (FULLY INLINED, NO HELPERS)
-    // ------------------------------------------------------------------
+    // ----------------------------------------------
+    // DELETE USER
+    // ----------------------------------------------
     if (op === "delete_user") {
       const { user_id } = body;
 
@@ -84,24 +105,16 @@ serve(async (req) => {
         cleanup[table.name] = [];
 
         for (const col of table.cols) {
-          try {
-            const { error, count } = await supabaseAdmin
-              .from(table.name)
-              .delete({ count: "exact" })
-              .eq(col, user_id);
+          const { error, count } = await supabaseAdmin
+            .from(table.name)
+            .delete({ count: "exact" })
+            .eq(col, user_id);
 
-            cleanup[table.name].push({
-              column: col,
-              deleted: count ?? 0,
-              error: error?.message ?? null,
-            });
-          } catch (e: any) {
-            cleanup[table.name].push({
-              column: col,
-              deleted: 0,
-              error: e?.message || String(e),
-            });
-          }
+          cleanup[table.name].push({
+            column: col,
+            deleted: count ?? 0,
+            error: error?.message ?? null,
+          });
         }
       }
 
@@ -113,11 +126,7 @@ serve(async (req) => {
       if (authError) {
         console.error("ADMIN auth delete failed", authError);
         return json(
-          {
-            error: "Auth delete failed",
-            authError: authError.message,
-            cleanup,
-          },
+          { error: "Auth delete failed", authError: authError.message, cleanup },
           500
         );
       }
@@ -127,9 +136,6 @@ serve(async (req) => {
       return json({ ok: true, cleanup });
     }
 
-    // ------------------------------------------------------------------
-    // UNKNOWN OP
-    // ------------------------------------------------------------------
     return json({ error: "Unknown op", op }, 400);
   } catch (err: any) {
     console.error("ADMIN function crash", err);
